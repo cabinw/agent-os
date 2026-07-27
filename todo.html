@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent OS — 实施 TODO 与技术栈</title>
+<style>
+:root{
+  --bg:#FCFCFD; --surface:#FFFFFF; --border:#E8EAED;
+  --text:#111827; --muted:#6B7280; --faint:#9CA3AF;
+  --accent:#6366F1; --accent2:#8B5CF6;
+  --ok:#10B981; --warn:#F59E0B; --risk:#EF4444; --info:#3B82F6;
+  --code-bg:#F3F4F6;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#0E1014; --surface:#161A21; --text:#E6E8EB; --muted:#9BA3AF; --faint:#79818C; --border:#252A33; --code-bg:#1B2029; }
+}
+:root[data-theme="dark"]{ --bg:#0E1014; --surface:#161A21; --text:#E6E8EB; --muted:#9BA3AF; --faint:#79818C; --border:#252A33; --code-bg:#1B2029; }
+:root[data-theme="light"]{ --bg:#FCFCFD; --surface:#FFFFFF; --text:#111827; --muted:#6B7280; --faint:#9CA3AF; --border:#E8EAED; --code-bg:#F3F4F6; }
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased;font-size:15px}
+
+.shell{display:grid;grid-template-columns:236px minmax(0,1fr);max-width:1400px;margin:0 auto}
+.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:26px 16px 60px;border-right:1px solid var(--border);font-size:13px}
+.toc-brand{display:flex;align-items:center;gap:9px;margin-bottom:8px;font-weight:650;font-size:15px;letter-spacing:-.01em}
+.toc-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700;flex:none}
+.toc h4{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin:18px 0 6px;font-weight:650}
+.toc a{display:flex;align-items:center;gap:7px;padding:5px 9px;border-radius:6px;color:var(--muted);text-decoration:none;transition:.12s}
+.toc a:hover{background:var(--code-bg);color:var(--text)}
+.toc a.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent);font-weight:550}
+.toc .pc{margin-left:auto;font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.main{padding:0 40px 120px;min-width:0}
+@media(max-width:960px){.shell{grid-template-columns:1fr}.toc{display:none}.main{padding:0 18px 80px}}
+
+section{padding-top:50px;scroll-margin-top:14px}
+h1{font-size:34px;font-weight:700;letter-spacing:-.025em;line-height:1.2}
+h2{font-size:24px;font-weight:680;letter-spacing:-.02em;margin-bottom:6px;padding-bottom:11px;border-bottom:1px solid var(--border)}
+h3{font-size:17px;font-weight:640;margin:28px 0 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+p{margin:11px 0}
+.lede{font-size:16.5px;color:var(--muted);line-height:1.7}
+.eyebrow{font-size:11px;font-weight:680;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:9px}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.87em;background:var(--code-bg);padding:.14em .42em;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--border);border-radius:10px;padding:15px 17px;overflow-x:auto;margin:14px 0}
+pre code{background:none;padding:0;font-size:12.5px;line-height:1.6}
+ul,ol{margin:11px 0 11px 22px}li{margin:4px 0}
+strong{font-weight:640}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;display:block;overflow-x:auto}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+th{font-weight:640;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);white-space:nowrap}
+td code{white-space:nowrap}
+.note{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 5%,transparent);padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0;font-size:14px}
+.note.warn{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+.note.risk{border-color:var(--risk);background:color-mix(in srgb,var(--risk) 6%,transparent)}
+
+.hero{padding:60px 0 6px}
+.progress-wrap{margin:26px 0 0;border:1px solid var(--border);border-radius:14px;padding:18px 20px;background:var(--surface)}
+.progress-top{display:flex;align-items:baseline;gap:10px;margin-bottom:11px}
+.progress-top .n{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.progress-top .l{font-size:13px;color:var(--muted)}
+.progress-top .rs{margin-left:auto;font-size:12px;color:var(--faint);cursor:pointer;border:1px solid var(--border);padding:4px 11px;border-radius:7px;background:none;font-family:inherit}
+.pbar{height:8px;border-radius:5px;background:var(--code-bg);overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s ease}
+.phase-mini{display:flex;gap:5px;margin-top:12px;flex-wrap:wrap}
+.phase-mini span{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid var(--border);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* decision cards */
+.dec{border:1px solid var(--border);border-radius:12px;padding:15px 17px;margin:12px 0;background:var(--surface)}
+.dec .dh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:7px}
+.dec .dt{font-size:12px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.dec .dv{font-size:15.5px;font-weight:660}
+.dec .dv code{font-size:14px;background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+.dec p{margin:5px 0;font-size:13.5px;color:var(--muted)}
+.dec p b{color:var(--text);font-weight:620}
+.rej{font-size:12.5px;color:var(--faint);margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)}
+.rej b{color:var(--muted)}
+
+/* checklist */
+.tasks{list-style:none;margin:10px 0 0;padding:0}
+.tasks li{display:flex;gap:11px;padding:11px 12px;border-radius:9px;align-items:flex-start;border:1px solid transparent;transition:.12s}
+.tasks li:hover{background:var(--code-bg)}
+.tasks li.done{opacity:.5}
+.tasks li.done .tt{text-decoration:line-through}
+.tasks input[type=checkbox]{appearance:none;width:17px;height:17px;border:1.6px solid var(--faint);border-radius:5px;flex:none;margin-top:3px;cursor:pointer;position:relative;transition:.12s;background:var(--surface)}
+.tasks input[type=checkbox]:hover{border-color:var(--accent)}
+.tasks input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+.tasks input[type=checkbox]:checked::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}
+.tb{flex:1;min-width:0}
+.tt{font-size:14.5px;font-weight:580;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tid{font-family:var(--mono);font-size:11px;color:var(--faint);flex:none}
+.td{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.55}
+.td b{color:var(--text);font-weight:600}
+.tm{display:flex;gap:7px;margin-top:5px;flex-wrap:wrap;align-items:center}
+.tag{font-size:10.5px;padding:2px 8px;border-radius:5px;font-weight:560;background:var(--code-bg);color:var(--muted);white-space:nowrap}
+.tag.pkg{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+.tag.crit{background:color-mix(in srgb,var(--risk) 12%,transparent);color:var(--risk)}
+.tag.dep{background:color-mix(in srgb,var(--warn) 13%,transparent);color:#B45309}
+@media (prefers-color-scheme:dark){.tag.dep{color:#FBBF24}}
+.tag.sz{border:1px solid var(--border);background:none}
+.done-when{font-size:12.5px;color:var(--faint);margin-top:4px}
+.done-when b{color:var(--muted);font-weight:600}
+
+.phase-hd{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-top:34px}
+.phase-hd h3{margin:0}
+.badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:620}
+.badge.now{background:color-mix(in srgb,var(--ok) 14%,transparent);color:#059669}
+.badge.next{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
+.badge.later{background:var(--code-bg);color:var(--muted)}
+.phase-count{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.phase-goal{font-size:13.5px;color:var(--muted);margin:6px 0 4px}
+
+.toggle{position:fixed;top:14px;right:16px;z-index:50;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:9px;padding:6px 11px;font-size:12px;cursor:pointer;font-family:inherit}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:13px;margin:16px 0}
+.tile{border:1px solid var(--border);border-radius:12px;padding:15px 17px;background:var(--surface)}
+.tile h4{font-size:14.5px;font-weight:640;margin-bottom:5px}
+.tile p{margin:0;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="tg">◐ 主题</button>
+
+<div class="shell">
+<nav class="toc">
+  <div class="toc-brand"><span class="toc-mark">◈</span> 实施 TODO</div>
+  <h4>决策</h4>
+  <a href="#ask">① 需要你拍板</a>
+  <a href="#stack">② 技术栈选型</a>
+  <a href="#arch-notes">③ 四个关键判断</a>
+  <h4>清单</h4>
+  <a href="#p0">Phase 0 地基<span class="pc" data-pc="p0"></span></a>
+  <a href="#p1">Phase 1 核心循环<span class="pc" data-pc="p1"></span></a>
+  <a href="#p2">Phase 2 记忆<span class="pc" data-pc="p2"></span></a>
+  <a href="#p3">Phase 3 界面<span class="pc" data-pc="p3"></span></a>
+  <a href="#p4">Phase 4 复活/画布<span class="pc" data-pc="p4"></span></a>
+  <a href="#p5">Phase 5 多智能体<span class="pc" data-pc="p5"></span></a>
+  <h4>执行</h4>
+  <a href="#week1">第一周做什么</a>
+  <a href="#risk">风险与坑</a>
+</nav>
+
+<main class="main">
+
+<div class="hero">
+  <div class="eyebrow">从规格到代码</div>
+  <h1>实施 TODO</h1>
+  <p class="lede" style="margin-top:12px;max-width:640px">当前状态：31 份规格、5 条 ADR、0 行代码。这份清单把规格翻译成可勾选的工程任务，并给出技术栈选型及其理由。勾选状态保存在浏览器本地。</p>
+
+  <div class="progress-wrap">
+    <div class="progress-top">
+      <span class="n" id="pctNum">0%</span>
+      <span class="l"><b id="doneNum">0</b> / <span id="totalNum">0</span> 项完成</span>
+      <button class="rs" id="reset">清空进度</button>
+    </div>
+    <div class="pbar"><i id="pbar" style="width:0%"></i></div>
+    <div class="phase-mini" id="phaseMini"></div>
+  </div>
+</div>
+
+<!-- ===================== 需要拍板 ===================== -->
+<section id="ask">
+<h2>① 需要你拍板的四件事</h2>
+<p>其余选型我按项目约束直接定了（见下一节）。这四个的答案会改变实际要写的代码，所以先问你。</p>
+
+<div class="dec">
+  <div class="dh"><span class="dt">决策 A</span><span class="dv">桌面外壳：Tauri 还是 SwiftUI？</span></div>
+  <p>我推荐 <b>Tauri 2</b>，理由在下一节。但如果你对「macOS 原生手感」的要求高于一切，SwiftUI 是更好的答案——代价是<b>必须在 Swift 里重新实现一遍 reducer</b>，这直接违反 ADR-005 的单一事实来源。这个取舍只有你能定。</p>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">决策 B</span><span class="dv">单机，还是从一开始就考虑多人？</span></div>
+  <p>我按<b>单机桌面应用</b>设计的（SQLite、本地事件日志、无服务端）。如果半年内要做多人协作，事件存储层的抽象要不一样——现在多花两天，比之后改内核便宜得多。</p>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">决策 C</span><span class="dv">Supervisor 的成本档位</span></div>
+  <p>目标拆解和记忆摘要都要调 LLM。我默认 <code>claude-opus-5</code> + <code>effort: "high"</code>（拆解质量直接决定整个系统的输出质量）。如果要压成本，记忆摘要那条链路可以降到 <code>medium</code>——但拆解不建议动。</p>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">决策 D</span><span class="dv">要不要 CI？</span></div>
+  <p>Phase 0 里我放了 GitHub Actions。如果这是个人项目、你只在本机跑，可以砍掉省半天；但<b>重放测试</b>那条最好留着——它是防止 reducer 悄悄改变历史状态的唯一保险。</p>
+</div>
+</section>
+
+<!-- ===================== 技术栈 ===================== -->
+<section id="stack">
+<h2>② 技术栈选型</h2>
+<p>每一项都写了被否决的替代方案。规格里的约束（尤其是 ADR-004 和 ADR-005）淘汰掉了不少看起来更顺手的选择。</p>
+
+<h3>核心</h3>
+
+<div class="dec">
+  <div class="dh"><span class="dt">语言</span><span class="dv"><code>TypeScript</code> · Node 22+</span></div>
+  <p><b>为什么：</b>MCP 官方 SDK 在 TS 上是一等公民；更重要的是 ADR-005 规定 UI 是 reducer 的投影——UI 和内核用同一种语言，reducer 只写一遍，类型直接共享。</p>
+  <div class="rej"><b>否决 Swift：</b>原生手感最好，但领域模型和 reducer 要在 Swift 里重写一遍，两份实现迟早分叉。<b>否决 Rust：</b>做内核很合适，但适配器生态和迭代速度不划算，而且逼着 UI 走 IPC。</div>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">桌面外壳</span><span class="dv"><code>Tauri 2</code></span></div>
+  <p><b>为什么：</b>三个硬需求同时满足——原生菜单栏挂件（规格里是对等界面，不是快捷方式）、原生窗口 chrome、UI 用 TS 从而与 packages 共享事件类型。体积约 10MB。</p>
+  <p><b>诚实的代价：</b>Tauri 的 UI 层是 WebView。设计语言里写的「macOS 原生质感」会变成<b>设计工作</b>，而不是白拿的东西——滚动惯性、控件手感都得自己调。</p>
+  <div class="rej"><b>否决 Electron：</b>能力相同但 150MB 起步，没有换来任何优势。<b>否决 SwiftUI：</b>见决策 A。</div>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">事件存储</span><span class="dv"><code>SQLite</code> · better-sqlite3 · WAL</span></div>
+  <p><b>为什么：</b>append-only 表 + 项目内单调 <code>seq</code> + 独立快照表，正好是 event-core 需要的全部。同步 API 让 reducer 保持纯函数（异步 reducer 会毁掉重放的确定性）。WAL 模式解决崩溃恢复。</p>
+  <div class="rej"><b>否决 Postgres：</b>桌面产品不该要求用户装数据库。<b>否决纯文件追加：</b>排序、幂等、崩溃恢复全要自己实现，等于重写一个更差的 SQLite。</div>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">边界校验</span><span class="dv"><code>Zod</code> · <code>.strict()</code></span></div>
+  <p><b>为什么：</b>规格明确写了「未知字段是<b>拒绝</b>而不是忽略」。<code>.strict()</code> 就是这一条的直接实现，不用自己写校验器。同一份 schema 还能推导出 TS 类型和 MCP 工具的 JSON Schema。</p>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">ID</span><span class="dv"><code>ULID</code></span></div>
+  <p><b>为什么：</b>规格示例里的 <code>evt_01H...</code> 本身就是 ULID 前缀。可按时间排序、无需协调、26 字符。</p>
+  <div class="rej"><b>否决 UUIDv4：</b>不可排序，事件日志里是明确的劣势。</div>
+</div>
+
+<h3>协议与智能体</h3>
+
+<div class="dec">
+  <div class="dh"><span class="dt">MCP</span><span class="dv"><code>@modelcontextprotocol/sdk</code></span></div>
+  <p>stdio（本地进程智能体）+ Streamable HTTP（远程）两种 transport 都要支持。ADR-001 决定了这是唯一入口。</p>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">LLM SDK</span><span class="dv"><code>@anthropic-ai/sdk</code> · <code>claude-opus-5</code></span></div>
+  <p>用于 Supervisor 的目标拆解、记忆摘要、脉冲头条生成。开 <code>thinking: { type: "adaptive" }</code>，拆解用 <code>effort: "high"</code>。</p>
+  <p><b>注意：</b>这是 Agent OS <b>自己</b>调的模型，和「通过 MCP 接入的外部智能体」是两回事——后者永远不在核心代码里出现厂商名（ADR-004）。</p>
+</div>
+
+<div class="dec">
+  <div class="dh"><span class="dt">Supervisor 循环</span><span class="dv">Tool Runner，<b>不是</b> Managed Agents</span></div>
+  <p><b>为什么这个区分重要：</b>Managed Agents 会把 agent loop 和会话状态放在 Anthropic 侧。而 ADR-005 要求<b>事件是唯一可写对象、状态必须能从本地日志重放</b>。把循环托管出去，Agent OS 就失去了对自己事实来源的所有权。</p>
+  <p>用 <code>client.beta.messages.toolRunner</code>：SDK 提供循环，状态留在我们的日志里。它的 per-turn hook 正好是<b>审批闸门</b>的落点——在工具真正执行前拦下来等人。</p>
+</div>
+
+<h3>工程</h3>
+
+<table>
+<tr><th>领域</th><th>选型</th><th>理由 / 否决的替代</th></tr>
+<tr><td>Monorepo</td><td><code>pnpm workspaces</code> + TS project references</td><td>5 个包，Turborepo 现在是过度工程。等构建慢了再加，不会白干</td></tr>
+<tr><td>构建</td><td><code>tsup</code></td><td>零配置输出 ESM + d.ts，够用</td></tr>
+<tr><td>测试</td><td><code>Vitest</code> + 自建重放 harness</td><td>重放 harness 是自己写的，别的框架不提供</td></tr>
+<tr><td>Lint/Format</td><td><code>Biome</code></td><td>一个工具替代 ESLint + Prettier，快一个数量级</td></tr>
+<tr><td>UI 框架</td><td><code>React</code> + Vite</td><td>Tauri 生态最成熟的一条路</td></tr>
+<tr><td>样式</td><td>CSS 变量 + CSS Modules</td><td>design-language.md 的 token 是权威，直接落成 <code>:root</code> 变量。<b>否决 Tailwind：</b>会诱导在 class 里写死数值，绕过 token</td></tr>
+<tr><td>UI 状态</td><td>订阅 reducer 输出</td><td><b>不引入 Redux/Zustand 管领域状态</b>——那会造出第二个事实来源。仅局部视图状态（展开/折叠）用 useState</td></tr>
+<tr><td>i18n</td><td>类型化 JSON catalog + <code>t()</code></td><td>规格要求 day one 外部化。7 个界面用不着 i18next</td></tr>
+<tr><td>图表</td><td>手写 SVG</td><td>脉冲里的图表都很简单，引图表库不划算</td></tr>
+</table>
+
+<h3>目标目录</h3>
+<pre><code>agent-os/
+├── apps/macos/              Tauri 壳 + React UI
+│   ├── src-tauri/           Rust：窗口、tray、菜单栏挂件
+│   └── src/                 React：七个界面
+├── packages/
+│   ├── event-core/          内核（无 UI、无厂商依赖）
+│   ├── task-engine/         生命周期、依赖、能力路由
+│   ├── memory-core/         知识抽取
+│   ├── agent-sdk/           适配器（唯一允许出现厂商名的层）
+│   └── mcp-server/          v0.3 工具 + 校验 + 授权
+├── docs/  ui/  tests/
+└── pnpm-workspace.yaml</code></pre>
+<p class="lede" style="font-size:14px">注意 Tauri 会引入 Rust——但只在 <code>src-tauri/</code>，用于窗口和 tray，不碰领域逻辑。这是可以接受的边界。</p>
+</section>
+
+<!-- ===================== 关键判断 ===================== -->
+<section id="arch-notes">
+<h2>③ 四个容易做错的关键判断</h2>
+
+<div class="grid2">
+  <div class="tile">
+    <h4>1. 先写 reducer，再写 UI</h4>
+    <p>顺序反了，UI 一定会自己发明状态字段，然后你会为了迁就它在内核里加表。Phase 1 全程无 UI 是刻意的。</p>
+  </div>
+  <div class="tile">
+    <h4>2. 状态转移矩阵要穷举测试</h4>
+    <p>8 个状态 × 10 个事件 = 80 个格子，小到可以全测。<b>非法转移被拒绝</b>的用例比合法路径更重要——它是防止生命周期再次漂移的唯一保险。</p>
+  </div>
+  <div class="tile">
+    <h4>3. 审批闸门要在最早期落地</h4>
+    <p>它在 Phase 3 的清单里，但闸门的<b>接口</b>要在 Phase 1 的 MCP Server 就留好。事后加一道能阻塞调用方的闸门，比一开始就留位置贵得多。</p>
+  </div>
+  <div class="tile">
+    <h4>4. 别让 provider 泄进内核</h4>
+    <p>写完 Phase 1 时跑一次：<code>grep -rE 'openai|anthropic' packages/event-core packages/task-engine</code>。有命中就说明抽象漏了。这条可以做成 CI 检查。</p>
+  </div>
+</div>
+</section>
+
+<!-- ===================== 清单 ===================== -->
+<section id="p0">
+<h2>实施清单</h2>
+<p class="lede">每项带：所属包 · 依赖 · 粗略规模 · 完成判据。<code>关键路径</code> 标记的是卡住别人的任务。</p>
+
+<div class="phase-hd">
+  <h3 id="p0h">Phase 0 — 工程地基</h3>
+  <span class="badge now">现在做</span>
+  <span class="phase-count" data-count="p0"></span>
+</div>
+<p class="phase-goal">roadmap 里没有这一阶段，但没有它 Phase 1 无处落脚。预计 1–2 天。</p>
+
+<ul class="tasks" data-phase="p0">
+  <li><input type="checkbox" id="t-0-1"><label for="t-0-1" class="tb">
+    <span class="tt"><span class="tid">0.1</span>pnpm workspace + 五个空包骨架</span>
+    <span class="td"><code>pnpm-workspace.yaml</code>、根 <code>tsconfig.base.json</code>、每个包的 <code>package.json</code> + <code>tsconfig.json</code>（用 project references 表达依赖方向）。</span>
+    <span class="tm"><span class="tag crit">关键路径</span><span class="tag sz">半天</span></span>
+    <span class="done-when"><b>完成判据：</b><code>pnpm -r build</code> 通过；在 event-core 里 import mcp-server 会被 TS 报错</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-0-2"><label for="t-0-2" class="tb">
+    <span class="tt"><span class="tid">0.2</span>Vitest + Biome + <code>.gitignore</code></span>
+    <span class="td">仓库现在<b>连 .gitignore 都没有</b>。至少要有 <code>node_modules/</code>、<code>dist/</code>、<code>.DS_Store</code>、<code>.claude/</code>、<code>target/</code>。</span>
+    <span class="tm"><span class="tag sz">2 小时</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-0-3"><label for="t-0-3" class="tb">
+    <span class="tt"><span class="tid">0.3</span>CI：build + test + 分层检查</span>
+    <span class="td">GitHub Actions。除了常规 build/test，加一条 <b>grep 检查</b>：<code>event-core</code> 和 <code>task-engine</code> 里不得出现任何厂商名字符串（ADR-004）。</span>
+    <span class="tm"><span class="tag dep">依赖 0.1</span><span class="tag sz">半天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-0-4"><label for="t-0-4" class="tb">
+    <span class="tt"><span class="tid">0.4</span>更新 CLAUDE.md 的「无构建命令」段落</span>
+    <span class="td">那一段现在写着「没有构建/测试命令，不要编造」。工具链落地后要换成真实命令，否则未来的 agent 会继续以为这是纯文档仓库。</span>
+    <span class="tm"><span class="tag sz">10 分钟</span></span>
+  </label></li>
+</ul>
+</section>
+
+<section id="p1">
+<div class="phase-hd">
+  <h3>Phase 1 — 核心循环（无 UI）</h3>
+  <span class="badge next">接着做</span>
+  <span class="phase-count" data-count="p1"></span>
+</div>
+<p class="phase-goal">目标：headless 跑通完整运行循环。<b>刻意不做任何界面</b>。预计 3–4 周。</p>
+
+<ul class="tasks" data-phase="p1">
+  <li><input type="checkbox" id="t-1-1"><label for="t-1-1" class="tb">
+    <span class="tt"><span class="tid">1.1</span>事件信封类型 + Zod schema + ULID</span>
+    <span class="td">按 <code>event-core.md</code> 的信封：<code>id / type / seq / project / actor / subject / at / causedBy / payload</code>。事件目录里的 22 个类型各写一个 payload schema，用 discriminated union 收口。</span>
+    <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag sz">2 天</span></span>
+    <span class="done-when"><b>完成判据：</b>未知 <code>type</code> 或多余字段在解析时被拒绝</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-2"><label for="t-1-2" class="tb">
+    <span class="tt"><span class="tid">1.2</span>SQLite 事件存储：append-only + 幂等</span>
+    <span class="td"><code>seq</code> 在事务内分配保证项目内单调。client token 做唯一索引——重试返回原事件而不是插入新的。持久化成功后才向生产者确认。</span>
+    <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.1</span><span class="tag sz">3 天</span></span>
+    <span class="done-when"><b>完成判据：</b>并发 append 不产生重复 seq；同一 token 重试两次只落一条</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-3"><label for="t-1-3" class="tb">
+    <span class="tt"><span class="tid">1.3</span>事件总线 + 重放 + reducer 注册</span>
+    <span class="td"><code>append / subscribe / replay / registerReducer</code>。reducer 是纯函数 <code>(state, event) =&gt; state</code>，<b>必须同步</b>——异步会毁掉重放的确定性。</span>
+    <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.2</span><span class="tag sz">2 天</span></span>
+    <span class="done-when"><b>完成判据：</b>从 seq 0 重放整条日志，得到与增量归约完全一致的状态</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-4"><label for="t-1-4" class="tb">
+    <span class="tt"><span class="tid">1.4</span>快照与恢复</span>
+    <span class="td">每 N 条事件写一次状态快照；启动时加载最新快照 + 重放尾部。快照是缓存，删掉必须不丢数据。</span>
+    <span class="tm"><span class="tag pkg">event-core</span><span class="tag dep">依赖 1.3</span><span class="tag sz">2 天</span></span>
+    <span class="done-when"><b>完成判据：</b>删除所有快照后重启，状态不变</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-5"><label for="t-1-5" class="tb">
+    <span class="tt"><span class="tid">1.5</span>任务状态转移矩阵 + 穷举测试</span>
+    <span class="td">ADR-002 的八个状态。<b>先写测试再写实现</b>：8 状态 × 10 事件全表覆盖，非法转移必须被拒绝而不是被纠正。</span>
+    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.3</span><span class="tag sz">2 天</span></span>
+    <span class="done-when"><b>完成判据：</b>80 个格子全覆盖；<code>progress: 100</code> 不引发任何转移</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-6"><label for="t-1-6" class="tb">
+    <span class="tt"><span class="tid">1.6</span>依赖图 + 环检测 + 就绪重算</span>
+    <span class="td">有未满足 <code>dependsOn</code> 的任务不能离开 <code>created</code>。依赖完成时重算就绪集。创建时拒绝成环。</span>
+    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag dep">依赖 1.5</span><span class="tag sz">2 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-7"><label for="t-1-7" class="tb">
+    <span class="tt"><span class="tid">1.7</span>能力路由 + 智能体注册表</span>
+    <span class="td">只读 <code>capabilities</code>，按（能力匹配度、当前负载、历史结果）排序。饱和的智能体退出匹配。<b>无人具备某能力时任务显式浮出</b>，不静默滞留。</span>
+    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.5</span><span class="tag sz">3 天</span></span>
+    <span class="done-when"><b>完成判据：</b>代码里搜不到任何 provider 字符串；换厂商只是换一次注册</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-8"><label for="t-1-8" class="tb">
+    <span class="tt"><span class="tid">1.8</span>MCP Server：11 个工具 + strict 校验</span>
+    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。</span>
+    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.7</span><span class="tag sz">4 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-9"><label for="t-1-9" class="tb">
+    <span class="tt"><span class="tid">1.9</span>授权边界：智能体不能做的三件事</span>
+    <span class="td">不能直接写事件、不能设置任务状态、不能批准任何请求（包括别的智能体的）。这三条要有独立测试——它们是信任边界的全部内容。</span>
+    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.8</span><span class="tag sz">2 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-10"><label for="t-1-10" class="tb">
+    <span class="tt"><span class="tid">1.10</span>审批闸门接口（占位实现）</span>
+    <span class="td">Phase 3 才做 UI，但<b>现在就要留好能阻塞调用方的接口</b>。此阶段用 CLI 提示代替界面。超时发 <code>approval.expired</code>，绝不自动放行。</span>
+    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.9</span><span class="tag sz">2 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-11"><label for="t-1-11" class="tb">
+    <span class="tt"><span class="tid">1.11</span>Agent SDK + 第一个适配器</span>
+    <span class="td"><code>register / receiveTask / reportProgress / reportResult / sendEvent</code>。另外验证一个<b>已经会说 MCP 的智能体零适配器直连</b>——这是 ADR-001 的验收点。</span>
+    <span class="tm"><span class="tag pkg">agent-sdk</span><span class="tag dep">依赖 1.8</span><span class="tag sz">3 天</span></span>
+    <span class="done-when"><b>完成判据：</b>两个不同厂商的智能体执行同一类任务，核心代码零改动</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-12"><label for="t-1-12" class="tb">
+    <span class="tt"><span class="tid">1.12</span>Supervisor：目标拆解成任务图</span>
+    <span class="td"><code>claude-opus-5</code> + adaptive thinking + <code>effort: "high"</code>，用 structured outputs 约束成任务图 schema（带 <code>requires</code> 能力和 <code>dependsOn</code>）。<b>拆解时选中某方案就要写一条决策进记忆</b>。</span>
+    <span class="tm"><span class="tag pkg">supervisor</span><span class="tag dep">依赖 1.7</span><span class="tag sz">4 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-1-13"><label for="t-1-13" class="tb">
+    <span class="tt"><span class="tid">1.13</span>端到端 demo 脚本</span>
+    <span class="td">目标 → 拆解 → 按能力路由 → 执行 → 进度 → 结果 → 验收 → 状态更新。<b>断言写在事件日志上</b>，不是截图。</span>
+    <span class="tm"><span class="tag crit">Phase 1 验收</span><span class="tag dep">依赖 1.1–1.12</span><span class="tag sz">2 天</span></span>
+  </label></li>
+</ul>
+</section>
+
+<section id="p2">
+<div class="phase-hd">
+  <h3>Phase 2 — 记忆</h3>
+  <span class="badge later">之后</span>
+  <span class="phase-count" data-count="p2"></span>
+</div>
+<p class="phase-goal">这里是产品和任务追踪器分道扬镳的地方。<b>不要为了赶 UI 推迟它</b>——Phase 4 的复活模式完全建立在它之上。预计 2–3 周。</p>
+
+<ul class="tasks" data-phase="p2">
+  <li><input type="checkbox" id="t-2-1"><label for="t-2-1" class="tb">
+    <span class="tt"><span class="tid">2.1</span>知识项模型 + 抽取触发规则</span>
+    <span class="td">六种类型。关键是<b>筛选规则</b>：哪些事件承载知识（决策、结果、研究、讨论、已解除的阻塞），哪些是噪音。</span>
+    <span class="tm"><span class="tag pkg">memory-core</span><span class="tag sz">2 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-2-2"><label for="t-2-2" class="tb">
+    <span class="tt"><span class="tid">2.2</span>摘要管线：窗口化 + 因果上下文</span>
+    <span class="td">对一<b>批相关事件</b>做摘要，不是单条——否则产出读起来像日志行而不是结论。每个知识项必须带 <code>sourceEvents</code>。</span>
+    <span class="tm"><span class="tag pkg">memory-core</span><span class="tag dep">依赖 2.1</span><span class="tag sz">4 天</span></span>
+    <span class="done-when"><b>完成判据：</b>任何一句结论都能回溯到产生它的事件</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-2-3"><label for="t-2-3" class="tb">
+    <span class="tt"><span class="tid">2.3</span>覆盖机制（supersedes）</span>
+    <span class="td">知识不修改。新决策指向旧的，旧的仍可读。「曾经这么做，第 N 月改了，原因是……」要是一等查询。</span>
+    <span class="tm"><span class="tag pkg">memory-core</span><span class="tag dep">依赖 2.1</span><span class="tag sz">2 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-2-4"><label for="t-2-4" class="tb">
+    <span class="tt"><span class="tid">2.4</span><code>get_context</code>：把决策注入智能体</span>
+    <span class="td">智能体开工前拿到约束它的那些决策，从而不重新讨论已定的问题。<b>这是整个协议存在的理由</b>，别做成可选项。</span>
+    <span class="tm"><span class="tag pkg">memory-core</span><span class="tag crit">关键</span><span class="tag dep">依赖 2.2</span><span class="tag sz">3 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-2-5"><label for="t-2-5" class="tb">
+    <span class="tt"><span class="tid">2.5</span><code>query_memory</code> + 图 API</span>
+    <span class="td">按类型/时间/关联查询；图的边由事件的 <code>causedBy</code> 生成，不手工维护。</span>
+    <span class="tm"><span class="tag pkg">memory-core</span><span class="tag dep">依赖 2.3</span><span class="tag sz">3 天</span></span>
+  </label></li>
+</ul>
+</section>
+
+<section id="p3">
+<div class="phase-hd">
+  <h3>Phase 3 — 人的界面</h3>
+  <span class="badge later">之后</span>
+  <span class="phase-count" data-count="p3"></span>
+</div>
+<p class="phase-goal">此时 reducer 已经存在，UI 只能是投影，没有发明状态的机会。预计 4–6 周。</p>
+
+<ul class="tasks" data-phase="p3">
+  <li><input type="checkbox" id="t-3-1"><label for="t-3-1" class="tb">
+    <span class="tt"><span class="tid">3.1</span>Tauri 壳 + 七项导航 + design token</span>
+    <span class="td">把 <code>design-language.md</code> 的 token 落成 CSS 变量文件——<b>这个文件是权威</b>，组件里不许出现字面色值。导航按 ADR-003 的七项。</span>
+    <span class="tm"><span class="tag pkg">apps/macos</span><span class="tag crit">关键路径</span><span class="tag sz">1 周</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-3-2"><label for="t-3-2" class="tb">
+    <span class="tt"><span class="tid">3.2</span>i18n 骨架（zh-CN / en）</span>
+    <span class="td">规格要求 day one 外部化。<b>先做，再写界面</b>——事后把字面量抠出来的代价高十倍。</span>
+    <span class="tm"><span class="tag pkg">apps/macos</span><span class="tag dep">依赖 3.1</span><span class="tag sz">2 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-3-3"><label for="t-3-3" class="tb">
+    <span class="tt"><span class="tid">3.3</span>项目脉冲</span>
+    <span class="td">KPI 行、头条（按<b>后果严重性</b>排序而非时间）、六张卡。每个数字都要能点进去看到底层事件。</span>
+    <span class="tm"><span class="tag pkg">apps/macos</span><span class="tag dep">依赖 3.1</span><span class="tag sz">1.5 周</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-3-4"><label for="t-3-4" class="tb">
+    <span class="tt"><span class="tid">3.4</span>审批闸门 UI + 菜单栏挂件</span>
+    <span class="td">替换 1.10 的 CLI 占位。<b>不可逆动作在菜单栏里不可决定</b>，只给「在应用中查看」。驳回必须带理由。图标只在有待审批/阻塞时变化。</span>
+    <span class="tm"><span class="tag pkg">apps/macos</span><span class="tag crit">关键</span><span class="tag dep">依赖 3.1 · 1.10</span><span class="tag sz">1.5 周</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-3-5"><label for="t-3-5" class="tb">
+    <span class="tt"><span class="tid">3.5</span>项目库 + 项目详情</span>
+    <span class="td">状态筛选、项目行五列、右侧详情抽屉（五个 tab）。项目洞察条可以先留空。</span>
+    <span class="tm"><span class="tag pkg">apps/macos</span><span class="tag dep">依赖 3.1</span><span class="tag sz">1.5 周</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-3-6"><label for="t-3-6" class="tb">
+    <span class="tt"><span class="tid">3.6</span>任务视图 + 智能体视图</span>
+    <span class="td">任务列表要能直观呈现「100% 但仍是 review」和「无人具备能力所以未指派」这两种状态。智能体视图带能力覆盖表（Runtime 已折叠进来）。</span>
+    <span class="tm"><span class="tag pkg">apps/macos</span><span class="tag dep">依赖 3.1</span><span class="tag sz">1 周</span></span>
+  </label></li>
+</ul>
+</section>
+
+<section id="p4">
+<div class="phase-hd">
+  <h3>Phase 4 — 复活与画布</h3>
+  <span class="badge later">之后</span>
+  <span class="phase-count" data-count="p4"></span>
+</div>
+<p class="phase-goal">如果 Phase 2 做扎实了，复活模式基本上只是一次查询。预计 3–4 周。</p>
+
+<ul class="tasks" data-phase="p4">
+  <li><input type="checkbox" id="t-4-1"><label for="t-4-1" class="tb">
+    <span class="tt"><span class="tid">4.1</span>复活报告 + 重启计划</span>
+    <span class="td">六个部分全部从既有事件和知识查询得出，<b>不采集任何新数据</b>。计划每步带时间估算和 ▶ 转任务。</span>
+    <span class="tm"><span class="tag pkg">memory-core + UI</span><span class="tag dep">依赖 2.4 · 3.5</span><span class="tag sz">1 周</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-4-2"><label for="t-4-2" class="tb">
+    <span class="tt"><span class="tid">4.2</span>失效推测标注</span>
+    <span class="td">依赖新版本、API 弃用、凭据过期标为<b>可能已失效</b>而不是断言已坏。第一步「环境检查」的作用就是把推测变成事实。</span>
+    <span class="tm"><span class="tag dep">依赖 4.1</span><span class="tag sz">3 天</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-4-3"><label for="t-4-3" class="tb">
+    <span class="tt"><span class="tid">4.3</span>项目快照捕获 + 胶片条</span>
+    <span class="td"><code>project.snapshot.captured</code>。何时自动截图是个产品判断——建议锚定在里程碑完成事件上。</span>
+    <span class="tm"><span class="tag dep">依赖 3.5</span><span class="tag sz">1 周</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-4-4"><label for="t-4-4" class="tb">
+    <span class="tt"><span class="tid">4.4</span>画布三个缩放级别</span>
+    <span class="td">边由 <code>causedBy</code> 生成。缩放改变的是<b>细节层级</b>而不只是比例。已完成分支降低不透明度。</span>
+    <span class="tm"><span class="tag dep">依赖 3.1</span><span class="tag sz">1.5 周</span></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-4-5"><label for="t-4-5" class="tb">
+    <span class="tt"><span class="tid">4.5</span>记忆内的知识图谱视图切换</span>
+    <span class="td">按 ADR-003，图是记忆的一种渲染，不是独立目的地。列表/图谱是一等切换控件。</span>
+    <span class="tm"><span class="tag dep">依赖 2.5</span><span class="tag sz">1 周</span></span>
+  </label></li>
+</ul>
+</section>
+
+<section id="p5">
+<div class="phase-hd">
+  <h3>Phase 5 — 多智能体深度</h3>
+  <span class="badge later">最后</span>
+  <span class="phase-count" data-count="p5"></span>
+</div>
+<p class="phase-goal">刻意排在最后：这几项只有在日志、记忆、审批闸门都可信之后才有意义。</p>
+
+<ul class="tasks" data-phase="p5">
+  <li><input type="checkbox" id="t-5-1"><label for="t-5-1" class="tb">
+    <span class="tt"><span class="tid">5.1</span>智能体协商</span>
+    <span class="td">两个智能体在改变架构的问题上分歧时的解决协议（当前是直接升级给人）。</span>
+    <span class="tm"><span class="tag sz">未估</span></span>
+  </label></li>
+  <li><input type="checkbox" id="t-5-2"><label for="t-5-2" class="tb">
+    <span class="tt"><span class="tid">5.2</span>多智能体规划提案</span>
+    <span class="td">Supervisor 之外的智能体也能提出计划修改。</span>
+    <span class="tm"><span class="tag sz">未估</span></span>
+  </label></li>
+  <li><input type="checkbox" id="t-5-3"><label for="t-5-3" class="tb">
+    <span class="tt"><span class="tid">5.3</span>自主任务路由</span>
+    <span class="td">运行时自行调整分配，无需 Supervisor 介入。</span>
+    <span class="tm"><span class="tag sz">未估</span></span>
+  </label></li>
+  <li><input type="checkbox" id="t-5-4"><label for="t-5-4" class="tb">
+    <span class="tt"><span class="tid">5.4</span>智能体性能分析</span>
+    <span class="td">按能力维度的历史表现，反哺路由排序。</span>
+    <span class="tm"><span class="tag sz">未估</span></span>
+  </label></li>
+</ul>
+</section>
+
+<!-- ===================== 第一周 ===================== -->
+<section id="week1">
+<h2>第一周具体做什么</h2>
+<p>如果明天就开工，这是我建议的顺序。</p>
+
+<table>
+<tr><th>天</th><th>做什么</th><th>产出</th></tr>
+<tr><td><b>1</b></td><td>0.1 + 0.2 —— workspace 骨架、Vitest、Biome、<code>.gitignore</code></td><td><code>pnpm -r build</code> 通过</td></tr>
+<tr><td><b>2</b></td><td>1.1 —— 事件信封 + 22 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
+<tr><td><b>3–4</b></td><td>1.2 —— SQLite 存储、seq 分配、幂等 token</td><td>并发 append 测试通过</td></tr>
+<tr><td><b>5</b></td><td>1.3 —— 总线 + 重放 + reducer 注册</td><td><b>重放等价性测试通过 → 内核成立</b></td></tr>
+</table>
+
+<div class="note"><b>第 5 天的那条测试是整个项目的分水岭。</b>「从 seq 0 重放整条日志，得到与增量归约完全一致的状态」——这条一旦通过，ADR-005 就从一句原则变成了一个被机器守住的性质。后面所有派生状态的正确性都挂在它上面。先写这条测试，再写实现。</div>
+
+<h3>三条随时可以自查的命令</h3>
+<pre><code># 1. 内核有没有被厂商污染（ADR-004）
+grep -rniE 'openai|anthropic|gemini|xai' packages/event-core packages/task-engine
+
+# 2. 兄弟包有没有互相引用（packages.md）
+grep -rn 'memory-core' packages/task-engine/src
+grep -rn 'task-engine' packages/memory-core/src
+
+# 3. 事件类型有没有偷偷绕过目录（event-catalog.md）
+grep -rhoE "'[a-z]+\.[a-z.]+'" packages/*/src | sort -u</code></pre>
+</section>
+
+<!-- ===================== 风险 ===================== -->
+<section id="risk">
+<h2>风险与坑</h2>
+
+<div class="note risk"><b>最大的风险：为了看到界面而跳过 Phase 2。</b>记忆是这个产品和任务追踪器的全部区别，也是复活模式成立的前提。跳过它去做 UI，会得到一个很好看的、但和市面上任何 agent 面板没有区别的东西。</div>
+
+<table>
+<tr><th>风险</th><th>征兆</th><th>对策</th></tr>
+<tr><td><b>reducer 被绕过</b></td><td>出现「先写表，再补一条事件给 UI 看」的代码</td><td>事件日志退化成通知通道，历史不可重建 → CI 里禁止 event-core 之外的模块直接写库</td></tr>
+<tr><td><b>厂商名泄进内核</b></td><td><code>if (provider === 'openai')</code></td><td>抽象已经漏了。CI grep 检查</td></tr>
+<tr><td><b>重放性能</b></td><td>项目跑几个月后启动变慢</td><td>快照就是为这个存在的（1.4）。别等到慢了才做</td></tr>
+<tr><td><b>Tauri 的原生手感落差</b></td><td>用户说「感觉像网页」</td><td>预期之内的代价。滚动、右键菜单、窗口行为要专门调，预留时间</td></tr>
+<tr><td><b>LLM 成本失控</b></td><td>记忆摘要对每条事件都调一次</td><td>2.2 的窗口化设计就是为这个。另外考虑 <code>task_budget</code> 给 Supervisor 设上限</td></tr>
+<tr><td><b>审批闸门后加</b></td><td>Phase 3 才发现工具调用没法阻塞</td><td>1.10 把接口先留出来，哪怕实现是个 CLI 提示</td></tr>
+</table>
+
+<p style="margin-top:26px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px">
+勾选状态存在浏览器 <code>localStorage</code>，换设备不同步。工作量估算是单人全职的粗略量级，不是承诺。<br>
+规格依据：<code>docs/development/roadmap.md</code> · <code>docs/architecture/packages.md</code> · ADR-001 至 ADR-005。
+</p>
+</section>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var t=document.getElementById('tg');
+  t.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme');
+    if(!cur){cur=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+    document.documentElement.setAttribute('data-theme',cur==='dark'?'light':'dark');
+  });
+
+  var KEY='agentos-todo-v1';
+  var boxes=[].slice.call(document.querySelectorAll('.tasks input[type=checkbox]'));
+  var saved={};
+  try{saved=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){saved={};}
+
+  function save(){
+    var o={};
+    boxes.forEach(function(b){if(b.checked)o[b.id]=1;});
+    try{localStorage.setItem(KEY,JSON.stringify(o));}catch(e){}
+  }
+
+  function refresh(){
+    var done=0;
+    boxes.forEach(function(b){
+      b.closest('li').classList.toggle('done',b.checked);
+      if(b.checked)done++;
+    });
+    var pct=boxes.length?Math.round(done/boxes.length*100):0;
+    document.getElementById('pctNum').textContent=pct+'%';
+    document.getElementById('doneNum').textContent=done;
+    document.getElementById('totalNum').textContent=boxes.length;
+    document.getElementById('pbar').style.width=pct+'%';
+
+    var mini=[];
+    [].slice.call(document.querySelectorAll('.tasks[data-phase]')).forEach(function(ul){
+      var ph=ul.getAttribute('data-phase');
+      var bs=[].slice.call(ul.querySelectorAll('input[type=checkbox]'));
+      var d=bs.filter(function(b){return b.checked;}).length;
+      mini.push('<span>'+ph.toUpperCase()+' '+d+'/'+bs.length+'</span>');
+      var c=document.querySelector('[data-count="'+ph+'"]');
+      if(c)c.textContent=d+' / '+bs.length;
+      var p=document.querySelector('[data-pc="'+ph+'"]');
+      if(p)p.textContent=d+'/'+bs.length;
+    });
+    document.getElementById('phaseMini').innerHTML=mini.join('');
+  }
+
+  boxes.forEach(function(b){
+    if(saved[b.id])b.checked=true;
+    b.addEventListener('change',function(){save();refresh();});
+  });
+  refresh();
+
+  document.getElementById('reset').addEventListener('click',function(){
+    boxes.forEach(function(b){b.checked=false;});
+    save();refresh();
+  });
+
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));}).filter(Boolean);
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(!e.isIntersecting)return;
+      links.forEach(function(l){l.classList.remove('on');});
+      var m=links.filter(function(l){return l.getAttribute('href')==='#'+e.target.id;})[0];
+      if(m)m.classList.add('on');
+    });
+  },{rootMargin:'-8% 0px -82% 0px'});
+  secs.forEach(function(s){io.observe(s);});
+})();
+</script>
+</body>
+</html>

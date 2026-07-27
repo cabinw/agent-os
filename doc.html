@@ -1,0 +1,1986 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent OS — 架构与使用指南</title>
+<style>
+:root{
+  --bg:#F7F8FA; --surface:#FFFFFF; --border:#E8EAED;
+  --text:#111827; --muted:#6B7280; --faint:#9CA3AF;
+  --accent:#6366F1; --accent2:#8B5CF6;
+  --ok:#10B981; --warn:#F59E0B; --risk:#EF4444; --info:#3B82F6;
+  --code-bg:#F3F4F6;
+  --doc-bg:#FCFCFD; --doc-surface:#FFFFFF; --doc-text:#111827; --doc-muted:#6B7280; --doc-border:#E8EAED;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --doc-bg:#0E1014; --doc-surface:#161A21; --doc-text:#E6E8EB; --doc-muted:#9BA3AF; --doc-border:#252A33; --code-bg:#1B2029; }
+}
+:root[data-theme="dark"]{ --doc-bg:#0E1014; --doc-surface:#161A21; --doc-text:#E6E8EB; --doc-muted:#9BA3AF; --doc-border:#252A33; --code-bg:#1B2029; }
+:root[data-theme="light"]{ --doc-bg:#FCFCFD; --doc-surface:#FFFFFF; --doc-text:#111827; --doc-muted:#6B7280; --doc-border:#E8EAED; --code-bg:#F3F4F6; }
+
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{font-family:var(--sans);background:var(--doc-bg);color:var(--doc-text);line-height:1.65;-webkit-font-smoothing:antialiased;font-size:15px}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);gap:0;max-width:1560px;margin:0 auto}
+.toc{position:sticky;top:0;height:100vh;overflow-y:auto;padding:28px 18px 60px;border-right:1px solid var(--doc-border);font-size:13px}
+.toc-brand{display:flex;align-items:center;gap:9px;margin-bottom:22px;font-weight:650;font-size:15px;letter-spacing:-.01em}
+.toc-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700;flex:none}
+.toc h4{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);margin:20px 0 7px;font-weight:650}
+.toc a{display:block;padding:5px 9px;border-radius:6px;color:var(--doc-muted);text-decoration:none;transition:.12s;border-left:2px solid transparent}
+.toc a:hover{background:var(--code-bg);color:var(--doc-text)}
+.toc a.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent);font-weight:550}
+.main{padding:0 44px 120px;min-width:0}
+@media(max-width:1000px){.shell{grid-template-columns:1fr}.toc{display:none}.main{padding:0 20px 80px}}
+
+/* ---------- typography ---------- */
+section{padding-top:56px;scroll-margin-top:16px}
+h1{font-size:38px;font-weight:700;letter-spacing:-.025em;line-height:1.2}
+h2{font-size:26px;font-weight:680;letter-spacing:-.02em;margin-bottom:8px;padding-bottom:12px;border-bottom:1px solid var(--doc-border)}
+h3{font-size:18px;font-weight:640;letter-spacing:-.01em;margin:32px 0 10px}
+h4{font-size:15px;font-weight:640;margin:22px 0 6px}
+p{margin:12px 0;color:var(--doc-text)}
+.lede{font-size:17px;color:var(--doc-muted);line-height:1.7}
+.eyebrow{font-size:11px;font-weight:680;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:.87em;background:var(--code-bg);padding:.14em .42em;border-radius:4px}
+pre{background:var(--code-bg);border:1px solid var(--doc-border);border-radius:10px;padding:16px 18px;overflow-x:auto;margin:16px 0}
+pre code{background:none;padding:0;font-size:12.5px;line-height:1.6}
+ul,ol{margin:12px 0 12px 22px}
+li{margin:5px 0}
+strong{font-weight:640}
+
+/* ---------- doc components ---------- */
+.hero{padding:70px 0 8px}
+.hero-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px}
+.badge{font-size:12px;padding:4px 11px;border-radius:20px;border:1px solid var(--doc-border);color:var(--doc-muted);background:var(--doc-surface)}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.5px;display:block;overflow-x:auto}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--doc-border);vertical-align:top}
+th{font-weight:640;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);white-space:nowrap}
+td code{white-space:nowrap}
+.note{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 5%,transparent);padding:13px 17px;border-radius:0 8px 8px 0;margin:18px 0;font-size:14px}
+.note.warn{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+.note b{font-weight:650}
+.rules{counter-reset:r;list-style:none;margin:18px 0 0}
+.rules li{counter-increment:r;position:relative;padding:14px 0 14px 46px;border-top:1px solid var(--doc-border)}
+.rules li::before{content:counter(r);position:absolute;left:0;top:13px;width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:grid;place-items:center;font-size:12px;font-weight:680}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:18px 0}
+.tile{border:1px solid var(--doc-border);border-radius:12px;padding:16px 18px;background:var(--doc-surface)}
+.tile h4{margin:0 0 5px}
+.tile p{margin:0;font-size:13.5px;color:var(--doc-muted)}
+figure{margin:26px 0}
+figcaption{font-size:12.5px;color:var(--doc-muted);margin-top:10px;text-align:center}
+figcaption b{color:var(--doc-text);font-weight:600}
+.svgwrap{border:1px solid var(--doc-border);border-radius:14px;background:var(--doc-surface);padding:22px;overflow-x:auto}
+.svgwrap svg{display:block;margin:0 auto;max-width:100%;height:auto}
+
+/* step walkthrough */
+.steps{list-style:none;margin:22px 0 0;padding:0;counter-reset:s}
+.steps>li{counter-increment:s;position:relative;padding:0 0 30px 42px;border-left:2px solid var(--doc-border);margin-left:13px}
+.steps>li:last-child{border-left-color:transparent;padding-bottom:0}
+.steps>li::before{content:counter(s);position:absolute;left:-14px;top:-2px;width:26px;height:26px;border-radius:50%;background:var(--doc-surface);border:2px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:12px;font-weight:680}
+.steps h4{margin:0 0 4px;font-size:15.5px}
+.steps p{margin:4px 0;font-size:14px;color:var(--doc-muted)}
+.evt{display:inline-block;font-family:var(--mono);font-size:11.5px;background:color-mix(in srgb,var(--accent) 11%,transparent);color:var(--accent);padding:2px 7px;border-radius:5px;margin:3px 4px 0 0}
+
+/* ============ MOCKUPS — always light, product surface ============ */
+.mock{background:var(--bg);border:1px solid #DDE1E6;border-radius:14px;overflow:hidden;box-shadow:0 10px 34px rgba(15,23,42,.10);color:var(--text);font-size:12px;line-height:1.45;color-scheme:light}
+.mock *{box-sizing:border-box}
+.chrome{height:34px;background:linear-gradient(#FDFDFE,#F4F5F7);border-bottom:1px solid #E3E6EA;display:flex;align-items:center;padding:0 13px;gap:7px;flex:none}
+.dot{width:11px;height:11px;border-radius:50%}
+.d1{background:#FF5F57}.d2{background:#FEBC2E}.d3{background:#28C840}
+.chrome .ttl{margin-left:10px;font-size:11.5px;color:#8A9099;font-weight:520}
+.app{display:flex;min-height:520px}
+
+/* sidebar */
+.sb{width:186px;flex:none;background:#FBFBFC;border-right:1px solid #E8EAED;padding:14px 10px;display:flex;flex-direction:column}
+.sb-brand{display:flex;align-items:center;gap:8px;padding:0 6px 14px;font-weight:680;font-size:14px;letter-spacing:-.01em}
+.sb-mark{width:24px;height:24px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;flex:none}
+.sb-lab{font-size:10px;color:#9CA3AF;padding:10px 8px 5px;font-weight:600;letter-spacing:.04em}
+.proj-sel{margin:0 4px 10px;padding:7px 9px;border:1px solid #E8EAED;border-radius:8px;background:#fff;display:flex;align-items:center;gap:7px;font-size:12px;font-weight:560}
+.proj-sel .cv{width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#818CF8,#C084FC);flex:none}
+.proj-sel .car{margin-left:auto;color:#9CA3AF;font-size:9px}
+.nav{display:flex;flex-direction:column;gap:1px}
+.nav a{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;color:#4B5563;text-decoration:none;font-size:12.5px;font-weight:520}
+.nav a.on{background:#EEF0FE;color:#4F46E5;font-weight:620}
+.nav .ic{width:15px;text-align:center;opacity:.85;font-size:12px}
+.sb-foot{margin-top:auto;padding-top:12px;border-top:1px solid #E8EAED;display:flex;align-items:center;gap:8px;padding-left:6px}
+.av{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#A5B4FC,#818CF8);flex:none}
+.sb-foot .nm{font-size:11.5px;font-weight:600;line-height:1.3}
+.sb-foot .rl{font-size:10px;color:#9CA3AF}
+
+/* content */
+.ct{flex:1;padding:18px 20px;min-width:0;overflow:hidden}
+.pghd{display:flex;align-items:flex-start;gap:12px;margin-bottom:15px}
+.pghd h1{font-size:21px;font-weight:680;letter-spacing:-.02em;line-height:1.25}
+.pghd .sub{font-size:11.5px;color:#6B7280;margin-top:2px}
+.pghd .sp{margin-left:auto;display:flex;gap:7px;align-items:center}
+.btn{padding:6px 12px;border-radius:8px;font-size:11.5px;font-weight:600;border:1px solid #E3E6EA;background:#fff;color:#374151;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn.pri{background:linear-gradient(135deg,#6366F1,#7C5CF0);border-color:transparent;color:#fff;box-shadow:0 1px 3px rgba(99,102,241,.35)}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:14px}
+.kpi{background:#fff;border:1px solid #E8EAED;border-radius:11px;padding:11px 13px;display:flex;align-items:center;gap:10px}
+.kpi .ki{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font-size:13px;flex:none}
+.kpi .kn{font-size:19px;font-weight:680;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .kl{font-size:10.5px;color:#6B7280;margin-top:1px}
+.card{background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:13px 15px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.card>.hd{display:flex;align-items:center;gap:7px;margin-bottom:11px;font-size:12.5px;font-weight:650}
+.card>.hd .all{margin-left:auto;font-size:11px;color:#6366F1;font-weight:560}
+.chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10.5px;font-weight:560;background:#F3F4F6;color:#4B5563;white-space:nowrap}
+.chip.b{background:#EEF2FF;color:#4F46E5}.chip.g{background:#ECFDF5;color:#059669}
+.chip.a{background:#FFFBEB;color:#B45309}.chip.r{background:#FEF2F2;color:#DC2626}
+.sd{width:7px;height:7px;border-radius:50%;flex:none}
+.sd.g{background:#10B981}.sd.a{background:#F59E0B}.sd.r{background:#EF4444}.sd.b{background:#3B82F6}
+.bar{height:5px;border-radius:3px;background:#EEF0F3;overflow:hidden;flex:1}
+.bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#6366F1,#8B5CF6)}
+.bar i.g{background:#10B981}.bar i.a{background:#F59E0B}
+.mut{color:#6B7280}.tiny{font-size:10.5px}
+.nums{font-variant-numeric:tabular-nums}
+
+/* pulse hero */
+.hero-card{border-radius:13px;overflow:hidden;position:relative;background:linear-gradient(115deg,#EEF0FE 0%,#E7E9FB 42%,#DDE3F5 100%);border:1px solid #E1E4F0;padding:20px 22px;margin-bottom:13px;min-height:132px;display:flex;align-items:center}
+.hero-card .txt{max-width:60%;position:relative;z-index:2}
+.hero-card .tag{font-size:10px;font-weight:700;letter-spacing:.1em;color:#6366F1}
+.hero-card h2{font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1.25;margin:5px 0 6px}
+.hero-card p{font-size:11.5px;color:#4B5563;line-height:1.55}
+.hero-card .by{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:10.5px;color:#6B7280}
+.hero-art{position:absolute;right:0;top:0;bottom:0;width:44%;opacity:.95}
+.dots{display:flex;gap:4px;position:absolute;bottom:12px;left:22px}
+.dots i{width:5px;height:5px;border-radius:50%;background:#C7CBD9}.dots i.on{background:#6366F1;width:14px;border-radius:3px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.feed{display:flex;flex-direction:column;gap:9px}
+.fr{display:flex;align-items:flex-start;gap:8px}
+.fr .ab{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:9.5px;font-weight:700}
+.fr .fb{flex:1;min-width:0}
+.fr .fn{font-size:11.5px;font-weight:600}
+.fr .fd{font-size:10.5px;color:#6B7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr .ft{font-size:10px;color:#9CA3AF;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.prog-row{margin-bottom:10px}
+.prog-row .pl{display:flex;justify-content:space-between;font-size:11.5px;font-weight:560;margin-bottom:2px}
+.prog-row .pw{font-size:10px;color:#9CA3AF;margin-bottom:4px}
+.prog-row .pb{display:flex;align-items:center;gap:8px}
+.prog-row .pp{font-size:11px;font-weight:640;width:32px;text-align:right;font-variant-numeric:tabular-nums}
+.risk{border-left:3px solid #EF4444;padding:2px 0 2px 10px;margin-bottom:11px}
+.risk.a{border-color:#F59E0B}
+.risk .rt{font-size:10px;font-weight:700;letter-spacing:.05em;color:#DC2626}
+.risk.a .rt{color:#B45309}
+.risk .rn{font-size:11.5px;font-weight:620;margin:1px 0}
+.risk .rd{font-size:10.5px;color:#6B7280;line-height:1.45}
+
+/* library */
+.tabs{display:flex;gap:6px;margin-bottom:13px;flex-wrap:wrap}
+.tab{padding:5px 12px;border-radius:8px;font-size:11.5px;font-weight:560;color:#6B7280;border:1px solid transparent}
+.tab.on{background:#EEF0FE;color:#4F46E5;font-weight:640}
+.tab .n{opacity:.6;margin-left:3px}
+.prow{display:grid;grid-template-columns:64px 1.5fr 1.1fr .9fr 1.05fr;gap:13px;align-items:center;padding:11px 13px;border-bottom:1px solid #F0F1F3}
+.prow:last-child{border-bottom:none}
+.prow.sel{background:#FAFAFE;border:1.5px solid #C7CBF5;border-radius:11px}
+.pcv{width:64px;height:46px;border-radius:8px;overflow:hidden;flex:none}
+.pn{font-size:12.5px;font-weight:660;display:flex;align-items:center;gap:6px}
+.pdsc{font-size:10.5px;color:#6B7280;margin:2px 0 5px}
+.stk{display:flex;gap:4px;flex-wrap:wrap}
+.avs{display:flex;align-items:center}
+.avs .a{width:17px;height:17px;border-radius:50%;border:1.5px solid #fff;margin-right:-5px;background:linear-gradient(135deg,#A5B4FC,#818CF8)}
+.avs .more{font-size:10px;color:#6B7280;margin-left:10px}
+.col-lab{font-size:10px;color:#9CA3AF;margin-bottom:3px}
+
+/* detail drawer */
+.drawer{width:288px;flex:none;border-left:1px solid #E8EAED;background:#fff;padding:14px 15px;display:flex;flex-direction:column;gap:11px;overflow:hidden}
+.dw-hd{display:flex;align-items:center;gap:9px}
+.dw-hd .ic{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#818CF8,#C084FC);flex:none}
+.dw-hd h3{font-size:14.5px;font-weight:680;letter-spacing:-.01em}
+.dw-tabs{display:flex;gap:14px;border-bottom:1px solid #EEF0F3;font-size:11.5px;color:#6B7280}
+.dw-tabs span{padding-bottom:7px}
+.dw-tabs span.on{color:#4F46E5;font-weight:640;border-bottom:2px solid #6366F1}
+.kv{display:flex;justify-content:space-between;font-size:11px;padding:3.5px 0}
+.kv .k{color:#6B7280}.kv .v{font-weight:580}
+.sect{border:1px solid #EEF0F3;border-radius:10px;padding:11px 12px}
+.sect>.sh{font-size:11.5px;font-weight:650;margin-bottom:7px;display:flex;align-items:center}
+.sect>.sh .all{margin-left:auto;font-size:10px;color:#6366F1;font-weight:500}
+
+/* revival */
+.revival{border:1px solid #C7CBF5;border-radius:12px;padding:14px 16px;background:linear-gradient(135deg,#F5F3FF,#EEF0FE)}
+.revival .rh{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:680;color:#5B21B6}
+.revival .rs{font-size:11px;color:#6B7280;margin:5px 0 11px}
+.rstats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}
+.rstat{background:rgba(255,255,255,.75);border-radius:9px;padding:8px 10px}
+.rstat .t{font-size:10px;color:#6B7280;display:flex;align-items:center;gap:4px}
+.rstat .n{font-size:17px;font-weight:700;margin-top:1px;font-variant-numeric:tabular-nums}
+.plan{font-size:10.5px;color:#4B5563;margin-bottom:11px;line-height:1.7}
+.plan b{color:#111827}
+.rbtn{width:100%;text-align:center;padding:9px;border-radius:9px;background:linear-gradient(135deg,#6366F1,#7C5CF0);color:#fff;font-size:12px;font-weight:640;box-shadow:0 2px 8px rgba(99,102,241,.32)}
+.film{display:flex;gap:9px;overflow:hidden}
+.shot{width:118px;flex:none}
+.shot .im{height:74px;border-radius:8px;border:1px solid #E8EAED;overflow:hidden}
+.shot .cap{font-size:10.5px;font-weight:600;margin-top:5px}
+.shot .dt{font-size:9.5px;color:#9CA3AF;display:flex;align-items:center;gap:5px;margin-top:1px}
+.tl{position:relative;padding-left:16px}
+.tl::before{content:"";position:absolute;left:3.5px;top:5px;bottom:5px;width:1.5px;background:#EEF0F3}
+.tli{position:relative;padding-bottom:11px}
+.tli::before{content:"";position:absolute;left:-16px;top:4px;width:8px;height:8px;border-radius:50%;background:#fff;border:2px solid #A5B4FC}
+.tli.done::before{border-color:#6366F1;background:#6366F1}
+.tli .td{font-size:10px;color:#9CA3AF}
+.tli .tt{font-size:11.5px;font-weight:600;margin:1px 0}
+.tli .tx{font-size:10.5px;color:#6B7280;line-height:1.45}
+.dec{border:1px solid #EEF0F3;border-radius:9px;padding:9px 11px;margin-bottom:8px;display:flex;gap:9px}
+.dec .di{width:22px;height:22px;border-radius:7px;background:#EEF2FF;display:grid;place-items:center;font-size:11px;flex:none}
+.dec .dt{font-size:11.5px;font-weight:620;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.dec .dr{font-size:10.5px;color:#6B7280;margin-top:2px;line-height:1.45}
+.dec .dd{font-size:10px;color:#9CA3AF;margin-left:auto;white-space:nowrap}
+.nxt{display:flex;align-items:center;gap:10px;border:1px solid #EEF0F3;border-radius:9px;padding:9px 11px;margin-bottom:7px}
+.nxt .nn{width:20px;height:20px;border-radius:50%;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center;font-size:10.5px;font-weight:700;flex:none}
+.nxt .nb{flex:1;min-width:0}
+.nxt .nt{font-size:11.5px;font-weight:620}
+.nxt .nd{font-size:10.5px;color:#6B7280}
+.nxt .ne{font-size:10px;color:#9CA3AF;white-space:nowrap}
+.nxt .np{width:22px;height:22px;border-radius:7px;border:1px solid #E3E6EA;display:grid;place-items:center;font-size:9px;color:#6366F1;flex:none}
+
+/* menubar */
+.mbwrap{background:linear-gradient(150deg,#5B7BB8,#8C6FA8 45%,#C98B7A);border-radius:14px;padding:0;overflow:hidden;box-shadow:0 12px 40px rgba(15,23,42,.22);color:var(--text);font-size:12px;line-height:1.45;color-scheme:light}
+.mbwrap *{box-sizing:border-box}
+.mbtop{height:26px;background:rgba(255,255,255,.62);backdrop-filter:blur(20px);display:flex;align-items:center;padding:0 12px;gap:15px;font-size:11px;font-weight:560;color:#1F2937}
+.mbtop .rt{margin-left:auto;display:flex;gap:12px;align-items:center}
+.mbtop .act{background:#6366F1;color:#fff;border-radius:5px;padding:2px 6px;font-weight:600}
+.mbpanel{width:352px;margin:8px 12px 22px auto;background:rgba(255,255,255,.97);backdrop-filter:blur(30px);border-radius:14px;box-shadow:0 18px 52px rgba(15,23,42,.3);overflow:hidden}
+.mbsec{padding:11px 14px;border-bottom:1px solid #EEF0F3}
+.mbsec:last-child{border-bottom:none}
+.mbsec .sh{font-size:11px;font-weight:650;margin-bottom:8px;display:flex;align-items:center}
+.mbsec .sh .all{margin-left:auto;font-size:10px;color:#6366F1;font-weight:500}
+.mbhd{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:680}
+.mbhd .gear{margin-left:auto;color:#9CA3AF;font-size:11px}
+.mbstat{font-size:10.5px;color:#059669;display:flex;align-items:center;gap:5px;margin-top:4px}
+.mbk{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.mbk .b{border:1px solid #E8EAED;border-radius:9px;padding:7px 9px}
+.mbk .n{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.mbk .l{font-size:9.5px;color:#6B7280}
+.agrow{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px}
+.agrow .ab{width:17px;height:17px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:8.5px;font-weight:700;flex:none}
+.agrow .an{font-weight:600;width:62px}
+.agrow .as{display:flex;align-items:center;gap:5px;width:72px;color:#4B5563}
+.agrow .aw{color:#9CA3AF;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.apv{display:flex;align-items:center;gap:9px}
+.apv .ai{width:24px;height:24px;border-radius:7px;background:#F3F4F6;display:grid;place-items:center;font-size:11px;flex:none}
+.apv .at{font-size:11.5px;font-weight:620}
+.apv .am{font-size:10px;color:#9CA3AF}
+.apv .yn{margin-left:auto;display:flex;gap:6px}
+.apv .yn i{width:26px;height:24px;border-radius:7px;border:1px solid #E3E6EA;display:grid;place-items:center;font-style:normal;font-size:11px}
+.apv .yn i.y{color:#059669;border-color:#A7F3D0;background:#ECFDF5}
+.apv .yn i.n{color:#DC2626;border-color:#FECACA;background:#FEF2F2}
+.qa{display:flex;gap:7px}
+.qa .q{flex:1;border:1px solid #E8EAED;border-radius:8px;padding:7px;text-align:center;font-size:10.5px;font-weight:560;display:flex;align-items:center;justify-content:center;gap:4px}
+.dock{height:46px;background:rgba(255,255,255,.4);backdrop-filter:blur(20px);border-radius:12px;margin:0 auto 10px;width:min(420px,80%);display:flex;align-items:center;justify-content:center;gap:7px}
+.dock i{width:32px;height:32px;border-radius:8px;display:block}
+
+/* tasks */
+.tk-hd{display:grid;grid-template-columns:52px 2.3fr 92px 1fr 76px 84px;gap:10px;padding:0 12px 7px;font-size:10px;color:#9CA3AF;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+.tk{display:grid;grid-template-columns:52px 2.3fr 92px 1fr 76px 84px;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid #F0F1F3;font-size:11.5px}
+.tk .id{font-family:var(--mono);font-size:10.5px;color:#9CA3AF}
+.tk .ti{font-weight:600}
+.tk .tg{font-size:10px;color:#9CA3AF;margin-top:1px}
+.st{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;font-size:10.5px;font-weight:600}
+.st.run{background:#EEF2FF;color:#4F46E5}.st.blk{background:#FEF2F2;color:#DC2626}
+.st.rev{background:#FFFBEB;color:#B45309}.st.don{background:#ECFDF5;color:#059669}
+.st.asg{background:#F3F4F6;color:#4B5563}.st.new{background:#F9FAFB;color:#6B7280}
+.exq{display:flex;align-items:center;gap:6px}
+.exq .ab{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:8.5px;font-weight:700;flex:none}
+
+/* agents */
+.agc{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.agcard{background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:13px 14px}
+.agcard .t{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.agcard .ab{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;flex:none}
+.agcard .nm{font-size:12.5px;font-weight:660}
+.agcard .rl{font-size:10.5px;color:#9CA3AF}
+.caps{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}
+.mtr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:9px;border-top:1px solid #F0F1F3}
+.mtr .m .n{font-size:13px;font-weight:680;font-variant-numeric:tabular-nums}
+.mtr .m .l{font-size:9.5px;color:#9CA3AF}
+
+/* memory */
+.knw{display:flex;gap:10px;padding:11px 0;border-bottom:1px solid #F0F1F3}
+.knw:last-child{border-bottom:none}
+.knw .ki{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:12px;flex:none}
+.knw .kt{font-size:12px;font-weight:640;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.knw .ks{font-size:11px;color:#4B5563;margin-top:2px;line-height:1.5}
+.knw .kw{font-size:10.5px;color:#9CA3AF;margin-top:4px}
+.seg{display:inline-flex;border:1px solid #E3E6EA;border-radius:8px;overflow:hidden;background:#fff}
+.seg span{padding:5px 11px;font-size:11px;font-weight:560;color:#6B7280}
+.seg span.on{background:#EEF0FE;color:#4F46E5;font-weight:640}
+
+/* threads */
+.thcol{width:246px;flex:none;border-right:1px solid #E8EAED;background:#FBFBFC;display:flex;flex-direction:column;overflow:hidden}
+.thsearch{margin:11px 11px 8px;padding:6px 10px;border:1px solid #E8EAED;border-radius:8px;background:#fff;font-size:11px;color:#9CA3AF;display:flex;align-items:center;gap:6px}
+.thtabs{display:flex;gap:5px;padding:0 11px 9px}
+.thtabs span{font-size:10.5px;padding:3px 9px;border-radius:6px;color:#6B7280;font-weight:560}
+.thtabs span.on{background:#EEF0FE;color:#4F46E5;font-weight:650}
+.throw{padding:10px 12px;border-top:1px solid #F0F1F3;position:relative}
+.throw.on{background:#fff;box-shadow:inset 2.5px 0 0 #6366F1}
+.throw .tl1{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:640}
+.throw .tl1 .id{font-family:var(--mono);font-size:10px;color:#9CA3AF;font-weight:400}
+.throw .tl1 .tm{margin-left:auto;font-size:9.5px;color:#9CA3AF;font-weight:400;white-space:nowrap}
+.throw .pv{font-size:10.5px;color:#6B7280;margin:3px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.throw .tl3{display:flex;align-items:center;gap:5px}
+.throw .unread{margin-left:auto;min-width:16px;height:16px;padding:0 5px;border-radius:8px;background:#6366F1;color:#fff;font-size:9.5px;font-weight:700;display:grid;place-items:center}
+.throw .dot{position:absolute;left:5px;top:15px;width:5px;height:5px;border-radius:50%;background:#6366F1}
+.mgpane{flex:1;display:flex;flex-direction:column;min-width:0;background:#fff;overflow:hidden}
+.mghd{padding:11px 15px;border-bottom:1px solid #EEF0F3;display:flex;align-items:center;gap:9px}
+.mghd .t{font-size:13px;font-weight:660}
+.mghd .s{font-size:10.5px;color:#9CA3AF;margin-top:1px}
+.mgfilt{display:flex;gap:6px;padding:8px 15px;border-bottom:1px solid #F5F6F7;background:#FCFCFD}
+.mgfilt span{font-size:10.5px;padding:3px 9px;border-radius:6px;border:1px solid #E8EAED;background:#fff;color:#6B7280}
+.mgbody{flex:1;padding:12px 15px;display:flex;flex-direction:column;gap:11px;overflow:hidden}
+.msg{display:flex;gap:9px}
+.msg .av{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:10px;font-weight:700}
+.msg .bd{flex:1;min-width:0}
+.msg .mh{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.msg .nm{font-size:11.5px;font-weight:650}
+.msg .tt2{font-size:9.5px;color:#9CA3AF;margin-left:auto}
+.msg .ct{font-size:11.5px;color:#374151;line-height:1.6;margin-top:3px}
+.msg .quote{font-size:10px;color:#9CA3AF;margin-top:4px;padding-left:8px;border-left:2px solid #E8EAED}
+.msg .att{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.msg.human .bd{border-left:2.5px solid #6366F1;padding-left:9px;margin-left:-2px}
+.mtag{font-size:9.5px;padding:1.5px 7px;border-radius:5px;font-weight:620}
+.mtag.ins{background:#EEF2FF;color:#4F46E5}
+.mtag.qst{background:#FFFBEB;color:#B45309}
+.mtag.ans{background:#F3F4F6;color:#4B5563}
+.mtag.rev{background:#EEF2FF;color:#4F46E5}
+.mtag.wrn{background:#FEF2F2;color:#DC2626}
+.mtag.rpt{background:#ECFDF5;color:#059669}
+.divi{display:flex;align-items:center;gap:9px;font-size:10px;color:#9CA3AF}
+.divi::before,.divi::after{content:"";height:1px;background:#EEF0F3;flex:1}
+.divi b{font-weight:600}
+.divi.warn{color:#B45309}.divi.warn::before,.divi.warn::after{background:#FDE68A}
+.divi.ok{color:#059669}.divi.ok::before,.divi.ok::after{background:#A7F3D0}
+.fold{font-size:10.5px;color:#9CA3AF;background:#FAFAFB;border:1px dashed #E8EAED;border-radius:8px;padding:6px 11px;display:flex;align-items:center;gap:8px}
+.fold .ex{margin-left:auto;color:#6366F1;font-weight:600}
+.compose{margin:0 15px 13px;border:1px solid #E3E6EA;border-radius:10px;padding:9px 12px;display:flex;align-items:center;gap:9px;background:#fff}
+.compose .ph{font-size:11.5px;color:#9CA3AF;flex:1}
+.compose .snd{font-size:10.5px;padding:4px 11px;border-radius:7px;background:linear-gradient(135deg,#6366F1,#7C5CF0);color:#fff;font-weight:620}
+
+.mockcap{font-size:12.5px;color:var(--doc-muted);margin-top:12px;position:sticky;left:0}
+.mockcap b{color:var(--doc-text);font-weight:620}
+/* product mockups are fixed-layout: scroll them, never squash them */
+figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
+.mock{min-width:980px}
+.mbwrap{min-width:660px}
+.toggle{position:fixed;top:14px;right:16px;z-index:50;border:1px solid var(--doc-border);background:var(--doc-surface);color:var(--doc-muted);border-radius:9px;padding:6px 11px;font-size:12px;cursor:pointer;font-family:inherit}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="tg">◐ 主题</button>
+
+<div class="shell">
+<nav class="toc">
+  <div class="toc-brand"><span class="toc-mark">◈</span> Agent OS</div>
+  <h4>开始</h4>
+  <a href="#intro">这是什么</a>
+  <a href="#problem">要解决的问题</a>
+  <h4>系统架构</h4>
+  <a href="#loop">运行循环</a>
+  <a href="#layers">分层与包</a>
+  <a href="#events">事件内核</a>
+  <a href="#tasks">任务生命周期</a>
+  <a href="#mcp">MCP 协议</a>
+  <a href="#memory">记忆系统</a>
+  <a href="#rules">五条铁律</a>
+  <h4>使用指南</h4>
+  <a href="#u-start">① 建项目、下目标</a>
+  <a href="#u-day">② 日常：看脉冲</a>
+  <a href="#u-approve">③ 审批</a>
+  <a href="#u-block">④ 处理阻塞</a>
+  <a href="#u-pause">⑤ 暂停与复活</a>
+  <h4>界面设计</h4>
+  <a href="#d-pulse">项目脉冲</a>
+  <a href="#d-library">项目库</a>
+  <a href="#d-detail">项目详情 · 复活</a>
+  <a href="#d-menubar">菜单栏</a>
+  <a href="#d-tasks">任务</a>
+  <a href="#d-agents">智能体</a>
+  <a href="#d-threads">智能体对话</a>
+  <a href="#d-memory">记忆</a>
+  <a href="#d-canvas">画布</a>
+  <h4>附录</h4>
+  <a href="#roadmap">路线图</a>
+  <a href="#adr">决策记录</a>
+</nav>
+
+<main class="main">
+
+<div class="hero">
+  <div class="eyebrow">架构与使用指南</div>
+  <h1>Agent OS</h1>
+  <p class="lede" style="margin-top:14px;max-width:660px">面向 AI 原生团队的操作系统。人只负责说出目标，AI 团队负责拆解、执行、协作，并把过程沉淀成不会随对话窗口消失的项目记忆。</p>
+  <div class="hero-badges">
+    <span class="badge">规格阶段 · 尚未实现</span>
+    <span class="badge">MCP 协议 v0.3</span>
+    <span class="badge">7 个界面 · 34 份规格</span>
+    <span class="badge">6 条 ADR</span>
+  </div>
+</div>
+
+<!-- ============ 介绍 ============ -->
+<section id="intro">
+<h2>这是什么</h2>
+<p>Agent OS 不是一个 agent 监控面板。它是一个让多个 AI 智能体<strong>协同工作、彼此交接、并共同积累知识</strong>的运行环境。</p>
+
+<div class="grid2">
+  <div class="tile"><h4>人只做两件事</h4><p>说出目标，以及在系统停下来问你的时候做决定。中间的拆解、路由、执行、汇报，都由 AI 团队完成。</p></div>
+  <div class="tile"><h4>智能体按能力调度</h4><p>任务要求的是"会写代码"，不是"用 Codex"。换一家厂商只是换一次注册，不改一行核心代码。</p></div>
+  <div class="tile"><h4>发生过的一切都是事件</h4><p>没有直接改状态这回事。所有视图都是事件日志的投影，因此历史随时可以重建。</p></div>
+  <div class="tile"><h4>记忆回答"为什么"</h4><p>不只记录选了 PostgreSQL，还记录为什么不选 MongoDB、谁提的、什么时候可以推翻。</p></div>
+</div>
+</section>
+
+<section id="problem">
+<h2>要解决的问题</h2>
+<p>今天的 AI 智能体会话是一间密室。工作在里面发生，上下文在里面累积，窗口一关就全没了。三个月后你问它"这个项目为什么用 PostgreSQL"，它毫无概念——理由从来没存在过任何地方，除了一份没人保留的对话记录。</p>
+<p>再乘以五个来自不同厂商的智能体，就连共享状态都没有了：没有共同的任务列表，没有一个智能体把活交给另一个的通道，没有谁决定了什么的记录。</p>
+
+<figure>
+<div class="svgwrap">
+<svg viewBox="0 0 720 200" width="720">
+  <defs><style>
+    .bx{fill:#fff;stroke:#E1E4EA;stroke-width:1.2;rx:10}
+    .lb{font:600 12px var(--sans);fill:#111827}
+    .sm{font:11px var(--sans);fill:#6B7280}
+    .xx{font:600 13px var(--sans);fill:#EF4444}
+  </style></defs>
+  <text x="8" y="18" class="sm" style="font-weight:600;fill:#EF4444">今天</text>
+  <rect x="8" y="30" width="150" height="58" class="bx"/>
+  <text x="26" y="53" class="lb">Claude 会话</text><text x="26" y="72" class="sm">上下文 · 决策 · 理由</text>
+  <rect x="186" y="30" width="150" height="58" class="bx"/>
+  <text x="204" y="53" class="lb">Codex 会话</text><text x="204" y="72" class="sm">上下文 · 决策 · 理由</text>
+  <rect x="364" y="30" width="150" height="58" class="bx"/>
+  <text x="382" y="53" class="lb">Cursor 会话</text><text x="382" y="72" class="sm">上下文 · 决策 · 理由</text>
+  <text x="545" y="55" class="xx">✕ 关闭即消失</text>
+  <text x="545" y="74" class="sm">彼此不可见</text>
+
+  <line x1="8" y1="108" x2="712" y2="108" stroke="#E8EAED" stroke-dasharray="3 3"/>
+
+  <text x="8" y="132" class="sm" style="font-weight:600;fill:#6366F1">Agent OS</text>
+  <rect x="8" y="142" width="506" height="46" rx="10" fill="#EEF0FE" stroke="#C7CBF5"/>
+  <text x="26" y="163" class="lb">统一事件日志 + 项目记忆</text>
+  <text x="26" y="180" class="sm">任何智能体接入同一份任务、同一份上下文、同一份决策历史</text>
+  <text x="545" y="163" class="sm" style="fill:#059669;font-weight:600">✓ 跨会话留存</text>
+  <text x="545" y="180" class="sm">✓ 可重放、可追溯</text>
+</svg>
+</div>
+<figcaption><b>问题的形状。</b>孤立的会话无法互相交接，也无法向未来的自己解释过去。</figcaption>
+</figure>
+</section>
+
+<!-- ============ 架构 ============ -->
+<section id="loop">
+<h2>运行循环</h2>
+<p>整个系统就是这一个循环。每个组件的存在都是为了服务其中一条箭头。</p>
+
+<figure>
+<div class="svgwrap">
+<svg viewBox="0 0 760 430" width="760">
+<defs>
+  <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+    <path d="M0,0 L10,5 L0,10 z" fill="#9CA3AF"/></marker>
+  <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+    <path d="M0,0 L10,5 L0,10 z" fill="#6366F1"/></marker>
+  <linearGradient id="gr" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#6366F1"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient>
+  <style>
+    .n{fill:#fff;stroke:#E1E4EA;stroke-width:1.3}
+    .t{font:620 13px var(--sans);fill:#111827}
+    .d{font:11px var(--sans);fill:#6B7280}
+    .e{font:11px var(--mono);fill:#6366F1}
+  </style>
+</defs>
+
+<rect x="278" y="10" width="204" height="42" rx="21" fill="url(#gr)"/>
+<text x="380" y="36" class="t" fill="#fff" text-anchor="middle">人 · 说出一个目标</text>
+
+<line x1="380" y1="52" x2="380" y2="76" stroke="#9CA3AF" marker-end="url(#ar)"/>
+
+<rect x="268" y="78" width="224" height="52" rx="11" class="n"/>
+<text x="380" y="100" class="t" text-anchor="middle">Supervisor Agent</text>
+<text x="380" y="118" class="d" text-anchor="middle">拆解 · 排依赖 · 决定所需能力</text>
+
+<line x1="380" y1="130" x2="380" y2="152" stroke="#9CA3AF" marker-end="url(#ar)"/>
+<text x="392" y="146" class="e">create_task</text>
+
+<rect x="268" y="154" width="224" height="52" rx="11" class="n"/>
+<text x="380" y="176" class="t" text-anchor="middle">Task Engine</text>
+<text x="380" y="194" class="d" text-anchor="middle">生命周期 · 依赖 · 按能力路由</text>
+
+<line x1="380" y1="206" x2="380" y2="228" stroke="#9CA3AF" marker-end="url(#ar)"/>
+<text x="392" y="222" class="e">task.assigned</text>
+
+<rect x="268" y="230" width="224" height="52" rx="11" class="n" stroke="#C7CBF5"/>
+<text x="380" y="252" class="t" text-anchor="middle">MCP Server</text>
+<text x="380" y="270" class="d" text-anchor="middle">唯一入口 · 校验 · 授权</text>
+
+<line x1="380" y1="282" x2="380" y2="304" stroke="#9CA3AF" marker-end="url(#ar)"/>
+
+<rect x="228" y="306" width="304" height="46" rx="11" class="n"/>
+<text x="380" y="326" class="t" text-anchor="middle">智能体执行</text>
+<text x="380" y="343" class="d" text-anchor="middle">任何具备所需能力的智能体</text>
+
+<path d="M228 329 L120 329 L120 250" fill="none" stroke="#6366F1" stroke-width="1.4" marker-end="url(#ar2)"/>
+<text x="18" y="290" class="e">每个动作 → 事件</text>
+
+<rect x="34" y="196" width="172" height="52" rx="11" fill="#EEF0FE" stroke="#C7CBF5"/>
+<text x="120" y="218" class="t" text-anchor="middle">Event Core</text>
+<text x="120" y="236" class="d" text-anchor="middle">bus → store → reducers</text>
+
+<path d="M120 196 L120 130" fill="none" stroke="#6366F1" stroke-width="1.4" marker-end="url(#ar2)"/>
+<rect x="18" y="78" width="204" height="46" rx="11" class="n"/>
+<text x="120" y="97" class="t" text-anchor="middle">归约出的状态</text>
+<text x="120" y="114" class="d" text-anchor="middle">任务 · 记忆 · 脉冲 · 画布</text>
+
+<path d="M222 100 L268 100" fill="none" stroke="#6366F1" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+<text x="196" y="70" class="d" text-anchor="middle">回到 Supervisor</text>
+
+<rect x="556" y="180" width="188" height="120" rx="11" fill="#FAFAFB" stroke="#E8EAED" stroke-dasharray="4 3"/>
+<text x="650" y="204" class="t" text-anchor="middle">人的界面</text>
+<text x="650" y="226" class="d" text-anchor="middle">项目脉冲</text>
+<text x="650" y="245" class="d" text-anchor="middle">画布 · 任务 · 记忆</text>
+<text x="650" y="264" class="d" text-anchor="middle">菜单栏 · 审批</text>
+<text x="650" y="288" class="d" text-anchor="middle" style="fill:#9CA3AF">同一份事件的另一种投影</text>
+<path d="M206 222 L556 230" fill="none" stroke="#6366F1" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ar2)"/>
+
+<rect x="556" y="330" width="188" height="66" rx="11" fill="#FFFBEB" stroke="#FDE68A"/>
+<text x="650" y="352" class="t" text-anchor="middle">审批闸门</text>
+<text x="650" y="370" class="d" text-anchor="middle">高风险动作在这里停下</text>
+<text x="650" y="387" class="d" text-anchor="middle" style="fill:#B45309">超时永不自动放行</text>
+<path d="M492 330 L556 352" fill="none" stroke="#F59E0B" stroke-width="1.4" marker-end="url(#ar)"/>
+</svg>
+</div>
+<figcaption><b>运行循环。</b>循环是闭合的：人在项目脉冲里看到的，和任务引擎用来推进状态的，是同一批事件。系统里不存在第二个事实来源。</figcaption>
+</figure>
+
+<h3>组件职责</h3>
+<table>
+<tr><th>组件</th><th>负责</th><th>绝不做</th></tr>
+<tr><td><b>Supervisor Agent</b></td><td>拆解目标、分配工作、发现停滞</td><td>自己动手干活</td></tr>
+<tr><td><b>Agent Runtime</b></td><td>智能体生命周期、能力匹配</td><td>在适配器之外出现厂商名</td></tr>
+<tr><td><b>MCP Server</b></td><td>校验并接纳智能体调用、发出事件</td><td>持有状态</td></tr>
+<tr><td><b>Event Core</b></td><td>追加、排序、持久化、重放、归约</td><td>解释业务含义</td></tr>
+<tr><td><b>Task Engine</b></td><td>强制合法状态转移</td><td>直接和智能体通话</td></tr>
+<tr><td><b>Memory Core</b></td><td>把事件历史变成可追溯的知识</td><td>把原始对话当知识存</td></tr>
+<tr><td><b>审批闸门</b></td><td>挂起高风险动作等人</td><td>超时自动放行</td></tr>
+</table>
+</section>
+
+<section id="layers">
+<h2>分层与包依赖</h2>
+<p>依赖方向严格向下。<code>event-core</code> 必须在完全不知道"存在 UI"和"存在 AI 厂商"的前提下能编译通过。</p>
+
+<figure>
+<div class="svgwrap">
+<svg viewBox="0 0 700 320" width="700">
+<defs><style>
+  .l{font:620 13px var(--sans);fill:#111827}
+  .s{font:11px var(--sans);fill:#6B7280}
+  .tag{font:10px var(--sans);fill:#9CA3AF}
+</style></defs>
+<rect x="180" y="8" width="340" height="42" rx="10" fill="#fff" stroke="#E1E4EA"/>
+<text x="350" y="26" class="l" text-anchor="middle">apps/macos</text>
+<text x="350" y="42" class="s" text-anchor="middle">脉冲 · 项目库 · 画布 · 菜单栏</text>
+<text x="540" y="33" class="tag">表现层</text>
+
+<path d="M350 50 L350 66" stroke="#9CA3AF" stroke-width="1.3" marker-end="url(#ar)"/>
+<rect x="180" y="68" width="340" height="42" rx="10" fill="#EEF0FE" stroke="#C7CBF5"/>
+<text x="350" y="86" class="l" text-anchor="middle">mcp-server</text>
+<text x="350" y="102" class="s" text-anchor="middle">协议入口 · 校验 · 授权 · 信任边界</text>
+<text x="540" y="93" class="tag">边界层</text>
+
+<path d="M350 110 L350 126" stroke="#9CA3AF" stroke-width="1.3" marker-end="url(#ar)"/>
+<rect x="180" y="128" width="340" height="42" rx="10" fill="#fff" stroke="#E1E4EA"/>
+<text x="350" y="146" class="l" text-anchor="middle">agent-sdk</text>
+<text x="350" y="162" class="s" text-anchor="middle">适配器 · 唯一允许出现厂商名的层</text>
+<text x="540" y="153" class="tag">集成层</text>
+
+<path d="M350 170 L350 186" stroke="#9CA3AF" stroke-width="1.3" marker-end="url(#ar)"/>
+<rect x="180" y="188" width="340" height="42" rx="10" fill="#EEF0FE" stroke="#C7CBF5"/>
+<text x="350" y="206" class="l" text-anchor="middle">event-core</text>
+<text x="350" y="222" class="s" text-anchor="middle">日志 · 排序 · 快照 · 重放 · reducer</text>
+<text x="540" y="213" class="tag">内核</text>
+
+<path d="M280 230 L280 252" stroke="#9CA3AF" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M420 230 L420 252" stroke="#9CA3AF" stroke-width="1.3" marker-end="url(#ar)"/>
+<rect x="150" y="254" width="176" height="42" rx="10" fill="#fff" stroke="#E1E4EA"/>
+<text x="238" y="272" class="l" text-anchor="middle">task-engine</text>
+<text x="238" y="288" class="s" text-anchor="middle">合法转移 · 依赖</text>
+<rect x="374" y="254" width="176" height="42" rx="10" fill="#fff" stroke="#E1E4EA"/>
+<text x="462" y="272" class="l" text-anchor="middle">memory-core</text>
+<text x="462" y="288" class="s" text-anchor="middle">知识项 · 关联</text>
+<text x="350" y="314" class="tag" text-anchor="middle" style="fill:#EF4444">✕ 兄弟层互不引用</text>
+<text x="612" y="273" class="tag">领域层</text>
+</svg>
+</div>
+<figcaption><b>包依赖。</b><code>task-engine</code> 与 <code>memory-core</code> 是兄弟，只能通过发事件和归约事件通信，绝不互相 import。</figcaption>
+</figure>
+
+<div class="note"><b>构建顺序即依赖顺序：</b><code>event-core → task-engine → mcp-server → agent-sdk → memory-core → UI</code>。在 reducer 存在之前先写 UI，UI 就会自己发明状态，而那个状态一定是错的。</div>
+</section>
+
+<section id="events">
+<h2>事件内核</h2>
+<p>三个产品需求会塌缩成同一个机制：项目脉冲需要"今天发生了什么"的叙述（重放今天），复活模式需要解释一个停摆一年的项目（重放全部），画布需要实时状态（订阅同一条流）。用可变数据库实现这三件事需要三套变更追踪系统；用事件日志实现，一套都不需要。</p>
+
+<h3>事件信封</h3>
+<pre><code>{
+  "id": "evt_01H...",
+  "type": "task.progress.updated",
+  "seq": 4821,                        // 项目内单调递增，重放顺序以此为准
+  "project": "proj_oldwebsite",
+  "actor": { "kind": "agent", "id": "codex-developer" },
+  "subject": { "kind": "task", "id": "TASK-014" },
+  "at": "2026-07-27T09:41:02Z",
+  "causedBy": "evt_01H...",           // 因果链 → 画布的边、记忆的推理链
+  "payload": { "progress": 65, "note": "Implementing MCP tools" }
+}</code></pre>
+
+<h3>保证</h3>
+<table>
+<tr><th>性质</th><th>保证</th></tr>
+<tr><td>不可变</td><td>事件永不编辑或删除。写错了用一条补偿事件纠正。</td></tr>
+<tr><td>有序</td><td>项目内通过 <code>seq</code> 全序。跨项目不保证。</td></tr>
+<tr><td>持久</td><td>持久化之后才向生产者确认。</td></tr>
+<tr><td>可重放</td><td>从 <code>seq 0</code> 归约完整日志，精确复现当前状态。</td></tr>
+<tr><td>幂等</td><td>生产者带 client token，重试返回原事件。</td></tr>
+</table>
+
+<h3>命名</h3>
+<p><code>&lt;域&gt;.&lt;主体&gt;.&lt;过去式动词&gt;</code>，小写、点分隔、<strong>永远过去时</strong>。事件记录已经发生的事，不记录应该发生的事。全量清单见 <code>docs/protocol/event-catalog.md</code>。</p>
+<p>
+<span class="evt">agent.registered</span><span class="evt">agent.status.changed</span><span class="evt">task.created</span><span class="evt">task.assigned</span><span class="evt">task.started</span><span class="evt">task.progress.updated</span><span class="evt">task.blocked</span><span class="evt">task.unblocked</span><span class="evt">task.review.requested</span><span class="evt">task.completed</span><span class="evt">task.failed</span><span class="evt">task.cancelled</span><span class="evt">message.sent</span><span class="evt">approval.requested</span><span class="evt">approval.granted</span><span class="evt">approval.rejected</span><span class="evt">approval.expired</span><span class="evt">knowledge.created</span><span class="evt">knowledge.superseded</span><span class="evt">project.snapshot.captured</span><span class="evt">project.revived</span><span class="evt">pulse.story.generated</span>
+</p>
+</section>
+
+<section id="tasks">
+<h2>任务生命周期</h2>
+<p>原来的规格里有三套互相冲突的生命周期。现在只有一套，全小写，JSON 里也一样。</p>
+
+<figure>
+<div class="svgwrap">
+<svg viewBox="0 0 856 274" width="856">
+<defs><style>
+  .sn{font:620 12px var(--sans);fill:#111827;text-anchor:middle}
+  .se{font:9.5px var(--mono);fill:#6366F1;text-anchor:middle}
+  .sx{font:10px var(--sans);fill:#9CA3AF;text-anchor:middle}
+</style></defs>
+
+<!-- blocked bypass -->
+<rect x="380" y="22" width="92" height="38" rx="9" fill="#FEF2F2" stroke="#FECACA"/><text x="426" y="46" class="sn">blocked</text>
+<path d="M402 100 L402 62" fill="none" stroke="#EF4444" stroke-width="1.3" marker-end="url(#ar)"/>
+<text x="290" y="84" class="se" style="fill:#EF4444;text-anchor:end">notify_blocked</text>
+<path d="M450 62 L450 98" fill="none" stroke="#10B981" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+<text x="486" y="78" class="sx" style="fill:#059669;text-anchor:start">解除后回到 running</text>
+<text x="486" y="92" class="sx" style="text-anchor:start">进度完整保留</text>
+
+<!-- main chain -->
+<rect x="16" y="100" width="92" height="38" rx="9" fill="#F9FAFB" stroke="#E1E4EA"/><text x="62" y="124" class="sn">created</text>
+<path d="M112 119 L190 119" stroke="#9CA3AF" marker-end="url(#ar)"/><text x="153" y="110" class="se">assign_task</text>
+
+<rect x="198" y="100" width="92" height="38" rx="9" fill="#F3F4F6" stroke="#E1E4EA"/><text x="244" y="124" class="sn">assigned</text>
+<path d="M294 119 L372 119" stroke="#9CA3AF" marker-end="url(#ar)"/><text x="335" y="110" class="sx">执行者接受</text>
+
+<rect x="380" y="100" width="92" height="38" rx="9" fill="#EEF2FF" stroke="#C7CBF5" stroke-width="1.4"/><text x="426" y="124" class="sn">running</text>
+<path d="M476 119 L554 119" stroke="#9CA3AF" marker-end="url(#ar)"/><text x="517" y="110" class="se">report_result</text>
+
+<rect x="562" y="100" width="92" height="38" rx="9" fill="#FFFBEB" stroke="#FDE68A"/><text x="608" y="124" class="sn">review</text>
+<path d="M658 119 L736 119" stroke="#9CA3AF" marker-end="url(#ar)"/><text x="697" y="110" class="sx">验收通过</text>
+
+<rect x="744" y="100" width="92" height="38" rx="9" fill="#ECFDF5" stroke="#A7F3D0"/><text x="790" y="124" class="sn">completed</text>
+
+<!-- rejected loop -->
+<path d="M608 138 L608 168 L426 168 L426 140" fill="none" stroke="#F59E0B" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ar)"/>
+<text x="517" y="183" class="sx" style="fill:#B45309">驳回（必须给理由）→ 回到 running</text>
+
+<!-- terminal -->
+<rect x="316" y="208" width="92" height="34" rx="9" fill="#FEF2F2" stroke="#FECACA"/><text x="362" y="230" class="sn">failed</text>
+<rect x="476" y="208" width="92" height="34" rx="9" fill="#F9FAFB" stroke="#E1E4EA"/><text x="522" y="230" class="sn">cancelled</text>
+<text x="306" y="229" class="sx" style="text-anchor:end">running / review →</text>
+<text x="578" y="229" class="sx" style="text-anchor:start">← 任何非终态</text>
+<text x="16" y="264" class="sx" style="text-anchor:start">终态：completed · failed · cancelled</text>
+</svg>
+</div>
+<figcaption><b>唯一的任务生命周期。</b><code>blocked</code> 是旁路而不是阶段——它从 running 进入，也回到 running，进度完整保留。</figcaption>
+</figure>
+
+<div class="note warn"><b>两个反直觉但重要的约束。</b>其一，<code>progress</code> 永远不触发状态转移：进度 100% 的任务仍然是 <code>running</code>，直到智能体调用 <code>report_result</code>——宣布完成的是智能体，不是那个百分比。其二，<code>report_result</code> 进入的是 <code>review</code> 而不是 <code>completed</code>：验收是独立的一步。</div>
+</section>
+
+<section id="mcp">
+<h2>MCP 协议 v0.3</h2>
+<p>所有外部智能体只通过这一层接入。没有第二条集成路径。</p>
+
+<table>
+<tr><th>工具</th><th>作用</th><th>发出事件</th></tr>
+<tr><td><code>register_agent</code></td><td>注册，声明能力。所有调用的前置</td><td><code>agent.registered</code></td></tr>
+<tr><td><code>find_agent</code></td><td>按能力发现，不按厂商</td><td>—</td></tr>
+<tr><td><code>create_task</code></td><td>建任务。注意没有 executor 字段</td><td><code>task.created</code></td></tr>
+<tr><td><code>assign_task</code></td><td>指派，或留空让运行时按能力匹配</td><td><code>task.assigned</code></td></tr>
+<tr><td><code>update_task</code></td><td>汇报进度与备注</td><td><code>task.progress.updated</code></td></tr>
+<tr><td><code>send_message</code></td><td>智能体之间通信</td><td><code>message.sent</code></td></tr>
+<tr><td><code>notify_blocked</code></td><td>报告卡住。沉默会被当作停滞处理</td><td><code>task.blocked</code></td></tr>
+<tr><td><code>report_result</code></td><td>交付产出，进入待验收</td><td><code>task.review.requested</code></td></tr>
+<tr><td><code>request_approval</code></td><td>请求人类批准，调用方阻塞</td><td><code>approval.requested</code></td></tr>
+<tr><td><code>get_context</code></td><td>取共享上下文：相关决策、上游产出</td><td>—</td></tr>
+<tr><td><code>write_memory</code> / <code>query_memory</code></td><td>写入与检索项目知识</td><td><code>knowledge.created</code></td></tr>
+</table>
+
+<h3>信任边界</h3>
+<p>外部智能体发来的一切只穿过一个边界——MCP Server——并在那里被校验。</p>
+<pre><code>外部智能体 ──▶ MCP Server ──▶ [校验 · 授权] ──▶ Event Core
+                                    │
+                                    └─▶ 审批闸门 ──▶ 人</code></pre>
+<p>智能体<strong>不能</strong>直接写事件，<strong>不能</strong>设置任务状态，<strong>不能</strong>批准任何请求（包括别的智能体的）。它只能"请求"，由运行时决定并发出事件。</p>
+</section>
+
+<section id="memory">
+<h2>记忆系统</h2>
+<p>目标是回答"为什么"，不只是"是什么"。原始事件日志记录了项目采用 PostgreSQL；记忆记录的是：它相对 MongoDB 被选中，因为 schema 需要关系连接同时又要 JSON 列；由 Claude 在 2024-03-25 提出；如果 JSON 用量继续增长，这个选择可以重新评估。</p>
+
+<pre><code>原始事件
+   │  筛选：哪些事件承载知识？
+   ▼
+候选集合  (决策 · 结果 · 研究 · 讨论 · 已解除的阻塞)
+   │  带因果上下文的 AI 摘要
+   ▼
+知识项  (有类型 · 有来源 · 有关联)
+   │
+   ▼
+项目记忆 ──▶ 知识图谱 · 复活模式 · 智能体上下文</code></pre>
+
+<div class="grid2">
+  <div class="tile"><h4>来源可追溯</h4><p>每个知识项都带 <code>sourceEvents</code>，任何一句结论都能回溯到产生它的那批事件。记忆永远不是任何东西的唯一副本。</p></div>
+  <div class="tile"><h4>不修改，只覆盖</h4><p>后来的决策通过 <code>supersedes</code> 指向旧的，旧的仍然可读。"我们曾经这么做，第 N 个月改了，原因是……"是一等查询。</p></div>
+  <div class="tile"><h4>注入智能体上下文</h4><p>接手 TASK-014 的智能体会收到约束它的那些决策，因此不会重新讨论已经定了的问题，也不会和早先的选择自相矛盾。</p></div>
+  <div class="tile"><h4>只压缩事件，不压缩知识</h4><p>知识抽取完成后事件可以压缩；知识项永不压缩。存储随有意义的产出增长，而不是随闲聊增长。</p></div>
+</div>
+</section>
+
+<section id="rules">
+<h2>五条铁律</h2>
+<p>这五条约束了每一行实现代码。它们不是风格偏好——每一条都对应一个已经写下 ADR 的决定。</p>
+<ol class="rules">
+<li><h4>事件是唯一可写对象</h4><p>任务、智能体、项目、知识、审批全是 reducer 的输出。建任务 = 追加一条 <code>task.created</code>，任务行之所以出现，是因为 reducer 把它放在那儿。需要一个无法从日志推导的数据，是设计问题，要提出来，而不是加一张表绕过去。</p></li>
+<li><h4>永远不对 provider 分支</h4><p>路由只读 <code>capabilities</code>。厂商名只允许出现在适配器里。如果 <code>event-core</code> 或 <code>task-engine</code> 里出现了 "openai" 这个字符串，说明架构已经漏了。</p></li>
+<li><h4>智能体请求，运行时决定</h4><p>校验发生在 MCP Server 边界，未知字段是拒绝而不是忽略。</p></li>
+<li><h4>进度不触发转移</h4><p>100% 的任务仍然是 running。</p></li>
+<li><h4>审批永不自动放行</h4><p>无人应答的请求发出 <code>approval.expired</code>，任务保持阻塞。这就是这道闸门存在的全部意义。</p></li>
+</ol>
+</section>
+
+<!-- ============ 使用指南 ============ -->
+<section id="u-start">
+<h2>使用指南：从用户视角</h2>
+<p class="lede">下面五个场景覆盖了一个用户在 Agent OS 里会遇到的全部日常。每一步都标出了背后真实发生的事件，你可以对照架构部分看这个循环是怎么闭合的。</p>
+
+<h3>① 建项目，下达目标</h3>
+<ol class="steps">
+<li><h4>新建项目</h4><p>在<strong>项目库</strong>点「+ 新建项目」，或导入一个已有仓库。填名字、技术栈；封面可以留空，系统会生成。</p><span class="evt">project.created</span></li>
+<li><h4>说出目标，用人话</h4><p>不需要写任务列表。你写的是「给这个官网加上 Stripe 支付，两周内能上线」。目标是给人看的陈述句，不是工单。</p></li>
+<li><h4>Supervisor 拆解</h4><p>它产出的是一张<strong>带依赖的任务图</strong>，不是平铺清单。每个任务标注所需<strong>能力</strong>——「coding」「research」——而不是指定某个智能体。</p>
+<pre style="margin-top:8px"><code>GOAL-003 "上线支付"
+├── TASK-011 调研支付服务商        requires: research
+├── TASK-012 决定服务商            requires: architecture   depends: 011
+├── TASK-013 实现结账流程          requires: coding         depends: 012
+├── TASK-014 实现 webhook 处理     requires: coding         depends: 012
+└── TASK-015 端到端支付测试        requires: testing        depends: 013,014</code></pre>
+<span class="evt">task.created ×5</span></li>
+<li><h4>你审一遍计划</h4><p>可以改、可以删、可以调优先级。这是你唯一需要看全局计划的时刻——之后系统会主动来找你。</p></li>
+<li><h4>按能力路由，开始执行</h4><p>运行时给每个就绪任务找到能力匹配且未饱和的智能体。有未满足依赖的任务停在 <code>created</code>，不会被指派。</p><span class="evt">task.assigned</span><span class="evt">task.started</span></li>
+</ol>
+
+<div class="note">如果某项能力没有任何已注册的智能体具备，任务不会静默滞留——Supervisor 会把它作为需要你处理的事项浮出来。</div>
+</section>
+
+<section id="u-day">
+<h3>② 日常：早上打开，看项目脉冲</h3>
+<p>AI 团队一天产生的活动量超过任何人的阅读能力。项目脉冲是编辑层：它把一天的事件归约成一个九十秒能看完的页面，并且<strong>把最重要的那件事放在最前面</strong>。</p>
+
+<ol class="steps">
+<li><h4>先看头条</h4><p>头条按<strong>后果严重性</strong>排序，不按时间。排序是：超期阻塞 &gt; 里程碑完成 &gt; 改变架构的决策 &gt; 最大进度增量。平局时偏向你能采取行动的那个。</p></li>
+<li><h4>扫一遍六张卡</h4><p>今日进度、智能体活动、风险与阻塞、知识更新、研究发现、AI 时刻。任何一个数字都可以点进去看到底层事件——脉冲不引入新状态，它只是投影。</p></li>
+<li><h4>「AI 时刻」是价值可见的地方</h4><p>「Codex 自动完成 120+ 资源导入，节省约 3.5 小时人工」。这个节省数是从实测任务耗时算出来的，不是估的。</p></li>
+</ol>
+
+<div class="note">如果你只想知道「有没有事等我」，不必打开应用——菜单栏挂件就是为这个问题存在的。图标只在有<strong>待审批</strong>或<strong>阻塞</strong>时才变化；进度变化不改图标，否则你很快就会学会无视它。</div>
+</section>
+
+<section id="u-approve">
+<h3>③ 审批：系统停下来问你</h3>
+<p>六类动作必须先问人：部署、销毁、花钱、对外发布、改架构、动用凭据。项目可以把门槛调高，不能取消。</p>
+
+<ol class="steps">
+<li><h4>智能体发起请求，然后阻塞</h4><p>它的任务转入 <code>blocked</code> 且 <code>needs: human</code>——待审批是<strong>项目状态</strong>，不只是一条通知。</p><span class="evt">approval.requested</span></li>
+<li><h4>三处同时可见</h4><p>菜单栏（带 ✓/✗）、项目脉冲的风险与阻塞、任务列表的阻塞标记。</p></li>
+<li><h4>你决定</h4><p>请求必须说清楚：动作是什么、风险等级、<strong>是否可逆</strong>、具体会发生什么。「部署到 staging」不够，得说清楚是哪个 commit、影响范围多大。</p><span class="evt">approval.granted</span><span class="evt">approval.rejected</span></li>
+<li><h4>驳回必须给理由</h4><p>理由会作为指导返回给智能体，任务回到 <code>running</code>，让它换个方案，而不是原样重试。</p></li>
+</ol>
+
+<div class="note warn"><b>三条不可协商的规则。</b>不可逆或高风险的动作<strong>不能</strong>在菜单栏里一键决定——它只显示请求并提供「在应用中查看」，因为从菜单栏一键批准一个破坏性操作是迟早要出事的设计。智能体<strong>不能</strong>批准任何请求，包括别的智能体的。无人应答的请求<strong>过期</strong>，绝不默认放行。</div>
+</section>
+
+<section id="u-block">
+<h3>④ 处理阻塞</h3>
+<p>阻塞是常态，不是异常。系统的设计目标不是消灭阻塞，而是让阻塞<strong>立刻可见</strong>并且<strong>带着足够的信息</strong>。</p>
+<table>
+<tr><th>needs</th><th>谁来解</th><th>你会看到</th></tr>
+<tr><td><code>agent</code></td><td>Supervisor 路由给另一个智能体</td><td>通常不打扰你，脉冲里出现一条活动</td></tr>
+<tr><td><code>resource</code></td><td>等上游任务产出</td><td>依赖完成后自动解除</td></tr>
+<tr><td><code>human</code></td><td>你</td><td>菜单栏图标变色、脉冲置顶、任务标红</td></tr>
+</table>
+<p>阻塞解除后任务回到 <code>running</code>，<strong>进度完整保留</strong>——不会从头再来。Supervisor 在下列情况下会升级给你：阻塞没有智能体侧的解法、两个智能体在改变架构的问题上分歧、按策略需要审批、同一任务换了执行者仍反复失败、超过阈值没有进展却也没报阻塞。</p>
+<p>它永远不会用「悄悄停下来」的方式升级。每一次升级都是一条事件，都会出现在脉冲和菜单栏里。</p>
+</section>
+
+<section id="u-pause">
+<h3>⑤ 暂停，然后在半年后复活</h3>
+<p>这是整个「记忆优先」原则的兑现时刻，也是这个产品最值钱的那个查询。</p>
+
+<ol class="steps">
+<li><h4>暂停</h4><p>菜单栏的「Pause All」或项目设置：运行中的任务跑完，不再开新的。项目状态转为 <code>paused</code>。</p><span class="evt">project.state.changed</span></li>
+<li><h4>312 天后，你回来了</h4><p>打开项目，看到的不是一个冷冰冰的仓库，而是一份<strong>欢迎回来报告</strong>。休眠越久，报告越详细，而不是越简略。</p><span class="evt">project.revived</span></li>
+<li><h4>报告告诉你六件事</h4>
+<table style="margin-top:8px">
+<tr><th>部分</th><th>回答</th><th>来自</th></tr>
+<tr><td>做完了什么</td><td>核心页面、博客系统、联系表单</td><td><code>task.completed</code></td></tr>
+<tr><td>现在什么状态</td><td>阶段、完成度、健康度</td><td>任务 reducer</td></tr>
+<tr><td>之前的决策</td><td>「选 PostgreSQL 而非 MongoDB，因为……」</td><td>知识，type=decision</td></tr>
+<tr><td>没做完的</td><td>开放任务，已排序</td><td>任务 reducer</td></tr>
+<tr><td>已知问题</td><td>失败与未解除的阻塞</td><td><code>task.failed</code></td></tr>
+<tr><td>重启计划</td><td>有序、带时间估算的头几步</td><td>Supervisor 基于以上生成</td></tr>
+</table></li>
+<li><h4>节点快照帮你想起来</h4><p>项目在各个阶段长什么样的日期化视觉检查点，横向排列。看到博客系统上线时的样子，比读一段「博客系统已完成」快得多。</p></li>
+<li><h4>一键把计划变成任务</h4><p>重启计划的每一步都有 ▶，点了就变成真实任务并按能力指派。第一步永远是「环境与依赖检查」——报告会明确标注哪些是<strong>可能已失效</strong>的推测（依赖发布了新版本、API 弃用、凭据过期），环境检查的作用就是把推测变成事实。</p></li>
+</ol>
+</section>
+
+<!-- ============ 设计 ============ -->
+<section id="d-pulse">
+<h2>界面设计</h2>
+<p class="lede">以下高保真设计图基于重写后的规格制作，采用 ADR-003 确定的七项导航。设计语言：白色仪表盘、发丝级描边、蓝紫强调色、macOS 原生质感。颜色只承载状态含义，不做装饰。</p>
+
+<h3>项目脉冲 Project Pulse</h3>
+<p>有项目在进行时的默认落地页。结构固定：KPI 行 → 头条 → 六张卡。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Agent OS — GameAI Factory</span></div>
+<div class="app">
+  <div class="sb">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="sb-lab">当前项目</div>
+    <div class="proj-sel"><span class="cv"></span>GameAI Factory<span class="car">▾</span></div>
+    <div class="nav">
+      <a href="#"><span class="ic">▦</span>项目库</a>
+      <a href="#" class="on"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#"><span class="ic">✦</span>画布</a>
+      <a href="#"><span class="ic">☑</span>任务</a>
+      <a href="#"><span class="ic">◍</span>智能体</a>
+      <a href="#"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+  <div class="ct">
+    <div class="pghd">
+      <div><h1>项目脉冲</h1><div class="sub">GameAI Factory 的每日概览 · 2026年7月27日 周一</div></div>
+      <div class="sp"><span class="btn">⤓ 导出简报</span><span class="btn pri">✦ 生成日报</span></div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><span class="ki" style="background:#EEF2FF;color:#4F46E5">◍</span><div><div class="kn">8</div><div class="kl">活跃智能体</div></div></div>
+      <div class="kpi"><span class="ki" style="background:#EFF6FF;color:#2563EB">☑</span><div><div class="kn">23</div><div class="kl">进行中任务</div></div></div>
+      <div class="kpi"><span class="ki" style="background:#ECFDF5;color:#059669">✓</span><div><div class="kn">17</div><div class="kl">今日完成</div></div></div>
+      <div class="kpi"><span class="ki" style="background:#FEF2F2;color:#DC2626">⚠</span><div><div class="kn">2</div><div class="kl">阻塞项</div></div></div>
+      <div class="kpi"><span class="ki" style="background:#FFFBEB;color:#B45309">◷</span><div><div class="kn">1</div><div class="kl">待你审批</div></div></div>
+    </div>
+
+    <div class="hero-card">
+      <svg class="hero-art" viewBox="0 0 320 140" preserveAspectRatio="xMaxYMid slice">
+        <defs><linearGradient id="hg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#C7CBF5" stop-opacity=".5"/><stop offset="1" stop-color="#A5B4FC" stop-opacity=".2"/></linearGradient></defs>
+        <rect width="320" height="140" fill="url(#hg)"/>
+        <g opacity=".55">
+          <rect x="40" y="46" width="42" height="42" rx="7" fill="#fff" stroke="#8B93E8"/>
+          <rect x="94" y="46" width="42" height="42" rx="7" fill="#fff" stroke="#8B93E8"/>
+          <rect x="148" y="46" width="42" height="42" rx="7" fill="#fff" stroke="#8B93E8"/>
+          <rect x="202" y="34" width="66" height="66" rx="10" fill="#6366F1" opacity=".85"/>
+          <text x="235" y="74" text-anchor="middle" fill="#fff" style="font:600 20px sans-serif">◆</text>
+          <rect x="30" y="100" width="250" height="7" rx="3.5" fill="#8B93E8" opacity=".5"/>
+          <circle cx="61" cy="67" r="4" fill="#8B93E8"/><circle cx="115" cy="67" r="4" fill="#8B93E8"/><circle cx="169" cy="67" r="4" fill="#8B93E8"/>
+        </g>
+      </svg>
+      <div class="txt">
+        <div class="tag">TOP STORY</div>
+        <h2>Codex 完成资产管线里程碑</h2>
+        <p>自动化资源摄取、处理与优化的全部核心系统已完成，可用于生产。下游 4 个任务随之解除依赖。</p>
+        <div class="by"><span class="ab" style="width:16px;height:16px;border-radius:50%;background:#2563EB;display:grid;place-items:center;color:#fff;font-size:8px;font-weight:700">C</span>Codex · 今天 09:41 · <span style="color:#6366F1;font-weight:600">查看详情 →</span></div>
+      </div>
+      <div class="dots"><i class="on"></i><i></i><i></i><i></i></div>
+    </div>
+
+    <div class="g3">
+      <div class="card">
+        <div class="hd">◷ 今日进度<span class="all">查看全部</span></div>
+        <div class="prog-row"><div class="pl"><span>资产管线</span></div><div class="pw">Codex</div><div class="pb"><div class="bar"><i class="g" style="width:100%"></i></div><span class="pp">100%</span></div></div>
+        <div class="prog-row"><div class="pl"><span>NPC 行为系统</span></div><div class="pw">Claude</div><div class="pb"><div class="bar"><i class="g" style="width:72%"></i></div><span class="pp">72%</span></div></div>
+        <div class="prog-row"><div class="pl"><span>世界流式加载</span></div><div class="pw">Grok · 已阻塞</div><div class="pb"><div class="bar"><i class="a" style="width:45%"></i></div><span class="pp">45%</span></div></div>
+        <div class="prog-row" style="margin-bottom:0"><div class="pl"><span>游戏经济调优</span></div><div class="pw">Claude</div><div class="pb"><div class="bar"><i class="g" style="width:60%"></i></div><span class="pp">60%</span></div></div>
+        <div style="border-top:1px solid #F0F1F3;margin-top:10px;padding-top:8px" class="tiny mut">✓ 今日完成 17 个任务</div>
+      </div>
+
+      <div class="card">
+        <div class="hd">◈ 智能体活动<span class="all">查看全部</span></div>
+        <div class="feed">
+          <div class="fr"><span class="ab" style="background:#2563EB">C</span><div class="fb"><div class="fn">Codex</div><div class="fd" style="color:#059669">完成资产管线里程碑</div></div><span class="ft">09:41<i class="sd g"></i></span></div>
+          <div class="fr"><span class="ab" style="background:#D97757">✳</span><div class="fb"><div class="fn">Claude</div><div class="fd">实现 NPC 行为状态机</div></div><span class="ft">09:15<i class="sd g"></i></span></div>
+          <div class="fr"><span class="ab" style="background:#111827">✕</span><div class="fb"><div class="fn">Grok</div><div class="fd" style="color:#DC2626">已阻塞：等待世界模式定义</div></div><span class="ft">08:47<i class="sd r"></i></span></div>
+          <div class="fr"><span class="ab" style="background:#4285F4">◆</span><div class="fb"><div class="fn">Gemini</div><div class="fd">分析玩家遥测数据</div></div><span class="ft">08:30<i class="sd g"></i></span></div>
+          <div class="fr"><span class="ab" style="background:#20808D">◉</span><div class="fb"><div class="fn">Perplexity</div><div class="fd">研究网格优化技术</div></div><span class="ft">08:12<i class="sd g"></i></span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">⚠ 风险与阻塞<span class="all">查看全部</span></div>
+        <div class="risk"><div class="rt">BLOCKER</div><div class="rn">世界模式不可用</div><div class="rd">Grok 等待设计团队提供最新世界模式定义。</div><div class="tiny mut" style="margin-top:4px">影响：<b style="color:#DC2626">高</b> · 已持续 2 天 4 小时</div></div>
+        <div class="risk a"><div class="rt">APPROVAL</div><div class="rn">部署资产管线到 staging</div><div class="rd">Codex 请求批准 · 可逆 · commit a3f21c</div><div style="display:flex;gap:6px;margin-top:6px"><span class="btn" style="padding:4px 10px;color:#059669;border-color:#A7F3D0;background:#ECFDF5">✓ 批准</span><span class="btn" style="padding:4px 10px;color:#DC2626;border-color:#FECACA;background:#FEF2F2">✗ 驳回</span></div></div>
+      </div>
+
+      <div class="card">
+        <div class="hd">▤ 知识更新<span class="all">查看全部</span></div>
+        <div class="feed">
+          <div class="fr"><span class="ab" style="background:#EEF2FF;color:#4F46E5">▤</span><div class="fb"><div class="fn">资产管线技术规范</div><div class="fd">由 Codex 添加 · 09:40</div></div><span class="chip">文档</span></div>
+          <div class="fr"><span class="ab" style="background:#FFFBEB;color:#B45309">◆</span><div class="fb"><div class="fn">采用行为树而非 FSM</div><div class="fd">由 Claude 添加 · 09:10</div></div><span class="chip a">决策</span></div>
+          <div class="fr"><span class="ab" style="background:#ECFDF5;color:#059669">▣</span><div class="fb"><div class="fn">世界模式 v0.8</div><div class="fd">由设计团队添加 · 昨天</div></div><span class="chip">规格</span></div>
+        </div>
+        <div style="border-top:1px solid #F0F1F3;margin-top:10px;padding-top:8px" class="tiny mut">✓ 今日 6 条更新</div>
+      </div>
+
+      <div class="card">
+        <div class="hd">◎ 研究发现<span class="all">查看全部</span></div>
+        <div class="feed">
+          <div class="fr"><span style="width:38px;height:28px;border-radius:6px;background:linear-gradient(135deg,#A7C7E7,#7FA8D4);flex:none"></span><div class="fb"><div class="fn">实时网格优化技术</div><div class="fd">arXiv · 15 分钟阅读</div></div><span class="chip b">图形</span></div>
+          <div class="fr"><span style="width:38px;height:28px;border-radius:6px;background:linear-gradient(135deg,#C4B5FD,#8B5CF6);flex:none"></span><div class="fb"><div class="fn">基于 LLM 的 NPC 行为生成</div><div class="fd">Stanford AI Lab · 22 分钟阅读</div></div><span class="chip b">AI</span></div>
+        </div>
+        <div style="border-top:1px solid #F0F1F3;margin-top:10px;padding-top:8px" class="tiny mut">✓ 3 个新发现</div>
+      </div>
+
+      <div class="card">
+        <div class="hd">✦ AI 时刻<span class="all">查看全部</span></div>
+        <div class="feed">
+          <div class="fr"><span class="ab" style="background:#ECFDF5;color:#059669">🏆</span><div class="fb"><div class="fn" style="font-weight:520;font-size:11px;line-height:1.45;white-space:normal">Codex 自动完成 120+ 资源导入，节省约 <b>3.5 小时</b>人工。</div></div></div>
+          <div class="fr"><span class="ab" style="background:#FFFBEB;color:#B45309">⚡</span><div class="fb"><div class="fn" style="font-weight:520;font-size:11px;line-height:1.45;white-space:normal">Claude 重构 8 个系统，NPC 性能提升 <b>18%</b>。</div></div></div>
+          <div class="fr"><span class="ab" style="background:#EEF2FF;color:#4F46E5">◆</span><div class="fb"><div class="fn" style="font-weight:520;font-size:11px;line-height:1.45;white-space:normal">Gemini 识别出一条优化路径，内存占用降低 <b>32MB</b>。</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>项目脉冲。</b>注意 KPI 行第五格「待你审批」——审批是项目状态的一部分，不只是一条通知。所有数字都可点击下钻到底层事件。</div>
+</figure>
+</section>
+
+<section id="d-library">
+<h3>项目库 Project Library</h3>
+<p>没有活跃项目时的落地页。它解决的问题是：个人和小团队的项目不会结束，只会安静下来——半年后重启的成本高于剩余工作量，于是项目就死了。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Agent OS — 项目库</span></div>
+<div class="app">
+  <div class="sb">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="sb-lab">当前项目</div>
+    <div class="proj-sel"><span class="cv"></span>Old Website<span class="car">▾</span></div>
+    <div class="nav">
+      <a href="#" class="on"><span class="ic">▦</span>项目库</a>
+      <a href="#"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#"><span class="ic">✦</span>画布</a>
+      <a href="#"><span class="ic">☑</span>任务</a>
+      <a href="#"><span class="ic">◍</span>智能体</a>
+      <a href="#"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+
+  <div class="ct">
+    <div class="pghd">
+      <div><h1>项目库</h1><div class="sub">管理和浏览所有项目，AI 帮助你快速回顾与重启</div></div>
+      <div class="sp"><span class="btn">▦</span><span class="btn">☰</span><span class="btn pri">＋ 新建项目</span></div>
+    </div>
+
+    <div class="tabs">
+      <span class="tab on">全部项目<span class="n">12</span></span>
+      <span class="tab">进行中<span class="n">4</span></span>
+      <span class="tab">已暂停<span class="n">3</span></span>
+      <span class="tab">已归档<span class="n">4</span></span>
+      <span class="tab">已完成<span class="n">1</span></span>
+    </div>
+
+    <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><span class="ki" style="background:#EEF2FF;color:#4F46E5">▦</span><div><div class="kn">12</div><div class="kl">全部项目 · 较上月 +20%</div></div></div>
+      <div class="kpi"><span class="ki" style="background:#ECFDF5;color:#059669">▶</span><div><div class="kn">4</div><div class="kl">进行中 · 活跃</div></div></div>
+      <div class="kpi"><span class="ki" style="background:#FFFBEB;color:#B45309">❙❙</span><div><div class="kn">3</div><div class="kl">已暂停 · 等待继续</div></div></div>
+      <div class="kpi"><span class="ki" style="background:#EFF6FF;color:#2563EB">◷</span><div><div class="kn">68%</div><div class="kl">平均完成度</div></div></div>
+    </div>
+
+    <div class="card" style="padding:4px 2px">
+      <div class="prow">
+        <div class="pcv"><svg viewBox="0 0 64 46"><defs><linearGradient id="c1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4C1D95"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs><rect width="64" height="46" fill="url(#c1)"/><circle cx="32" cy="23" r="11" fill="none" stroke="#C4B5FD" stroke-width="1.5" opacity=".9"/><circle cx="32" cy="23" r="5" fill="#DDD6FE"/></svg></div>
+        <div><div class="pn">GameAI Factory <span class="chip b">AI</span></div><div class="pdsc">AI 游戏生成平台</div><div style="display:flex;gap:7px;align-items:center"><span class="chip g">● 进行中</span><span class="avs"><i class="a"></i><i class="a"></i><i class="a"></i><span class="more">6 个智能体</span></span></div></div>
+        <div><div class="col-lab">项目进度</div><div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:72%"></i></div><span class="tiny nums" style="font-weight:640">72%</span></div><div class="tiny mut" style="margin-top:4px">当前阶段：MVP 开发</div></div>
+        <div><div class="col-lab">技术栈</div><div class="stk"><span class="chip">Next.js</span><span class="chip">TypeScript</span><span class="chip">Python</span><span class="chip">PostgreSQL</span></div></div>
+        <div><div class="col-lab">最后活动</div><div class="tiny" style="display:flex;align-items:center;gap:5px"><i class="sd g"></i>2 小时前</div><div class="tiny mut" style="margin-top:3px">Codex 完成了 TASK-014</div></div>
+      </div>
+
+      <div class="prow sel">
+        <div class="pcv"><svg viewBox="0 0 64 46"><rect width="64" height="46" fill="#1F2937"/><rect x="5" y="6" width="54" height="7" rx="2" fill="#4B5563"/><rect x="5" y="17" width="24" height="23" rx="2" fill="#374151"/><rect x="32" y="17" width="27" height="10" rx="2" fill="#374151"/><rect x="32" y="30" width="27" height="10" rx="2" fill="#374151"/></svg></div>
+        <div><div class="pn">Old Website <span class="chip a">● 已暂停</span></div><div class="pdsc">企业官网改版项目</div><div style="display:flex;gap:7px;align-items:center"><span class="chip">中优先级</span><span class="avs"><i class="a"></i><i class="a"></i><span class="more">3 个智能体</span></span></div></div>
+        <div><div class="col-lab">项目进度</div><div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:85%"></i></div><span class="tiny nums" style="font-weight:640">85%</span></div><div class="tiny mut" style="margin-top:4px">当前阶段：功能开发</div></div>
+        <div><div class="col-lab">技术栈</div><div class="stk"><span class="chip">Next.js</span><span class="chip">Node.js</span><span class="chip">PostgreSQL</span><span class="chip">Tailwind</span></div></div>
+        <div><div class="col-lab">最后活动</div><div class="tiny" style="display:flex;align-items:center;gap:5px"><i class="sd a"></i>312 天前</div><div class="tiny mut" style="margin-top:3px">Claude 设计了新的导航结构</div></div>
+      </div>
+
+      <div class="prow">
+        <div class="pcv"><svg viewBox="0 0 64 46"><rect width="64" height="46" fill="#0F172A"/><g stroke="#38BDF8" fill="none" stroke-width="1.2" opacity=".85"><circle cx="32" cy="17" r="6"/><path d="M32 23 L32 34 M32 27 L23 33 M32 27 L41 33 M32 34 L26 42 M32 34 L38 42"/></g></svg></div>
+        <div><div class="pn">AI Rig Builder</div><div class="pdsc">3D 角色绑定工具</div><div style="display:flex;gap:7px;align-items:center"><span class="chip g">● 进行中</span><span class="avs"><i class="a"></i><i class="a"></i><span class="more">2 个智能体</span></span></div></div>
+        <div><div class="col-lab">项目进度</div><div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:45%"></i></div><span class="tiny nums" style="font-weight:640">45%</span></div><div class="tiny mut" style="margin-top:4px">当前阶段：核心功能开发</div></div>
+        <div><div class="col-lab">技术栈</div><div class="stk"><span class="chip">C++</span><span class="chip">Qt</span><span class="chip">Python</span><span class="chip">OpenGL</span></div></div>
+        <div><div class="col-lab">最后活动</div><div class="tiny" style="display:flex;align-items:center;gap:5px"><i class="sd g"></i>1 天前</div><div class="tiny mut" style="margin-top:3px">Codex 提交了新的绑定算法</div></div>
+      </div>
+
+      <div class="prow">
+        <div class="pcv"><svg viewBox="0 0 64 46"><defs><linearGradient id="c4" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F472B6"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient></defs><rect width="64" height="46" fill="url(#c4)"/><path d="M22 30 L32 14 L42 30 Z" fill="#fff" opacity=".9"/></svg></div>
+        <div><div class="pn">MacPolish</div><div class="pdsc">macOS 系统清理工具</div><div style="display:flex;gap:7px;align-items:center"><span class="chip a">● 已暂停</span><span class="avs"><i class="a"></i><span class="more">1 个智能体</span></span></div></div>
+        <div><div class="col-lab">项目进度</div><div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:42%"></i></div><span class="tiny nums" style="font-weight:640">42%</span></div><div class="tiny mut" style="margin-top:4px">当前阶段：原型开发</div></div>
+        <div><div class="col-lab">技术栈</div><div class="stk"><span class="chip">Swift</span><span class="chip">SwiftUI</span><span class="chip">CoreData</span></div></div>
+        <div><div class="col-lab">最后活动</div><div class="tiny" style="display:flex;align-items:center;gap:5px"><i class="sd a"></i>85 天前</div><div class="tiny mut" style="margin-top:3px">完成了基础扫描功能</div></div>
+      </div>
+    </div>
+
+    <div class="g3" style="margin-top:13px;grid-template-columns:1.2fr 1fr 1.1fr">
+      <div class="card">
+        <div class="hd">◷ 活跃趋势<span class="all">最近 6 个月</span></div>
+        <svg viewBox="0 0 260 84" style="width:100%;height:84px">
+          <g stroke="#F0F1F3"><line x1="0" y1="14" x2="260" y2="14"/><line x1="0" y1="40" x2="260" y2="40"/><line x1="0" y1="66" x2="260" y2="66"/></g>
+          <polyline points="10,62 52,54 94,58 136,38 178,30 220,22 250,16" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <polygon points="10,62 52,54 94,58 136,38 178,30 220,22 250,16 250,80 10,80" fill="#6366F1" opacity=".08"/>
+          <g fill="#6366F1"><circle cx="136" cy="38" r="2.5"/><circle cx="220" cy="22" r="2.5"/><circle cx="250" cy="16" r="3"/></g>
+          <g style="font:9px var(--sans)" fill="#9CA3AF"><text x="6" y="80">2月</text><text x="90" y="80">4月</text><text x="174" y="80">6月</text><text x="238" y="80">7月</text></g>
+        </svg>
+      </div>
+      <div class="card">
+        <div class="hd">◔ 技术栈分布</div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <svg viewBox="0 0 74 74" style="width:74px;height:74px;flex:none">
+            <circle cx="37" cy="37" r="28" fill="none" stroke="#6366F1" stroke-width="13" stroke-dasharray="70.4 105.6" transform="rotate(-90 37 37)"/>
+            <circle cx="37" cy="37" r="28" fill="none" stroke="#8B5CF6" stroke-width="13" stroke-dasharray="44 132" transform="rotate(11 37 37)"/>
+            <circle cx="37" cy="37" r="28" fill="none" stroke="#F59E0B" stroke-width="13" stroke-dasharray="26.4 149.6" transform="rotate(101 37 37)"/>
+            <circle cx="37" cy="37" r="28" fill="none" stroke="#10B981" stroke-width="13" stroke-dasharray="17.6 158.4" transform="rotate(155 37 37)"/>
+            <circle cx="37" cy="37" r="28" fill="none" stroke="#D1D5DB" stroke-width="13" stroke-dasharray="17.6 158.4" transform="rotate(191 37 37)"/>
+            <text x="37" y="35" text-anchor="middle" style="font:600 8px var(--sans)" fill="#9CA3AF">总计</text>
+            <text x="37" y="45" text-anchor="middle" style="font:700 12px var(--sans)" fill="#111827">28</text>
+          </svg>
+          <div style="flex:1;font-size:10.5px">
+            <div style="display:flex;justify-content:space-between;padding:1.5px 0"><span><i class="sd" style="background:#6366F1;display:inline-block;margin-right:5px"></i>JS/TS</span><b class="nums">40%</b></div>
+            <div style="display:flex;justify-content:space-between;padding:1.5px 0"><span><i class="sd" style="background:#8B5CF6;display:inline-block;margin-right:5px"></i>Python</span><b class="nums">25%</b></div>
+            <div style="display:flex;justify-content:space-between;padding:1.5px 0"><span><i class="sd" style="background:#F59E0B;display:inline-block;margin-right:5px"></i>Swift</span><b class="nums">15%</b></div>
+            <div style="display:flex;justify-content:space-between;padding:1.5px 0"><span><i class="sd" style="background:#10B981;display:inline-block;margin-right:5px"></i>C++</span><b class="nums">10%</b></div>
+            <div style="display:flex;justify-content:space-between;padding:1.5px 0"><span><i class="sd" style="background:#D1D5DB;display:inline-block;margin-right:5px"></i>其他</span><b class="nums">10%</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="hd">✦ AI 建议</div>
+        <div class="feed">
+          <div class="fr"><span class="ab" style="background:#FFFBEB;color:#B45309">!</span><div class="fb"><div class="fn" style="font-weight:520;font-size:11px;line-height:1.45;white-space:normal">有 2 个项目已暂停超过 3 个月，建议评估是否归档。</div></div></div>
+          <div class="fr"><span class="ab" style="background:#ECFDF5;color:#059669">↑</span><div class="fb"><div class="fn" style="font-weight:520;font-size:11px;line-height:1.45;white-space:normal">GameAI Factory 进展良好，可保持当前的开发节奏。</div></div></div>
+          <div class="fr"><span class="ab" style="background:#EEF2FF;color:#4F46E5">◈</span><div class="fb"><div class="fn" style="font-weight:520;font-size:11px;line-height:1.45;white-space:normal">技术栈集中在 JS/TS，团队内部知识可复用性高。</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>项目库。</b>每行五列顺序固定，任何一列都可以纵向扫读。底部「项目洞察」在组合层面给建议——例如提示两个项目暂停已超三个月。</div>
+</figure>
+</section>
+
+<section id="d-detail">
+<h3>项目详情 · 复活模式</h3>
+<p>打开一个休眠 312 天的项目。它不给你一个冷仓库，给你一份欢迎回来报告。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Old Website — 项目详情</span></div>
+<div class="app">
+  <div class="sb" style="width:166px">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="nav" style="margin-top:8px">
+      <a href="#" class="on"><span class="ic">▦</span>项目库</a>
+      <a href="#"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#"><span class="ic">✦</span>画布</a>
+      <a href="#"><span class="ic">☑</span>任务</a>
+      <a href="#"><span class="ic">◍</span>智能体</a>
+      <a href="#"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+
+  <div class="ct" style="padding:16px 18px">
+    <div class="pghd" style="align-items:center">
+      <span style="width:44px;height:44px;border-radius:12px;background:#1F2937;display:grid;place-items:center;color:#9CA3AF;font-size:19px;flex:none">◍</span>
+      <div>
+        <h1 style="display:flex;align-items:center;gap:8px">Old Website <span class="chip a">● 已暂停</span></h1>
+        <div class="sub">最后活动：312 天前（2025年9月6日 14:32） · Next.js · Node.js · PostgreSQL +2</div>
+      </div>
+      <div class="sp"><span class="btn">◈ 打开脉冲</span><span class="btn">✦ 查看画布</span><span class="btn pri">▶ 恢复项目</span></div>
+    </div>
+
+    <div class="dw-tabs" style="margin-bottom:13px">
+      <span class="on">概览</span><span>时间线</span><span>记忆</span><span>文件</span><span>设置</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1.15fr 1.25fr;gap:11px;margin-bottom:11px">
+      <div class="card">
+        <div class="hd">项目快照</div>
+        <div style="display:flex;align-items:center;gap:14px">
+          <svg viewBox="0 0 76 76" style="width:76px;height:76px;flex:none">
+            <circle cx="38" cy="38" r="30" fill="none" stroke="#EEF0F3" stroke-width="8"/>
+            <circle cx="38" cy="38" r="30" fill="none" stroke="#6366F1" stroke-width="8" stroke-linecap="round" stroke-dasharray="128 188" transform="rotate(-90 38 38)"/>
+            <text x="38" y="36" text-anchor="middle" style="font:700 17px var(--sans)" fill="#111827">68%</text>
+            <text x="38" y="49" text-anchor="middle" style="font:9.5px var(--sans)" fill="#9CA3AF">完成度</text>
+          </svg>
+          <div style="flex:1">
+            <div class="kv"><span class="k">当前阶段</span><span class="v">Beta 测试</span></div>
+            <div class="kv"><span class="k">完成度</span><span class="v nums">68%</span></div>
+            <div class="kv"><span class="k">最后活动</span><span class="v nums">312 天前</span></div>
+            <div class="kv"><span class="k">智能体数量</span><span class="v nums">6 个</span></div>
+            <div class="kv"><span class="k">健康度</span><span class="v"><span class="chip a">需检查</span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">✦ AI 项目简介<span class="all">查看完整报告</span></div>
+        <p style="font-size:11px;color:#4B5563;line-height:1.6;margin-bottom:9px">这是一个企业官网重构项目，使用 Next.js 和 Node.js 构建现代化营销网站，集成博客、案例展示和联系表单功能。</p>
+        <div style="font-size:11px;line-height:1.75">
+          <div style="display:flex;gap:7px"><span style="color:#059669">✓</span><span><b>已完成：</b>核心页面、博客系统、联系表单</span></div>
+          <div style="display:flex;gap:7px"><span style="color:#F59E0B">◐</span><span><b>未完成：</b>SEO 优化、性能优化、多语言支持</span></div>
+          <div style="display:flex;gap:7px"><span style="color:#6366F1">➤</span><span><b>下一步：</b>完善 SEO 与性能，准备上线</span></div>
+        </div>
+      </div>
+
+      <div class="revival">
+        <div class="rh">✦ Revival Mode / 欢迎回来</div>
+        <div class="rs">项目已 inactive 312 天。让我们帮你快速回到状态。</div>
+        <div class="rstats">
+          <div class="rstat"><div class="t"><i class="sd g"></i>已完成项</div><div class="n">42</div></div>
+          <div class="rstat"><div class="t"><i class="sd a"></i>未完成项</div><div class="n">18</div></div>
+          <div class="rstat"><div class="t"><i class="sd r"></i>已知问题</div><div class="n">7</div></div>
+        </div>
+        <div class="plan"><b>推荐重启计划：</b><br>1) 环境检查　2) 依赖更新　3) 修复失效问题　4) 性能优化</div>
+        <div class="rbtn">恢复项目并制定重启计划</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:11px">
+      <div class="hd">▤ 项目快照 / 节点预览<span class="all">查看全部节点快照</span></div>
+      <div class="film">
+        <div class="shot"><div class="im"><svg viewBox="0 0 118 74"><rect width="118" height="74" fill="#F3F4F6"/><rect x="8" y="8" width="102" height="9" rx="2" fill="#D1D5DB"/><rect x="8" y="23" width="46" height="43" rx="3" fill="#E5E7EB"/><rect x="60" y="23" width="50" height="19" rx="3" fill="#E5E7EB"/><rect x="60" y="47" width="50" height="19" rx="3" fill="#E5E7EB"/></svg></div><div class="cap">项目初始化</div><div class="dt">2024/03/18 <span class="chip g" style="font-size:9px;padding:1px 5px">已完成</span></div></div>
+        <div class="shot"><div class="im"><svg viewBox="0 0 118 74"><rect width="118" height="74" fill="#1E293B"/><rect x="0" y="0" width="118" height="12" fill="#0F172A"/><text x="59" y="34" text-anchor="middle" fill="#fff" style="font:600 8px var(--sans)">企业数字化解决方案</text><rect x="44" y="42" width="30" height="8" rx="4" fill="#6366F1"/><path d="M0 60 L30 50 L60 58 L90 46 L118 54 L118 74 L0 74Z" fill="#334155"/></svg></div><div class="cap">首页设计完成</div><div class="dt">2024/04/10 <span class="chip g" style="font-size:9px;padding:1px 5px">已完成</span></div></div>
+        <div class="shot"><div class="im"><svg viewBox="0 0 118 74"><rect width="118" height="74" fill="#FAFAFA"/><rect x="0" y="0" width="118" height="10" fill="#E5E7EB"/><rect x="8" y="18" width="60" height="5" rx="2" fill="#D1D5DB"/><rect x="8" y="28" width="102" height="4" rx="2" fill="#EDEEF0"/><rect x="8" y="36" width="94" height="4" rx="2" fill="#EDEEF0"/><rect x="8" y="48" width="102" height="4" rx="2" fill="#EDEEF0"/><rect x="8" y="56" width="80" height="4" rx="2" fill="#EDEEF0"/></svg></div><div class="cap">博客系统上线</div><div class="dt">2024/05/20 <span class="chip g" style="font-size:9px;padding:1px 5px">已完成</span></div></div>
+        <div class="shot"><div class="im"><svg viewBox="0 0 118 74"><rect width="118" height="74" fill="#FFF"/><rect x="24" y="10" width="70" height="54" rx="6" fill="#F9FAFB" stroke="#E5E7EB"/><text x="59" y="32" text-anchor="middle" style="font:700 11px var(--sans)" fill="#111827">¥299.00</text><rect x="36" y="42" width="46" height="10" rx="5" fill="#6366F1"/></svg></div><div class="cap">支付方案确定</div><div class="dt">2024/05/30 <span class="chip g" style="font-size:9px;padding:1px 5px">已完成</span></div></div>
+        <div class="shot"><div class="im"><svg viewBox="0 0 118 74"><rect width="118" height="74" fill="#FAFAFA"/><g fill="#A5B4FC"><rect x="14" y="42" width="10" height="22"/><rect x="30" y="32" width="10" height="32"/><rect x="46" y="38" width="10" height="26"/><rect x="62" y="20" width="10" height="44"/><rect x="78" y="28" width="10" height="36"/><rect x="94" y="14" width="10" height="50"/></g></svg></div><div class="cap">Beta 测试阶段</div><div class="dt">2024/06/01 <span class="chip b" style="font-size:9px;padding:1px 5px">进行中</span></div></div>
+        <div class="shot"><div class="im"><svg viewBox="0 0 118 74"><rect width="118" height="74" fill="#334155"/><text x="59" y="30" text-anchor="middle" fill="#fff" style="font:600 8px var(--sans)">企业数字化解决方案</text><path d="M0 44 L34 34 L68 42 L100 30 L118 38 L118 74 L0 74Z" fill="#475569"/></svg></div><div class="cap">暂停前版本</div><div class="dt">2024/06/06 <span class="chip a" style="font-size:9px;padding:1px 5px">已暂停</span></div></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1.2fr 1.15fr;gap:11px">
+      <div class="card">
+        <div class="hd">项目时间线<span class="all">查看完整时间线</span></div>
+        <div class="tl">
+          <div class="tli done"><div class="td">2024年6月6日</div><div class="tt">Beta 测试阶段完成</div><div class="tx">完成核心功能开发，进入内部测试阶段</div></div>
+          <div class="tli done"><div class="td">2024年5月20日</div><div class="tt">博客系统上线</div><div class="tx">支持 Markdown 文章、分类、标签</div></div>
+          <div class="tli done"><div class="td">2024年4月28日</div><div class="tt">联系表单集成</div><div class="tx">集成 Resend 邮件服务</div></div>
+          <div class="tli done"><div class="td">2024年4月10日</div><div class="tt">首页与导航重构</div><div class="tx">完成首页设计与响应式导航组件</div></div>
+          <div class="tli done" style="padding-bottom:0"><div class="td">2024年3月22日</div><div class="tt">项目初始化</div><div class="tx">创建 Next.js 项目，搭建基础架构</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">决策记录<span class="all">查看全部决策记录</span></div>
+        <div class="dec"><span class="di">◆</span><div><div class="dt">架构决策：选择 Next.js 作为前端框架 <span class="chip b">架构</span></div><div class="dr">基于 SEO、性能和团队熟悉度，选择 Next.js App Router</div></div><span class="dd">2024/03/22</span></div>
+        <div class="dec"><span class="di">▣</span><div><div class="dt">数据库决策：采用 PostgreSQL <span class="chip g">数据</span></div><div class="dr">需要强关系数据加 JSON 支持，相对 MongoDB 更合适</div></div><span class="dd">2024/03/25</span></div>
+        <div class="dec" style="margin-bottom:0"><span class="di">☁</span><div><div class="dt">部署方案：Vercel + Railway <span class="chip">部署</span></div><div class="dr">前端部署到 Vercel，后端 API 部署到 Railway</div></div><span class="dd">2024/04/02</span></div>
+      </div>
+
+      <div class="card">
+        <div class="hd">建议下一步<span class="all">查看全部任务</span></div>
+        <div class="nxt"><span class="nn">1</span><div class="nb"><div class="nt">环境与依赖检查</div><div class="nd">更新依赖，检查 Node 版本与环境配置</div></div><span class="ne">◷ 30 分钟</span><span class="np">▶</span></div>
+        <div class="nxt"><span class="nn">2</span><div class="nb"><div class="nt">修复关键问题</div><div class="nd">解决 7 个已知问题，确保项目可稳定运行</div></div><span class="ne">◷ 2 小时</span><span class="np">▶</span></div>
+        <div class="nxt" style="margin-bottom:0"><span class="nn">3</span><div class="nb"><div class="nt">SEO 与性能优化</div><div class="nd">完善 SEO 配置，优化页面性能与加载速度</div></div><span class="ne">◷ 3 小时</span><span class="np">▶</span></div>
+        <div class="tiny mut" style="margin-top:9px;padding-top:8px;border-top:1px solid #F0F1F3">⚠ 依赖更新与 API 弃用标记为<b>可能已失效</b>，由第 1 步验证</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>项目详情与复活模式。</b>复活报告的每一项输入都已经以事件和知识的形式存在——它不采集任何新数据，只是一次查询，恰好是这个产品里最有价值的那次查询。</div>
+</figure>
+</section>
+
+<section id="d-menubar">
+<h3>菜单栏挂件</h3>
+<p>它是一个对等界面，不是快捷方式。存在的意义是让人不打开应用就能回答「有没有事等我」。</p>
+
+<figure>
+<div class="mbwrap">
+  <div class="mbtop">
+    <span style="font-weight:700"></span><span style="font-weight:650">Agent OS</span><span>文件</span><span>编辑</span><span>显示</span><span>窗口</span><span>帮助</span>
+    <span class="rt"><span class="act">◈</span><span>◍</span><span>▮</span><span>⌕</span><span>7月27日 周一 9:41</span></span>
+  </div>
+  <div class="mbpanel">
+    <div class="mbsec">
+      <div class="mbhd"><span class="sb-mark" style="width:20px;height:20px;font-size:10px">◈</span>Agent OS<span class="gear">⚙</span></div>
+      <div class="mbstat"><i class="sd g"></i>所有系统运行正常</div>
+    </div>
+    <div class="mbsec">
+      <div class="tiny mut" style="margin-bottom:5px">当前项目</div>
+      <div class="proj-sel" style="margin:0"><span class="cv"></span>GameAI Factory<span class="car">▾</span></div>
+    </div>
+    <div class="mbsec">
+      <div class="mbk">
+        <div class="b"><div class="n">6</div><div class="l">活跃智能体</div></div>
+        <div class="b"><div class="n">23</div><div class="l">活跃任务</div></div>
+        <div class="b" style="border-color:#FECACA;background:#FEF7F7"><div class="n" style="color:#DC2626">2</div><div class="l">阻塞项</div></div>
+      </div>
+    </div>
+    <div class="mbsec">
+      <div class="sh">智能体状态</div>
+      <div class="agrow"><span class="ab" style="background:#2563EB">C</span><span class="an">Codex</span><span class="as"><i class="sd g"></i>运行中</span><span class="aw">正在完成资产管线</span></div>
+      <div class="agrow"><span class="ab" style="background:#D97757">✳</span><span class="an">Claude</span><span class="as"><i class="sd g"></i>运行中</span><span class="aw">实施 NPC 行为树</span></div>
+      <div class="agrow"><span class="ab" style="background:#111827">✕</span><span class="an">Grok</span><span class="as"><i class="sd r"></i>已阻塞</span><span class="aw">等待世界模式</span></div>
+      <div class="agrow"><span class="ab" style="background:#4285F4">◆</span><span class="an">Gemini</span><span class="as"><i class="sd g"></i>运行中</span><span class="aw">正在分析遥测数据</span></div>
+      <div class="agrow"><span class="ab" style="background:#20808D">◉</span><span class="an">Perplexity</span><span class="as"><i class="sd g"></i>运行中</span><span class="aw">正在研究优化方案</span></div>
+      <div class="agrow"><span class="ab" style="background:#F2A73B">M</span><span class="an">Mistral</span><span class="as"><i class="sd g"></i>运行中</span><span class="aw">正在编写集成测试</span></div>
+    </div>
+    <div class="mbsec">
+      <div class="sh">关键阻塞项<span class="all">查看全部</span></div>
+      <div style="display:flex;gap:9px"><span class="ab" style="width:20px;height:20px;border-radius:50%;background:#111827;display:grid;place-items:center;color:#fff;font-size:9px;font-weight:700;flex:none">✕</span>
+      <div><div style="font-size:11.5px;font-weight:620">世界模式不可用</div><div style="font-size:10.5px;color:#6B7280;line-height:1.5">Grok 因等待最新世界模式架构而阻塞。</div><div class="tiny mut" style="margin-top:3px">影响级别：<b style="color:#DC2626">高</b> · 自从 7月25日 16:20</div></div></div>
+    </div>
+    <div class="mbsec">
+      <div class="sh">审批事项<span class="all">查看全部</span></div>
+      <div class="apv">
+        <span class="ai">◲</span>
+        <div><div class="at">将资产管线部署到 staging</div><div class="am">请求方：Codex · 2 分钟前 · <span style="color:#059669">可逆</span></div></div>
+        <span class="yn"><i class="y">✓</i><i class="n">✗</i></span>
+      </div>
+      <div class="apv" style="margin-top:9px;padding-top:9px;border-top:1px solid #F5F6F7">
+        <span class="ai" style="background:#FEF2F2;color:#DC2626">⚠</span>
+        <div><div class="at">删除旧资源存储桶</div><div class="am">请求方：Codex · 8 分钟前 · <span style="color:#DC2626">不可逆</span></div></div>
+        <span class="yn"><i style="width:auto;padding:0 9px;font-size:10.5px;color:#4F46E5;border-color:#C7D2FE;background:#EEF2FF">在应用中查看 ›</i></span>
+      </div>
+    </div>
+    <div class="mbsec">
+      <div class="sh">快速操作</div>
+      <div class="qa"><span class="q">◈ 打开脉冲</span><span class="q">✦ 打开画布</span><span class="q">❙❙ 全部暂停</span></div>
+    </div>
+    <div class="mbsec" style="display:flex;align-items:center;font-size:12px;font-weight:600">打开 Agent OS<span style="margin-left:auto;color:#9CA3AF">›</span></div>
+  </div>
+  <div class="dock">
+    <i style="background:linear-gradient(135deg,#5EC5F5,#2196F3)"></i>
+    <i style="background:linear-gradient(135deg,#F5F5F7,#D8D8DC)"></i>
+    <i style="background:linear-gradient(135deg,#5EC5F5,#1E88E5)"></i>
+    <i style="background:linear-gradient(135deg,#6DD36D,#34C759)"></i>
+    <i style="background:linear-gradient(135deg,#FF6B6B,#EE3B3B)"></i>
+    <i style="background:linear-gradient(135deg,#FFD166,#FFB020)"></i>
+    <i style="background:linear-gradient(135deg,#6366F1,#8B5CF6);box-shadow:0 0 0 2px rgba(255,255,255,.7)"></i>
+    <i style="background:linear-gradient(135deg,#3A3A3C,#1C1C1E)"></i>
+    <i style="background:linear-gradient(135deg,#FF7BA9,#FF2D55)"></i>
+  </div>
+</div>
+<div class="mockcap"><b>菜单栏挂件。</b>注意第二条审批：<b>不可逆</b>的动作在这里<b>不可决定</b>，只提供「在应用中查看」。从菜单栏一键批准一个破坏性操作，是迟早要出事的设计。图标只在有待审批或阻塞时变化——如果进度也让它变，人很快就学会无视它。</div>
+</figure>
+</section>
+
+<section id="d-tasks">
+<h3>任务 Tasks</h3>
+<p>生命周期在这里可见。状态色与全局一致：进行中蓝、阻塞红、待验收琥珀、已完成绿。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Agent OS — 任务</span></div>
+<div class="app" style="min-height:430px">
+  <div class="sb" style="width:166px">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="nav" style="margin-top:8px">
+      <a href="#"><span class="ic">▦</span>项目库</a>
+      <a href="#"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#"><span class="ic">✦</span>画布</a>
+      <a href="#" class="on"><span class="ic">☑</span>任务</a>
+      <a href="#"><span class="ic">◍</span>智能体</a>
+      <a href="#"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+  <div class="ct">
+    <div class="pghd">
+      <div><h1>任务</h1><div class="sub">GameAI Factory · 23 个进行中 · 2 个阻塞</div></div>
+      <div class="sp"><span class="seg"><span class="on">列表</span><span>看板</span><span>依赖图</span></span><span class="btn pri">＋ 新建任务</span></div>
+    </div>
+    <div class="tabs">
+      <span class="tab on">全部<span class="n">47</span></span><span class="tab">created<span class="n">6</span></span><span class="tab">assigned<span class="n">4</span></span><span class="tab">running<span class="n">11</span></span><span class="tab">blocked<span class="n">2</span></span><span class="tab">review<span class="n">3</span></span><span class="tab">completed<span class="n">21</span></span>
+    </div>
+    <div class="card" style="padding:11px 0 4px">
+      <div class="tk-hd"><span>ID</span><span>任务</span><span>状态</span><span>进度</span><span>能力</span><span>执行者</span></div>
+      <div class="tk">
+        <span class="id">TASK-014</span>
+        <div><div class="ti">实现资产管线 webhook 处理</div><div class="tg">GOAL-002 · 依赖 TASK-012</div></div>
+        <span><span class="st run"><i class="sd b"></i>running</span></span>
+        <div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:65%"></i></div><span class="tiny nums" style="font-weight:640">65%</span></div>
+        <span class="chip">coding</span>
+        <span class="exq"><i class="ab" style="background:#2563EB">C</i>Codex</span>
+      </div>
+      <div class="tk">
+        <span class="id">TASK-017</span>
+        <div><div class="ti">世界流式加载核心循环</div><div class="tg">GOAL-003 · 阻塞 2 天 4 小时</div></div>
+        <span><span class="st blk"><i class="sd r"></i>blocked</span></span>
+        <div style="display:flex;align-items:center;gap:7px"><div class="bar"><i class="a" style="width:45%"></i></div><span class="tiny nums" style="font-weight:640">45%</span></div>
+        <span class="chip">coding</span>
+        <span class="exq"><i class="ab" style="background:#111827">✕</i>Grok</span>
+      </div>
+      <div class="tk">
+        <span class="id">TASK-019</span>
+        <div><div class="ti">NPC 行为树实现</div><div class="tg">GOAL-003 · 待人工验收</div></div>
+        <span><span class="st rev"><i class="sd a"></i>review</span></span>
+        <div style="display:flex;align-items:center;gap:7px"><div class="bar"><i class="g" style="width:100%"></i></div><span class="tiny nums" style="font-weight:640">100%</span></div>
+        <span class="chip">coding</span>
+        <span class="exq"><i class="ab" style="background:#D97757">✳</i>Claude</span>
+      </div>
+      <div class="tk">
+        <span class="id">TASK-021</span>
+        <div><div class="ti">玩家遥测数据分析</div><div class="tg">GOAL-004</div></div>
+        <span><span class="st run"><i class="sd b"></i>running</span></span>
+        <div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:38%"></i></div><span class="tiny nums" style="font-weight:640">38%</span></div>
+        <span class="chip">data</span>
+        <span class="exq"><i class="ab" style="background:#4285F4">◆</i>Gemini</span>
+      </div>
+      <div class="tk">
+        <span class="id">TASK-022</span>
+        <div><div class="ti">集成测试套件</div><div class="tg">GOAL-002 · 依赖 TASK-014</div></div>
+        <span><span class="st asg">assigned</span></span>
+        <div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:0"></i></div><span class="tiny nums mut">—</span></div>
+        <span class="chip">testing</span>
+        <span class="exq"><i class="ab" style="background:#F2A73B">M</i>Mistral</span>
+      </div>
+      <div class="tk">
+        <span class="id">TASK-023</span>
+        <div><div class="ti">多语言资源加载策略调研</div><div class="tg">GOAL-005 · 等待能力匹配</div></div>
+        <span><span class="st new">created</span></span>
+        <div style="display:flex;align-items:center;gap:7px"><div class="bar"><i style="width:0"></i></div><span class="tiny nums mut">—</span></div>
+        <span class="chip">research</span>
+        <span class="tiny mut">未指派</span>
+      </div>
+      <div class="tk">
+        <span class="id">TASK-012</span>
+        <div><div class="ti">资产管线核心系统</div><div class="tg">GOAL-002 · 今日 09:41 验收</div></div>
+        <span><span class="st don"><i class="sd g"></i>completed</span></span>
+        <div style="display:flex;align-items:center;gap:7px"><div class="bar"><i class="g" style="width:100%"></i></div><span class="tiny nums" style="font-weight:640">100%</span></div>
+        <span class="chip">coding</span>
+        <span class="exq"><i class="ab" style="background:#2563EB">C</i>Codex</span>
+      </div>
+    </div>
+    <div class="tiny mut" style="margin-top:10px;display:flex;gap:16px">
+      <span>◷ TASK-019 已在 review 停留 3 小时，等待你验收</span>
+      <span>⚠ TASK-023 所需能力 <code style="font-size:10px">research</code> 当前无空闲智能体</span>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>任务列表。</b>TASK-019 进度 100% 但状态是 <code>review</code> 而不是 <code>completed</code>——这就是「进度不触发转移」的可视化。TASK-023 没有执行者，因为所需能力暂时无人具备，系统把它显式浮出而不是静默滞留。</div>
+</figure>
+</section>
+
+<section id="d-agents">
+<h3>智能体 Agents</h3>
+<p>Runtime 已按 ADR-003 折叠进这里——运行时状态就是智能体状态，两份同样的名单只会让人问「哪个是准的」。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Agent OS — 智能体</span></div>
+<div class="app" style="min-height:400px">
+  <div class="sb" style="width:166px">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="nav" style="margin-top:8px">
+      <a href="#"><span class="ic">▦</span>项目库</a>
+      <a href="#"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#"><span class="ic">✦</span>画布</a>
+      <a href="#"><span class="ic">☑</span>任务</a>
+      <a href="#" class="on"><span class="ic">◍</span>智能体</a>
+      <a href="#"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+  <div class="ct">
+    <div class="pghd">
+      <div><h1>智能体</h1><div class="sub">6 个已注册 · 按能力调度，不按厂商</div></div>
+      <div class="sp"><span class="btn">◲ 能力覆盖表</span><span class="btn pri">＋ 注册智能体</span></div>
+    </div>
+
+    <div class="agc" style="margin-bottom:11px">
+      <div class="agcard">
+        <div class="t"><span class="ab" style="background:#6366F1">◈</span><div><div class="nm">Supervisor</div><div class="rl">supervisor · 内置</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
+        <div class="tiny mut">正在协调 5 个智能体 · 23 个任务</div>
+        <div class="caps"><span class="chip b">planning</span><span class="chip b">routing</span></div>
+        <div class="mtr"><div class="m"><div class="n">47</div><div class="l">已派发</div></div><div class="m"><div class="n">3</div><div class="l">已升级</div></div><div class="m"><div class="n">—</div><div class="l">不执行</div></div></div>
+      </div>
+      <div class="agcard">
+        <div class="t"><span class="ab" style="background:#2563EB">C</span><div><div class="nm">Codex</div><div class="rl">developer · openai</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
+        <div class="tiny mut">TASK-014 · 实现 webhook 处理</div>
+        <div class="caps"><span class="chip">coding</span><span class="chip">testing</span><span class="chip">git</span></div>
+        <div class="mtr"><div class="m"><div class="n">18</div><div class="l">完成</div></div><div class="m"><div class="n">2/2</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#059669">98%</div><div class="l">健康</div></div></div>
+      </div>
+      <div class="agcard">
+        <div class="t"><span class="ab" style="background:#D97757">✳</span><div><div class="nm">Claude</div><div class="rl">architect · anthropic</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
+        <div class="tiny mut">TASK-019 · 已提交待验收</div>
+        <div class="caps"><span class="chip">architecture</span><span class="chip">coding</span><span class="chip">review</span></div>
+        <div class="mtr"><div class="m"><div class="n">14</div><div class="l">完成</div></div><div class="m"><div class="n">1/2</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#059669">99%</div><div class="l">健康</div></div></div>
+      </div>
+      <div class="agcard" style="border-color:#FECACA;background:#FFFCFC">
+        <div class="t"><span class="ab" style="background:#111827">✕</span><div><div class="nm">Grok</div><div class="rl">developer · xai</div></div><span class="chip r" style="margin-left:auto">● 已阻塞</span></div>
+        <div class="tiny" style="color:#DC2626">TASK-017 · 等待世界模式定义 · 2 天 4 小时</div>
+        <div class="caps"><span class="chip">coding</span><span class="chip">data</span></div>
+        <div class="mtr"><div class="m"><div class="n">7</div><div class="l">完成</div></div><div class="m"><div class="n">1/1</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#B45309">72%</div><div class="l">健康</div></div></div>
+      </div>
+      <div class="agcard">
+        <div class="t"><span class="ab" style="background:#4285F4">◆</span><div><div class="nm">Gemini</div><div class="rl">analyst · google</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
+        <div class="tiny mut">TASK-021 · 玩家遥测分析</div>
+        <div class="caps"><span class="chip">data</span><span class="chip">research</span></div>
+        <div class="mtr"><div class="m"><div class="n">9</div><div class="l">完成</div></div><div class="m"><div class="n">1/3</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#059669">96%</div><div class="l">健康</div></div></div>
+      </div>
+      <div class="agcard">
+        <div class="t"><span class="ab" style="background:#20808D">◉</span><div><div class="nm">Perplexity</div><div class="rl">researcher · perplexity</div></div><span class="chip" style="margin-left:auto">○ 空闲</span></div>
+        <div class="tiny mut">无任务 · 可接受指派</div>
+        <div class="caps"><span class="chip">research</span><span class="chip">writing</span></div>
+        <div class="mtr"><div class="m"><div class="n">11</div><div class="l">完成</div></div><div class="m"><div class="n">0/2</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#059669">100%</div><div class="l">健康</div></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">◲ 能力覆盖<span class="all">路由只读这一行，不读厂商</span></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:9px">
+        <div><div class="tiny mut">architecture</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="g" style="width:34%"></i></div><span class="tiny nums">1</span></div></div>
+        <div><div class="tiny mut">coding</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="g" style="width:100%"></i></div><span class="tiny nums">3</span></div></div>
+        <div><div class="tiny mut">testing</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="g" style="width:67%"></i></div><span class="tiny nums">2</span></div></div>
+        <div><div class="tiny mut">research</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="g" style="width:67%"></i></div><span class="tiny nums">2</span></div></div>
+        <div><div class="tiny mut">design</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i style="width:4%;background:#EF4444"></i></div><span class="tiny nums" style="color:#DC2626">0</span></div></div>
+      </div>
+      <div class="tiny" style="margin-top:9px;padding-top:8px;border-top:1px solid #F0F1F3;color:#DC2626">⚠ 能力 <code style="font-size:10px">design</code> 无任何已注册智能体——依赖该能力的任务会滞留在 created，Supervisor 已将其升级。</div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>智能体视图。</b>底部的能力覆盖表是这个架构决定的直接产物：你关心的是「design 这项能力有没有人能做」，而不是「有没有接入某家厂商」。</div>
+</figure>
+</section>
+
+<section id="d-threads">
+<h3>智能体对话 Threads</h3>
+<p>看智能体之间到底说了什么。<strong>这不是新增数据采集</strong>——<code>send_message</code> 一直在发 <code>message.sent</code> 事件，消息早就在日志里了。这个功能是一个 reducer 加一个界面。</p>
+
+<div class="note"><b>放在哪里：ADR-006。</b>它没有成为第八个导航项。会话是任务与智能体已有对象的一种<b>渲染</b>，不是新的对象域——开这个口子，ADR-003 关掉的 Runtime、Project Info、知识图谱就都能重新申诉。它折进<b>智能体</b>，用「目录 / 对话」切换，和记忆的列表/图谱是同一个机制。智能体原本是最单薄的一个目的地，正好承接。</p></div>
+
+<h4 style="font-size:15px;font-weight:640;margin:22px 0 6px">会话怎么划分</h4>
+<p>一个任务一条会话，另加每个项目一条「项目会话」承接没带 task 的消息。<strong>按参与者分组是筛选，不是第二套分组规则</strong>——「Claude ↔ Codex」横跨他们合作过的所有任务，会话就没有主题了，消息也失去了让它可读的上下文。两套分组规则意味着每条消息属于两条会话，「我该在哪儿回复」就没有答案。</p>
+
+<h4 style="font-size:15px;font-weight:640;margin:22px 0 6px">关键设计：把生命周期事件织进去</h4>
+<p>只显示消息的会话读起来是一段悬空的聊天。把任务自己的生命周期事件折进同一条流，它才变成一份工作记录——你能直接看到「这个问题问出来之后任务就阻塞了，人回答之后才解除」。</p>
+<pre><code>09:02  ◆ Claude → Codex          instruction
+       实现 webhook 处理，幂等性必须保证
+───────────────────────────────  TASK-014 · running · Codex 开始执行
+09:41  ◆ Codex → Claude          question
+       重复投递的重试语义没定义，按 at-least-once 还是去重?
+───────────────────────────────  TASK-014 · blocked · 等待人工决策  ⚠
+10:15  ◆ 你 → Codex              answer
+       用幂等键去重。这个决策我记进记忆了。
+───────────────────────────────  TASK-014 · running · 阻塞解除</code></pre>
+<p>分隔线永远不渲染成消息气泡——「有人说了什么」和「发生了什么」的视觉区分是承重的。</p>
+
+<h4 style="font-size:15px;font-weight:640;margin:22px 0 6px">协议增量</h4>
+<p><code>send_message</code> 增加三个字段，都是向后兼容的：</p>
+<table>
+<tr><th>字段</th><th>作用</th></tr>
+<tr><td><code>replyTo</code></td><td>被回复消息的事件 id。驱动引用显示，也让 <code>answer</code> 能和它的 <code>question</code> 配上对</td></tr>
+<tr><td><code>attachments</code></td><td>产出路径或 <code>KN-*</code> 知识 id。<b>只是引用</b>，附加不搬运任何东西</td></tr>
+<tr><td><code>to: "*"</code></td><td>寻址任务上的全部智能体。仍是单个字符串而不是数组——事件是永久的，协议改动能小就小</td></tr>
+</table>
+
+<h4 style="font-size:15px;font-weight:640;margin:22px 0 6px">人可以发言，但发言不是批准</h4>
+<div class="note warn"><b>这条是硬约束。</b>人在会话里发言会带 <code>actor.kind: "human"</code> 发出 <code>message.sent</code>，它能改变智能体接下来做什么——这正是「不取消整个运行就把方向拨回来」的方式。但它<b>不能</b>批准一个待处理的 <code>request_approval</code>。如果实现让会话里一句「行，你继续」满足了待审批，审批闸门就已经被绕过了。因此输入框在会话里<b>不提供批准/拒绝按钮</b>，待审批渲染成一条指向审批界面的分隔线。</div>
+
+<h4 style="font-size:15px;font-weight:640;margin:22px 0 6px">和另外两个界面的区别</h4>
+<p>三个地方都展示智能体通信。它们不冗余，而且这个区分要一直保持锋利：</p>
+<table>
+<tr><th>界面</th><th>展示</th><th>回答</th></tr>
+<tr><td><b>脉冲 · 智能体活动</b></td><td>跨任务的近期<b>动作</b>，每条一行</td><td>团队现在在干什么？</td></tr>
+<tr><td><b>画布</b></td><td>智能体节点之间的消息边</td><td>谁和谁在结构上有通信？</td></tr>
+<tr><td><b>对话</b></td><td>完整消息内容，按序，带任务上下文</td><td>他们究竟说了什么，这个任务为什么走成这样？</td></tr>
+</table>
+<p>脉冲是仪表盘，画布是地图，对话是<strong>逐字记录</strong>。任何两个开始趋同，就是那个漂移的错了。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Agent OS — 智能体 · 对话</span></div>
+<div class="app" style="min-height:520px">
+  <div class="sb" style="width:166px">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="nav" style="margin-top:8px">
+      <a href="#"><span class="ic">▦</span>项目库</a>
+      <a href="#"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#"><span class="ic">✦</span>画布</a>
+      <a href="#"><span class="ic">☑</span>任务</a>
+      <a href="#" class="on"><span class="ic">◍</span>智能体</a>
+      <a href="#"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+    <div style="padding:16px 18px 12px">
+      <div class="pghd" style="margin-bottom:0">
+        <div><h1>智能体</h1><div class="sub">6 个已注册 · 4 条会话有未读</div></div>
+        <div class="sp"><span class="seg"><span>目录</span><span class="on">对话</span></span><span class="btn">⌕ 全局搜索</span></div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex:1;border-top:1px solid #E8EAED;min-height:0">
+      <div class="thcol">
+        <div class="thsearch">⌕ 搜索会话与消息</div>
+        <div class="thtabs"><span class="on">全部 12</span><span>未读 4</span><span>阻塞 2</span></div>
+
+        <div class="throw on"><span class="dot"></span>
+          <div class="tl1"><span class="id">TASK-014</span>webhook 处理<span class="tm">4 分钟前</span></div>
+          <div class="pv">Codex: 重复投递的重试语义没定义，按…</div>
+          <div class="tl3"><span class="avs"><i class="a" style="background:#D97757"></i><i class="a" style="background:#2563EB"></i><i class="a" style="background:linear-gradient(135deg,#A5B4FC,#818CF8)"></i></span><span class="chip a" style="margin-left:6px">⚠ blocked</span><span class="unread">2</span></div>
+        </div>
+
+        <div class="throw"><span class="dot"></span>
+          <div class="tl1"><span class="id">TASK-017</span>世界流式加载<span class="tm">2 天前</span></div>
+          <div class="pv">Grok: 等待设计团队提供世界模式定义</div>
+          <div class="tl3"><span class="avs"><i class="a" style="background:#111827"></i><i class="a" style="background:#D97757"></i></span><span class="chip r" style="margin-left:6px">⚠ blocked</span><span class="unread">1</span></div>
+        </div>
+
+        <div class="throw">
+          <div class="tl1"><span class="id">TASK-019</span>NPC 行为树<span class="tm">今天 09:15</span></div>
+          <div class="pv">Claude: 已提交待验收，行为树替换了 FSM</div>
+          <div class="tl3"><span class="avs"><i class="a" style="background:#D97757"></i><i class="a" style="background:#F2A73B"></i></span><span class="chip a" style="margin-left:6px">review</span></div>
+        </div>
+
+        <div class="throw">
+          <div class="tl1"><span class="id">TASK-012</span>资产管线核心<span class="tm">今天 09:41</span></div>
+          <div class="pv">Codex: 全部核心系统完成，可用于生产</div>
+          <div class="tl3"><span class="avs"><i class="a" style="background:#2563EB"></i><i class="a" style="background:#D97757"></i></span><span class="chip g" style="margin-left:6px">✓ completed</span></div>
+        </div>
+
+        <div class="throw">
+          <div class="tl1"><span class="id">TASK-021</span>玩家遥测分析<span class="tm">昨天</span></div>
+          <div class="pv">Gemini: 已识别一条内存优化路径</div>
+          <div class="tl3"><span class="avs"><i class="a" style="background:#4285F4"></i></span></div>
+        </div>
+
+        <div class="throw" style="margin-top:auto;background:#FAFAFB">
+          <div class="tl1"><span class="id">项目</span>项目会话<span class="tm">3 天前</span></div>
+          <div class="pv">未绑定任务的消息</div>
+        </div>
+      </div>
+
+      <div class="mgpane">
+        <div class="mghd">
+          <span style="width:26px;height:26px;border-radius:8px;background:#EEF2FF;color:#4F46E5;display:grid;place-items:center;font-size:11px;flex:none">☑</span>
+          <div><div class="t">TASK-014 · 实现资产管线 webhook 处理</div><div class="s">Claude · Codex · 你　—　3 位参与者 · 11 条消息</div></div>
+          <span class="chip r" style="margin-left:auto">⚠ blocked</span>
+          <span class="btn" style="padding:5px 10px">打开任务 ›</span>
+        </div>
+
+        <div class="mgfilt"><span>全部类型 ▾</span><span>全部参与者 ▾</span><span style="color:#9CA3AF">⌕ 在本会话中搜索</span></div>
+
+        <div class="mgbody">
+          <div class="msg">
+            <span class="av" style="background:#D97757">✳</span>
+            <div class="bd">
+              <div class="mh"><span class="nm">Claude</span><span class="mtag ins">instruction</span><span class="tt2">09:02</span></div>
+              <div class="ct">按架构规格 v2 实现 webhook 处理。幂等性必须保证——Stripe 会重复投递。</div>
+              <div class="att"><span class="chip b">◆ KN-021 采用 PostgreSQL</span></div>
+            </div>
+          </div>
+
+          <div class="divi"><b>TASK-014</b> · running · Codex 开始执行 · 09:04</div>
+
+          <div class="fold">⋯ Codex 的 6 条进度更新（0% → 65%）<span class="ex">展开</span></div>
+
+          <div class="msg">
+            <span class="av" style="background:#2563EB">C</span>
+            <div class="bd">
+              <div class="mh"><span class="nm">Codex</span><span class="mtag qst">question</span><span class="tt2">09:41</span></div>
+              <div class="ct">重复投递的重试语义没定义。按 at-least-once 让下游自己去重，还是我在 handler 里用幂等键去重？两种在数据一致性上不等价。</div>
+              <div class="quote">↳ 回复 Claude 09:02 的 instruction</div>
+              <div class="att"><span class="chip">▤ src/webhooks/handler.ts</span></div>
+            </div>
+          </div>
+
+          <div class="divi warn"><b>TASK-014</b> · blocked · needs: human · 等待人工决策 ⚠ · 09:44</div>
+
+          <div class="msg human">
+            <span class="av" style="background:linear-gradient(135deg,#A5B4FC,#818CF8)">你</span>
+            <div class="bd">
+              <div class="mh"><span class="nm">你</span><span class="chip b" style="font-size:9.5px">人工</span><span class="mtag ans">answer</span><span class="tt2">10:15</span></div>
+              <div class="ct">用幂等键在 handler 里去重。下游不该承担这个责任。</div>
+              <div class="quote">↳ 回复 Codex 09:41 的 question</div>
+            </div>
+          </div>
+
+          <div class="divi ok"><b>TASK-014</b> · running · 阻塞解除，进度保留在 65% · 10:16</div>
+
+          <div class="msg">
+            <span class="av" style="background:#D97757">✳</span>
+            <div class="bd">
+              <div class="mh"><span class="nm">Claude</span><span class="mtag rpt">report</span><span class="tt2">10:18</span></div>
+              <div class="ct">已把这个决定写进记忆，后续任务不用再问一遍。</div>
+              <div class="att"><span class="chip b">◆ KN-058 webhook 幂等策略</span></div>
+            </div>
+          </div>
+
+          <div class="divi warn">◲ <b>待你审批</b> · Codex 请求部署到 staging · 可逆 · <span style="color:#4F46E5;font-weight:600">在审批界面处理 ›</span> · 10:22</div>
+        </div>
+
+        <div class="compose">
+          <span class="ph">@Codex　回复本会话…</span>
+          <span class="tiny mut">⌘↵</span>
+          <span class="snd">发送</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>智能体 · 对话。</b>注意三处：<b>生命周期分隔线</b>用发丝线而不是气泡，把「问题→阻塞→回答→解除」这条因果链直接摆出来；<b>6 条 progress 折成一行</b>，它们在长运行里占了大部分体量却几乎没有信息量；底部那条待审批只给「在审批界面处理」的链接，<b>输入框里没有批准按钮</b>——一句「行，你继续」不能满足待审批。人的消息也是左对齐的，只用强调色左边框区分：这是一支团队的逐字记录，右对齐会错误暗示人是对话的一方。</div>
+</figure>
+</section>
+
+<section id="d-memory">
+<h3>记忆 Memory</h3>
+<p>知识图谱按 ADR-003 折叠成这里的视图切换——图是记忆的一种渲染，不是另一份语料。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Agent OS — 记忆</span></div>
+<div class="app" style="min-height:400px">
+  <div class="sb" style="width:166px">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="nav" style="margin-top:8px">
+      <a href="#"><span class="ic">▦</span>项目库</a>
+      <a href="#"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#"><span class="ic">✦</span>画布</a>
+      <a href="#"><span class="ic">☑</span>任务</a>
+      <a href="#"><span class="ic">◍</span>智能体</a>
+      <a href="#" class="on"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+  <div class="ct">
+    <div class="pghd">
+      <div><h1>记忆</h1><div class="sub">Old Website · 61 个知识项 · 全部可追溯到源事件</div></div>
+      <div class="sp"><span class="seg"><span class="on">列表</span><span>图谱</span></span><span class="btn">⌕ 为什么用 postgres</span></div>
+    </div>
+    <div class="tabs">
+      <span class="tab on">全部<span class="n">61</span></span><span class="tab">决策<span class="n">12</span></span><span class="tab">研究<span class="n">9</span></span><span class="tab">技术笔记<span class="n">18</span></span><span class="tab">任务总结<span class="n">17</span></span><span class="tab">里程碑<span class="n">5</span></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:11px">
+      <div class="card">
+        <div class="knw">
+          <span class="ki" style="background:#EEF2FF;color:#4F46E5">◆</span>
+          <div style="flex:1">
+            <div class="kt">采用 PostgreSQL <span class="chip b">决策</span><span class="chip">KN-021</span></div>
+            <div class="ks">相对 MongoDB 被选中：schema 需要强关系连接，同时仍需 JSON 列支持。</div>
+            <div class="ks" style="color:#6B7280"><b>备选：</b>MongoDB · SQLite　　<b>可重估条件：</b>JSON 用量显著增长</div>
+            <div class="kw">Claude · 2024/03/25 · 来源 4 条事件 · 关联 TASK-012</div>
+          </div>
+        </div>
+        <div class="knw">
+          <span class="ki" style="background:#EEF2FF;color:#4F46E5">◆</span>
+          <div style="flex:1">
+            <div class="kt">选择 Next.js App Router <span class="chip b">决策</span><span class="chip">KN-018</span></div>
+            <div class="ks">基于 SEO、性能与团队熟悉度，相对 Pages Router 与 Remix 被选中。</div>
+            <div class="kw">Claude · 2024/03/22 · 来源 6 条事件 · 关联 TASK-003</div>
+          </div>
+        </div>
+        <div class="knw">
+          <span class="ki" style="background:#FFFBEB;color:#B45309">↺</span>
+          <div style="flex:1">
+            <div class="kt">邮件服务：Resend <span class="chip a">已覆盖前一决策</span><span class="chip">KN-034</span></div>
+            <div class="ks">取代 KN-027（SendGrid）。原因：模板 API 更简洁，成本更低。<span style="color:#9CA3AF">KN-027 仍可读。</span></div>
+            <div class="kw">Codex · 2024/04/28 · 来源 3 条事件</div>
+          </div>
+        </div>
+        <div class="knw">
+          <span class="ki" style="background:#ECFDF5;color:#059669">◎</span>
+          <div style="flex:1">
+            <div class="kt">竞品分析报告 <span class="chip g">研究</span><span class="chip">KN-009</span></div>
+            <div class="ks">分析了 6 个竞品网站的功能与设计，提炼出导航结构与案例展示模式。</div>
+            <div class="kw">Perplexity · 2024/03/18 · 来源 11 条事件</div>
+          </div>
+        </div>
+        <div class="knw">
+          <span class="ki" style="background:#F3F4F6;color:#4B5563">▤</span>
+          <div style="flex:1">
+            <div class="kt">性能优化调研笔记 <span class="chip">技术笔记</span><span class="chip">KN-041</span></div>
+            <div class="ks">Lighthouse 分析与优化方案；LCP 主要受首屏图片影响。</div>
+            <div class="kw">Claude · 2024/05/30 · 来源 5 条事件</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">◲ 知识图谱预览<span class="all">切换到图谱视图</span></div>
+        <svg viewBox="0 0 320 250" style="width:100%">
+          <g stroke="#D9DDE4" stroke-width="1.2">
+            <line x1="160" y1="42" x2="86" y2="112"/><line x1="160" y1="42" x2="234" y2="112"/>
+            <line x1="86" y1="112" x2="52" y2="190"/><line x1="86" y1="112" x2="134" y2="190"/>
+            <line x1="234" y1="112" x2="206" y2="190"/><line x1="234" y1="112" x2="278" y2="190"/>
+            <line x1="134" y1="190" x2="206" y2="190" stroke-dasharray="3 3"/>
+          </g>
+          <g>
+            <circle cx="160" cy="42" r="20" fill="#EEF0FE" stroke="#6366F1" stroke-width="1.5"/>
+            <text x="160" y="46" text-anchor="middle" style="font:600 10px var(--sans)" fill="#4F46E5">目标</text>
+            <circle cx="86" cy="112" r="17" fill="#fff" stroke="#8B5CF6" stroke-width="1.5"/>
+            <text x="86" y="116" text-anchor="middle" style="font:9px var(--sans)" fill="#6D28D9">架构</text>
+            <circle cx="234" cy="112" r="17" fill="#fff" stroke="#8B5CF6" stroke-width="1.5"/>
+            <text x="234" y="116" text-anchor="middle" style="font:9px var(--sans)" fill="#6D28D9">数据</text>
+            <circle cx="52" cy="190" r="15" fill="#fff" stroke="#A5B4FC"/>
+            <text x="52" y="194" text-anchor="middle" style="font:8.5px var(--sans)" fill="#6B7280">Next</text>
+            <circle cx="134" cy="190" r="15" fill="#fff" stroke="#A5B4FC"/>
+            <text x="134" y="194" text-anchor="middle" style="font:8.5px var(--sans)" fill="#6B7280">路由</text>
+            <circle cx="206" cy="190" r="15" fill="#EEF0FE" stroke="#6366F1"/>
+            <text x="206" y="194" text-anchor="middle" style="font:8.5px var(--sans)" fill="#4F46E5">PG</text>
+            <circle cx="278" cy="190" r="15" fill="#fff" stroke="#A5B4FC"/>
+            <text x="278" y="194" text-anchor="middle" style="font:8.5px var(--sans)" fill="#6B7280">Mongo</text>
+            <line x1="264" y1="180" x2="292" y2="200" stroke="#EF4444" stroke-width="1.5"/>
+          </g>
+          <text x="160" y="232" text-anchor="middle" style="font:10px var(--sans)" fill="#9CA3AF">边来自事件的 causedBy — 图是生成的，不是画的</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>记忆。</b>第三条展示了「不修改，只覆盖」：Resend 覆盖了 SendGrid 的决策，旧的仍然可读。这就是复活模式能解释项目漂移的原因。</div>
+</figure>
+</section>
+
+<section id="d-canvas">
+<h3>画布 Canvas</h3>
+<p>脉冲回答「发生了什么」，画布回答「这些东西怎么拼在一起」。边由事件的 <code>causedBy</code> 生成——没人手动排布，也没人需要维护它的时效性。</p>
+
+<figure>
+<div class="mock">
+<div class="chrome"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="ttl">Agent OS — 画布 · Mission View</span></div>
+<div class="app" style="min-height:430px">
+  <div class="sb" style="width:166px">
+    <div class="sb-brand"><span class="sb-mark">◈</span>Agent OS</div>
+    <div class="nav" style="margin-top:8px">
+      <a href="#"><span class="ic">▦</span>项目库</a>
+      <a href="#"><span class="ic">◈</span>项目脉冲</a>
+      <a href="#" class="on"><span class="ic">✦</span>画布</a>
+      <a href="#"><span class="ic">☑</span>任务</a>
+      <a href="#"><span class="ic">◍</span>智能体</a>
+      <a href="#"><span class="ic">◲</span>记忆</a>
+      <a href="#"><span class="ic">⚙</span>设置</a>
+    </div>
+    <div class="sb-foot"><span class="av"></span><div><div class="nm">Cabin</div><div class="rl">超级管理员</div></div></div>
+  </div>
+  <div class="ct" style="background:#FCFCFD">
+    <div class="pghd">
+      <div><h1>画布</h1><div class="sub">GOAL-002 资产管线 · Level 1 Mission View</div></div>
+      <div class="sp"><span class="seg"><span>L0 全景</span><span class="on">L1 任务图</span><span>L2 工作台</span></span><span class="btn">⊕ 适配窗口</span></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;background:#FDFDFE">
+      <svg viewBox="0 0 830 330" style="width:100%;display:block">
+        <defs>
+          <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#E9EBEF"/></pattern>
+          <marker id="ca" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#C3C8D2"/></marker>
+        </defs>
+        <rect width="830" height="330" fill="url(#grid)"/>
+
+        <g stroke="#C3C8D2" stroke-width="1.4" fill="none" marker-end="url(#ca)">
+          <path d="M148 78 L212 120"/>
+          <path d="M300 140 L364 140"/>
+          <path d="M452 128 L516 96"/>
+          <path d="M452 152 L516 190"/>
+          <path d="M604 96 L668 128"/>
+          <path d="M604 190 L668 156"/>
+        </g>
+        <path d="M300 168 L364 236" stroke="#EF4444" stroke-width="1.6" fill="none" stroke-dasharray="5 3" marker-end="url(#ca)"/>
+
+        <!-- goal -->
+        <g><rect x="24" y="52" width="124" height="52" rx="12" fill="#EEF0FE" stroke="#6366F1" stroke-width="1.4"/>
+        <text x="86" y="74" text-anchor="middle" style="font:650 12px var(--sans)" fill="#4F46E5">GOAL-002</text>
+        <text x="86" y="91" text-anchor="middle" style="font:10.5px var(--sans)" fill="#6B7280">资产管线</text></g>
+
+        <!-- completed task -->
+        <g opacity=".55"><rect x="212" y="114" width="88" height="52" rx="11" fill="#fff" stroke="#A7F3D0" stroke-width="1.4"/>
+        <text x="256" y="134" text-anchor="middle" style="font:600 10.5px var(--sans)" fill="#111827">TASK-012</text>
+        <text x="256" y="149" text-anchor="middle" style="font:9.5px var(--sans)" fill="#059669">✓ completed</text>
+        <circle cx="290" cy="124" r="8" fill="#2563EB"/><text x="290" y="127.5" text-anchor="middle" style="font:700 8px var(--sans)" fill="#fff">C</text></g>
+
+        <!-- running -->
+        <g><rect x="364" y="114" width="88" height="52" rx="11" fill="#fff" stroke="#6366F1" stroke-width="1.6"/>
+        <text x="408" y="134" text-anchor="middle" style="font:600 10.5px var(--sans)" fill="#111827">TASK-014</text>
+        <rect x="378" y="142" width="60" height="4" rx="2" fill="#EEF0F3"/><rect x="378" y="142" width="39" height="4" rx="2" fill="#6366F1"/>
+        <text x="408" y="158" text-anchor="middle" style="font:9px var(--sans)" fill="#6B7280">running · 65%</text>
+        <circle cx="442" cy="124" r="8" fill="#2563EB"/><text x="442" y="127.5" text-anchor="middle" style="font:700 8px var(--sans)" fill="#fff">C</text></g>
+
+        <!-- blocked -->
+        <g><rect x="364" y="210" width="88" height="52" rx="11" fill="#FFFAFA" stroke="#EF4444" stroke-width="1.6"/>
+        <text x="408" y="230" text-anchor="middle" style="font:600 10.5px var(--sans)" fill="#111827">TASK-017</text>
+        <text x="408" y="246" text-anchor="middle" style="font:9.5px var(--sans)" fill="#DC2626">⚠ blocked</text>
+        <circle cx="442" cy="220" r="8" fill="#111827"/><text x="442" y="223.5" text-anchor="middle" style="font:700 8px var(--sans)" fill="#fff">✕</text></g>
+        <text x="470" y="240" style="font:9.5px var(--sans)" fill="#DC2626">等待世界模式 · 2天4小时</text>
+
+        <!-- review -->
+        <g><rect x="516" y="70" width="88" height="52" rx="11" fill="#fff" stroke="#F59E0B" stroke-width="1.5"/>
+        <text x="560" y="90" text-anchor="middle" style="font:600 10.5px var(--sans)" fill="#111827">TASK-019</text>
+        <text x="560" y="106" text-anchor="middle" style="font:9.5px var(--sans)" fill="#B45309">◷ review</text>
+        <circle cx="594" cy="80" r="8" fill="#D97757"/><text x="594" y="83.5" text-anchor="middle" style="font:700 8px var(--sans)" fill="#fff">✳</text></g>
+
+        <!-- assigned -->
+        <g><rect x="516" y="164" width="88" height="52" rx="11" fill="#fff" stroke="#D9DDE4" stroke-width="1.4"/>
+        <text x="560" y="184" text-anchor="middle" style="font:600 10.5px var(--sans)" fill="#111827">TASK-022</text>
+        <text x="560" y="200" text-anchor="middle" style="font:9.5px var(--sans)" fill="#6B7280">assigned</text>
+        <circle cx="594" cy="174" r="8" fill="#F2A73B"/><text x="594" y="177.5" text-anchor="middle" style="font:700 8px var(--sans)" fill="#fff">M</text></g>
+
+        <!-- knowledge -->
+        <g><rect x="668" y="112" width="96" height="60" rx="11" fill="#FAF9FF" stroke="#C4B5FD" stroke-width="1.4"/>
+        <text x="716" y="132" text-anchor="middle" style="font:600 10.5px var(--sans)" fill="#6D28D9">◆ KN-052</text>
+        <text x="716" y="147" text-anchor="middle" style="font:9.5px var(--sans)" fill="#6B7280">管线技术规范</text>
+        <text x="716" y="161" text-anchor="middle" style="font:9px var(--sans)" fill="#9CA3AF">知识节点</text></g>
+
+        <!-- legend -->
+        <g transform="translate(24,268)">
+          <rect x="0" y="0" width="392" height="46" rx="10" fill="#fff" stroke="#EDEEF1"/>
+          <g style="font:9.5px var(--sans)" fill="#6B7280">
+            <rect x="12" y="13" width="10" height="10" rx="3" fill="#fff" stroke="#6366F1" stroke-width="1.4"/><text x="27" y="22">running</text>
+            <rect x="76" y="13" width="10" height="10" rx="3" fill="#fff" stroke="#F59E0B" stroke-width="1.4"/><text x="91" y="22">review</text>
+            <rect x="136" y="13" width="10" height="10" rx="3" fill="#FFFAFA" stroke="#EF4444" stroke-width="1.4"/><text x="151" y="22">blocked</text>
+            <rect x="202" y="13" width="10" height="10" rx="3" fill="#fff" stroke="#A7F3D0" stroke-width="1.4" opacity=".6"/><text x="217" y="22">completed（降低不透明度）</text>
+          </g>
+        </g>
+        <text x="700" y="296" style="font:9.5px var(--sans)" fill="#9CA3AF">已完成分支降低不透明度，让活跃前沿保持突出</text>
+      </svg>
+    </div>
+  </div>
+</div>
+</div>
+<div class="mockcap"><b>画布 · Level 1。</b>三个缩放级别改变的是<b>细节层级</b>而不只是比例：L0 是所有项目的健康全景，L1 是目标与任务图，L2 进到单个智能体的工作台、上下文与产出。</div>
+</figure>
+</section>
+
+<!-- ============ 附录 ============ -->
+<section id="roadmap">
+<h2>路线图</h2>
+<p>原来的 Phase 4 / 5 / 6 四份文档描述的是同一批范围、三个编号。因为实现尚未开始，重新从 1 编号。</p>
+
+<h3>Phase 1 — 核心循环（无 UI）</h3>
+<table>
+<tr><th>里程碑</th><th>交付</th><th>完成判据</th></tr>
+<tr><td>1.1 Event Core</td><td>信封、总线、存储、重放、reducer 注册</td><td>重放日志能精确复现状态</td></tr>
+<tr><td>1.2 Task Engine</td><td>ADR-002 生命周期、依赖、能力路由</td><td>非法转移被拒绝而不是被纠正</td></tr>
+<tr><td>1.3 MCP Server</td><td>v0.3 全部工具，边界校验</td><td>外部智能体零定制代码完成一个任务</td></tr>
+<tr><td>1.4 Agent SDK</td><td>注册、接收、汇报；一个适配器</td><td>两个不同厂商执行同一类任务</td></tr>
+<tr><td>1.5 演示</td><td>Supervisor → 任务 → 智能体 → 事件 → 状态</td><td>脚本可复现</td></tr>
+</table>
+
+<h3>Phase 2 — 记忆</h3>
+<p>知识抽取管线、有类型有来源可覆盖的知识项、<code>get_context</code>（智能体带着既往决策开工）、查询与图谱 API。</p>
+<div class="note"><b>不要为了赶 UI 推迟 Phase 2。</b>记忆是这个产品区别于任务追踪器的地方，也是 Phase 4 复活模式成立的前提。</div>
+
+<h3>Phase 3 — 人的界面</h3>
+<p>项目脉冲 → 项目库与详情 → 审批闸门与菜单栏 → 任务与智能体视图。</p>
+
+<h3>Phase 4 — 复活与画布</h3>
+<p>复活模式与重启计划、项目快照与胶片条、画布三个缩放级别、记忆内的知识图谱视图。</p>
+
+<h3>Phase 5 — 多智能体深度</h3>
+<p>智能体协商、多智能体规划、自主路由、性能分析。刻意排在最后：这几项只有在日志、记忆和审批闸门都可信之后才有意义。</p>
+</section>
+
+<section id="adr">
+<h2>决策记录</h2>
+<p>这轮重写把原规格里的冲突全部收敛，并为每个判断留下 ADR。</p>
+
+<table>
+<tr><th>ADR</th><th>决定</th><th>解决的冲突</th></tr>
+<tr><td><b>001</b></td><td>MCP 作为智能体通信层</td><td>——（原有）</td></tr>
+<tr><td><b>002</b></td><td>唯一任务生命周期，<code>blocked</code> 为旁路态</td><td>三套互不兼容的状态机：大小写不一、初态叫 planned 还是 created、有没有 blocked、review 还是 reviewing</td></tr>
+<tr><td><b>003</b></td><td>七项顶层导航</td><td>两张设计图给了两套侧边栏，且都没写进文档</td></tr>
+<tr><td><b>004</b></td><td>能力优先的智能体目录</td><td>文档列 5 家厂商，设计图画了 6 家且不完全重合</td></tr>
+<tr><td><b>005</b></td><td>只有派生状态</td><td>「事件驱动」原则此前没有约束力，实现时必然退化成"先写表再补事件"</td></tr>
+<tr><td><b>006</b></td><td>对话折进智能体，按任务分组</td><td>新增功能：智能体对话记录该放哪儿、会话该怎么划分</td></tr>
+</table>
+
+<h3>其他收敛</h3>
+<ul>
+<li><code>request_approval</code> 与 <code>request_human_approval()</code> 两个名字 → 统一为前者，并补齐了 <code>approval.*</code> 事件族</li>
+<li><code>news.generated</code> → <code>pulse.story.generated</code>；补齐 <code>agent.started</code> 等各文档缺失项，事件清单收敛为单一权威目录</li>
+<li>事件架构 3 份、记忆 2 份、包结构 3 份重复文档 → 各合并为 1 份</li>
+<li>MCP 协议 v0.1 三份 + v0.2 一份 → v0.3 单一权威</li>
+<li>此前只有设计图没有规格的四个界面（菜单栏挂件、审批、知识图谱、节点快照）→ 补齐规格</li>
+<li>失效引用 <code>assets/ui/project-library.png</code> → 指向 <code>ui/</code> 下的真实文件</li>
+</ul>
+
+<p style="margin-top:26px;padding-top:20px;border-top:1px solid var(--doc-border);color:var(--doc-muted);font-size:13px">
+本文档由 <code>docs/</code> 下的 31 份规格生成。规格发生实质变更时应重新生成。<br>
+设计图为基于规格制作的高保真示意，非最终视觉交付物；<code>ui/</code> 下的渲染图在间距与视觉细节上仍具权威性。
+</p>
+</section>
+
+</main>
+</div>
+
+<script>
+(function(){
+  var t=document.getElementById('tg');
+  t.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme');
+    if(!cur){cur=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+    document.documentElement.setAttribute('data-theme',cur==='dark'?'light':'dark');
+  });
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'));}).filter(Boolean);
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(!e.isIntersecting)return;
+      links.forEach(function(l){l.classList.remove('on');});
+      var m=links.filter(function(l){return l.getAttribute('href')==='#'+e.target.id;})[0];
+      if(m)m.classList.add('on');
+    });
+  },{rootMargin:'-10% 0px -80% 0px'});
+  secs.forEach(function(s){io.observe(s);});
+})();
+</script>
+</body>
+</html>
