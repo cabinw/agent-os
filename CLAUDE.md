@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-This repo is **specification-only**. There is no source code, no `package.json`, no build system, no tests, and no CI — the content is Markdown specs under `docs/`, high-fidelity design renders under `ui/`, a generated walkthrough at `doc.html`, plus [AGENTS.md](AGENTS.md) and [README.md](README.md). There are therefore no build/lint/test commands to run yet; do not invent them.
+This repo is **specification-only**. There is no source code, no `package.json`, no build system, no tests, and no CI — the content is Markdown specs under `docs/`, high-fidelity design renders under `ui/`, a generated walkthrough at `doc.html`, an implementation plan at `todo.html`, plus [AGENTS.md](AGENTS.md) and [README.md](README.md). There are therefore no build/lint/test commands to run yet; do not invent them.
 
-Phase 1 will create the tooling. When it does, replace this section with the real commands.
+The stack is chosen but not yet built: TypeScript + Tauri 2 + SQLite, single-machine ([ADR-007](docs/decisions/ADR-007-implementation-stack.md)). Phase 0 creates the tooling. When it does, replace this section with the real commands.
 
 ## What Agent OS is
 
