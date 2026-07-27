@@ -107,7 +107,8 @@ td code{white-space:nowrap}
 .phase-hd{display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-top:34px}
 .phase-hd h3{margin:0}
 .badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:620}
-.badge.now{background:color-mix(in srgb,var(--ok) 14%,transparent);color:#059669}
+.badge.done{background:color-mix(in srgb,var(--ok) 14%,transparent);color:#059669}
+.badge.now{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
 .badge.next{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent)}
 .badge.later{background:var(--code-bg);color:var(--muted)}
 .phase-count{margin-left:auto;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
@@ -148,7 +149,7 @@ td code{white-space:nowrap}
 <div class="hero">
   <div class="eyebrow">从规格到代码</div>
   <h1>实施 TODO</h1>
-  <p class="lede" style="margin-top:12px;max-width:640px">当前状态：35 份规格、7 条 ADR、0 行代码。四个前置决策已拍板（Tauri 2 · 单机 · opus-5/high · 不做 CI），技术栈定稿。这份清单把规格翻译成可勾选的工程任务。勾选状态保存在浏览器本地。</p>
+  <p class="lede" style="margin-top:12px;max-width:640px">当前状态：35 份规格、7 条 ADR，<b>Phase 0 已完成</b>——workspace 可构建、<code>pnpm verify</code> 全绿，但尚未实现任何行为。四个前置决策已拍板（Tauri 2 · 单机 · opus-5/high · 不做 CI）。下一步是 <a href="#p1">1.1 事件信封</a>。</p>
 
   <div class="progress-wrap">
     <div class="progress-top">
@@ -251,7 +252,8 @@ td code{white-space:nowrap}
 
 <table>
 <tr><th>领域</th><th>选型</th><th>理由 / 否决的替代</th></tr>
-<tr><td>Monorepo</td><td><code>pnpm workspaces</code> + TS project references</td><td>5 个包，Turborepo 现在是过度工程。等构建慢了再加，不会白干</td></tr>
+<tr><td>Monorepo</td><td><code>pnpm workspaces</code> + TS project references</td><td>5 个包，Turborepo 现在是过度工程。等构建慢了再加，不会白干。<b>pnpm 由 corepack 提供</b>（11.17.0），未全局安装</td></tr>
+<tr><td>install 脚本</td><td><code>allowBuilds</code> 白名单</td><td>pnpm 默认拦截 install 脚本。只放行了 Biome 和 esbuild（都要下载平台原生二进制）。<b>这个默认值保持开着</b>，以后加依赖逐个确认</td></tr>
 <tr><td>构建</td><td><code>tsup</code></td><td>零配置输出 ESM + d.ts，够用</td></tr>
 <tr><td>测试</td><td><code>Vitest</code> + 自建重放 harness</td><td>重放 harness 是自己写的，别的框架不提供</td></tr>
 <tr><td>Lint/Format</td><td><code>Biome</code></td><td>一个工具替代 ESLint + Prettier，快一个数量级</td></tr>
@@ -263,20 +265,26 @@ td code{white-space:nowrap}
 <tr><td>消息渲染</td><td><code>markdown-it</code> + <code>shiki</code></td><td>会话消息含 markdown 和代码块（3.7）。<b>必须开 HTML 转义</b>——消息内容来自外部智能体，是不可信输入</td></tr>
 </table>
 
-<h3>目标目录</h3>
+<h3>目录（✓ = Phase 0 已建）</h3>
 <pre><code>agent-os/
-├── apps/macos/              Tauri 壳 + React UI
-│   ├── src-tauri/           Rust：窗口、tray、菜单栏挂件
-│   └── src/                 React：七个界面
-├── packages/
-│   ├── event-core/          内核（无 UI、无厂商依赖）
-│   ├── task-engine/         生命周期、依赖、能力路由
-│   ├── memory-core/         知识抽取
-│   ├── agent-sdk/           适配器（唯一允许出现厂商名的层）
-│   └── mcp-server/          v0.3 工具 + 校验 + 授权
-├── docs/  ui/  tests/
-└── pnpm-workspace.yaml</code></pre>
-<p class="lede" style="font-size:14px">注意 Tauri 会引入 Rust——但只在 <code>src-tauri/</code>，用于窗口和 tray，不碰领域逻辑。这是可以接受的边界。</p>
+├── apps/macos/                Tauri 壳 + React UI          （Phase 3）
+│   ├── src-tauri/             Rust：窗口、tray、菜单栏挂件
+│   └── src/                   React：七个界面
+├── packages/                                              ✓
+│   ├── event-core/            内核 —— 零依赖，不含 DOM lib   ✓
+│   ├── task-engine/           生命周期、依赖、能力路由、会话  ✓
+│   ├── memory-core/           知识抽取                      ✓
+│   ├── agent-sdk/             适配器（唯一允许出现厂商名的层）✓
+│   └── mcp-server/            v0.3 工具 + 校验 + 授权        ✓
+├── scripts/check-layers.mjs   分层守卫                      ✓
+├── tests/                     跨包测试                      ✓
+├── docs/  ui/  doc.html  todo.html                          ✓
+└── pnpm-workspace.yaml  tsconfig.base.json  biome.json      ✓</code></pre>
+<p class="lede" style="font-size:14px">Tauri 会引入 Rust——但只在 <code>src-tauri/</code>，用于窗口和 tray，不碰领域逻辑。这是可以接受的边界。</p>
+
+<div class="note"><b>依赖方向（写 tsconfig 时修正过一次）：</b><code>A ──▶ B</code> 读作 A imports B。</p>
+<pre style="margin:10px 0 0"><code>mcp-server ──▶ { agent-sdk, task-engine, memory-core } ──▶ event-core</code></pre>
+<p style="margin-top:8px"><code>event-core</code> 在<b>最底层且零依赖</b>——它导出 <code>registerReducer</code>，是别人注册进来，不是反过来。原规格图把它画在中间，等于说内核依赖领域层；已修正并加了箭头图例。</p></div>
 </section>
 
 <!-- ===================== 关键判断 ===================== -->
@@ -310,35 +318,38 @@ td code{white-space:nowrap}
 
 <div class="phase-hd">
   <h3 id="p0h">Phase 0 — 工程地基</h3>
-  <span class="badge now">现在做</span>
+  <span class="badge done">✓ 已完成</span>
   <span class="phase-count" data-count="p0"></span>
 </div>
-<p class="phase-goal">roadmap 里没有这一阶段，但没有它 Phase 1 无处落脚。预计 1–2 天。</p>
+<p class="phase-goal">roadmap 里没有这一阶段，但没有它 Phase 1 无处落脚。<b>实际用时约半天</b>，已并入 <a href="https://github.com/cabinw/agent-os/pull/2">PR #2</a>。</p>
+
+<div class="note"><b>做的时候发现一个规格 bug。</b><code>packages.md</code> 的依赖图把 <code>event-core</code> 画在中间、领域包画在下面，配上「Strictly downward」等于说内核依赖领域层——而同一份文档要求它「在裸运行时里可测」、又导出 <code>registerReducer</code>（是别人注册进来）。已修正为 event-core 在最底层零依赖，并给箭头加了图例。<b>这种 bug 只有在写 tsconfig 的 references 时才会暴露</b>，纯文档阶段两种读法都说得通。</div>
 
 <ul class="tasks" data-phase="p0">
-  <li><input type="checkbox" id="t-0-1"><label for="t-0-1" class="tb">
+  <li><input type="checkbox" id="t-0-1" checked><label for="t-0-1" class="tb">
     <span class="tt"><span class="tid">0.1</span>pnpm workspace + 五个空包骨架</span>
-    <span class="td"><code>pnpm-workspace.yaml</code>、根 <code>tsconfig.base.json</code>、每个包的 <code>package.json</code> + <code>tsconfig.json</code>（用 project references 表达依赖方向）。</span>
+    <span class="td">依赖方向用 TS project references 编码。<code>event-core</code> 的 <code>references</code> 是空数组、<code>dependencies</code> 字段不存在——零依赖机械可验。<code>tsconfig.base.json</code> 的 <code>lib</code> <b>刻意不含 DOM</b>：packages 里碰 <code>window</code> 直接类型报错，把「内核不得假设 UI 存在」变成编译期约束。</span>
     <span class="tm"><span class="tag crit">关键路径</span><span class="tag sz">半天</span></span>
-    <span class="done-when"><b>完成判据：</b><code>pnpm -r build</code> 通过；在 event-core 里 import mcp-server 会被 TS 报错</span>
+    <span class="done-when"><b>已验证：</b><code>tsc --build</code> 通过，五个包各产出 <code>dist/index.d.ts</code></span>
   </label></li>
 
-  <li><input type="checkbox" id="t-0-2"><label for="t-0-2" class="tb">
+  <li><input type="checkbox" id="t-0-2" checked><label for="t-0-2" class="tb">
     <span class="tt"><span class="tid">0.2</span>Vitest + Biome</span>
-    <span class="td"><code>.gitignore</code> 已经补上了（含 <code>node_modules/</code>、<code>dist/</code>、<code>.DS_Store</code>、<code>.claude/</code>、<code>target/</code>），这项只剩测试与格式化工具。</span>
+    <span class="td">11 个测试。<code>workspace.test.ts</code> 断言 event-core 零依赖、兄弟包互不引用、<code>package.json</code> 的 deps 与 tsconfig 的 references 一致、base config 不含 DOM。Biome 需开 <code>json.parser.allowComments</code>——tsconfig 是 JSONC。</span>
     <span class="tm"><span class="tag sz">2 小时</span></span>
+    <span class="done-when"><b>已验证：</b>11/11 通过</span>
   </label></li>
 
-  <li><input type="checkbox" id="t-0-3"><label for="t-0-3" class="tb">
+  <li><input type="checkbox" id="t-0-3" checked><label for="t-0-3" class="tb">
     <span class="tt"><span class="tid">0.3</span>分层检查脚本 <code>pnpm check:layers</code></span>
-    <span class="td">CI 已砍（决策 D），但检查本身留着，落成本地脚本：① <code>event-core</code>/<code>task-engine</code> 不得出现厂商名（ADR-004）；② <code>task-engine</code> 与 <code>memory-core</code> 不得互相引用；③ 事件类型字符串不得绕过目录。<b>这是 ADR-004/005 唯一的机械保障</b>——想接 CI 或 pre-commit 时它是现成的。</span>
+    <span class="td">四条规则：厂商名泄漏、依赖方向、兄弟包互引、事件类型绕过目录。<b>守卫自己也被测试</b>——<code>layering.test.ts</code> 往包里植入四种真实违规，断言脚本确实非零退出并报出对应规则。一个从不失败的守卫等于没有守卫。它同时挂在 <code>pnpm test</code> 里，测试套件不可能在分层被破坏时变绿。</span>
     <span class="tm"><span class="tag crit">别省这个</span><span class="tag dep">依赖 0.1</span><span class="tag sz">2 小时</span></span>
-    <span class="done-when"><b>完成判据：</b>故意在 event-core 里写一行 <code>openai</code>，脚本非零退出</span>
+    <span class="done-when"><b>已验证：</b>往 event-core 写一行 <code>openai</code>，报 <code>[厂商名泄漏]</code> 并指出行号，退出码 1</span>
   </label></li>
 
-  <li><input type="checkbox" id="t-0-4"><label for="t-0-4" class="tb">
+  <li><input type="checkbox" id="t-0-4" checked><label for="t-0-4" class="tb">
     <span class="tt"><span class="tid">0.4</span>更新 CLAUDE.md 的「无构建命令」段落</span>
-    <span class="td">那一段现在写着「没有构建/测试命令，不要编造」。工具链落地后要换成真实命令，否则未来的 agent 会继续以为这是纯文档仓库。</span>
+    <span class="td">换成真实命令表，并写明<b>没有 CI、<code>pnpm verify</code> 是唯一且手动的关口</b>。仓库状态段改为「Phase 0 done，但没有实现任何行为」，免得未来的 agent 以为包里已经有逻辑。</span>
     <span class="tm"><span class="tag sz">10 分钟</span></span>
   </label></li>
 </ul>
@@ -347,10 +358,10 @@ td code{white-space:nowrap}
 <section id="p1">
 <div class="phase-hd">
   <h3>Phase 1 — 核心循环（无 UI）</h3>
-  <span class="badge next">接着做</span>
+  <span class="badge now">← 现在这里</span>
   <span class="phase-count" data-count="p1"></span>
 </div>
-<p class="phase-goal">目标：headless 跑通完整运行循环。<b>刻意不做任何界面</b>。预计 3–4 周。</p>
+<p class="phase-goal">目标：headless 跑通完整运行循环。<b>刻意不做任何界面</b>。预计 3–4 周。骨架已就绪，<code>packages/*/src/index.ts</code> 里已有各包契约和基础类型（<code>ProjectId</code>/<code>Seq</code>/<code>EventId</code>、<code>TaskStatus</code> 全八态、<code>Capability</code> 受控词表），从 1.1 接着写即可。</p>
 
 <ul class="tasks" data-phase="p1">
   <li><input type="checkbox" id="t-1-1"><label for="t-1-1" class="tb">
@@ -632,11 +643,10 @@ td code{white-space:nowrap}
 <!-- ===================== 第一周 ===================== -->
 <section id="week1">
 <h2>第一周具体做什么</h2>
-<p>如果明天就开工，这是我建议的顺序。</p>
 
 <table>
 <tr><th>天</th><th>做什么</th><th>产出</th></tr>
-<tr><td><b>1</b></td><td>0.1 + 0.2 + 0.3 —— workspace 骨架、Vitest、Biome、分层检查脚本</td><td><code>pnpm -r build</code> 与 <code>pnpm check:layers</code> 均通过</td></tr>
+<tr style="opacity:.5"><td><b>1</b> ✓</td><td><s>0.1 + 0.2 + 0.3 + 0.4 —— workspace 骨架、Vitest、Biome、分层检查脚本</s></td><td><s><code>pnpm verify</code> 全绿，11/11 测试通过</s></td></tr>
 <tr><td><b>2</b></td><td>1.1 —— 事件信封 + 22 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
 <tr><td><b>3–4</b></td><td>1.2 —— SQLite 存储、seq 分配、幂等 token</td><td>并发 append 测试通过</td></tr>
 <tr><td><b>5</b></td><td>1.3 —— 总线 + 重放 + reducer 注册</td><td><b>重放等价性测试通过 → 内核成立</b></td></tr>
@@ -644,17 +654,19 @@ td code{white-space:nowrap}
 
 <div class="note"><b>第 5 天的那条测试是整个项目的分水岭。</b>「从 seq 0 重放整条日志，得到与增量归约完全一致的状态」——这条一旦通过，ADR-005 就从一句原则变成了一个被机器守住的性质。后面所有派生状态的正确性都挂在它上面。先写这条测试，再写实现。</div>
 
-<h3>三条自查命令 —— 就是 <code>check:layers</code> 的内容</h3>
-<p>没有 CI，这三条就是分层约束的全部强制力。0.3 把它们脚本化，但在 <code>packages/</code> 存在之前你可以直接跑。</p>
-<pre><code># 1. 内核有没有被厂商污染（ADR-004）
-grep -rniE 'openai|anthropic|gemini|xai' packages/event-core packages/task-engine
+<h3>命令</h3>
+<p>pnpm 由 corepack 提供，没有全局安装。嫌每次敲 <code>corepack</code> 麻烦可以 <code>corepack enable</code>（会写全局 shim）。</p>
+<pre><code>corepack pnpm install       # allowBuilds 白名单只放行了 Biome 和 esbuild
+corepack pnpm verify        # build + lint + check:layers + test —— 提交前跑这个
+corepack pnpm test -- tests/layering.test.ts   # 单文件
 
-# 2. 兄弟包有没有互相引用（packages.md）
-grep -rn 'memory-core' packages/task-engine/src
-grep -rn 'task-engine' packages/memory-core/src
+# verify 里的四步也可以单跑
+corepack pnpm build
+corepack pnpm check         # check:fix 自动修
+corepack pnpm check:layers
+corepack pnpm test</code></pre>
 
-# 3. 事件类型有没有偷偷绕过目录（event-catalog.md）
-grep -rhoE "'[a-z]+\.[a-z.]+'" packages/*/src | sort -u</code></pre>
+<div class="note warn"><b>没有 CI，<code>pnpm verify</code> 是唯一的关口，而且它是手动的。</b>决策 D 砍掉的是 GitHub Actions，不是检查本身——但也因此没有任何东西会替你按下按钮。要么挂 pre-commit，要么把它写进提交前的例行动作。</div>
 </section>
 
 <!-- ===================== 风险 ===================== -->
