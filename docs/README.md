@@ -68,6 +68,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-004](decisions/ADR-004-capability-first-agent-catalog.md) | Agents are matched by capability, never by provider |
 | [ADR-005](decisions/ADR-005-derived-state-only.md) | No component stores state the event log can derive |
 | [ADR-006](decisions/ADR-006-threads-as-a-view-in-agents.md) | Threads live in Agents and are scoped to tasks |
+| [ADR-007](decisions/ADR-007-implementation-stack.md) | TypeScript + Tauri 2 + SQLite, single-machine |
 
 ## Assets
 

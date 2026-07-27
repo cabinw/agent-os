@@ -128,7 +128,7 @@ td code{white-space:nowrap}
 <nav class="toc">
   <div class="toc-brand"><span class="toc-mark">◈</span> 实施 TODO</div>
   <h4>决策</h4>
-  <a href="#ask">① 需要你拍板</a>
+  <a href="#ask">① 已定的四件事</a>
   <a href="#stack">② 技术栈选型</a>
   <a href="#arch-notes">③ 四个关键判断</a>
   <h4>清单</h4>
@@ -148,7 +148,7 @@ td code{white-space:nowrap}
 <div class="hero">
   <div class="eyebrow">从规格到代码</div>
   <h1>实施 TODO</h1>
-  <p class="lede" style="margin-top:12px;max-width:640px">当前状态：34 份规格、6 条 ADR、0 行代码。这份清单把规格翻译成可勾选的工程任务，并给出技术栈选型及其理由。勾选状态保存在浏览器本地。</p>
+  <p class="lede" style="margin-top:12px;max-width:640px">当前状态：35 份规格、7 条 ADR、0 行代码。四个前置决策已拍板（Tauri 2 · 单机 · opus-5/high · 不做 CI），技术栈定稿。这份清单把规格翻译成可勾选的工程任务。勾选状态保存在浏览器本地。</p>
 
   <div class="progress-wrap">
     <div class="progress-top">
@@ -163,27 +163,31 @@ td code{white-space:nowrap}
 
 <!-- ===================== 需要拍板 ===================== -->
 <section id="ask">
-<h2>① 需要你拍板的四件事</h2>
-<p>其余选型我按项目约束直接定了（见下一节）。这四个的答案会改变实际要写的代码，所以先问你。</p>
+<h2>① 已定的四件事</h2>
+<p>四个决策已拍板。A、B 两条约束未来工作，已按仓库规矩记入 <a href="docs/decisions/ADR-007-implementation-stack.md"><code>ADR-007</code></a>；C、D 是调参和流程，只记在这里。</p>
 
 <div class="dec">
-  <div class="dh"><span class="dt">决策 A</span><span class="dv">桌面外壳：Tauri 还是 SwiftUI？</span></div>
-  <p>我推荐 <b>Tauri 2</b>，理由在下一节。但如果你对「macOS 原生手感」的要求高于一切，SwiftUI 是更好的答案——代价是<b>必须在 Swift 里重新实现一遍 reducer</b>，这直接违反 ADR-005 的单一事实来源。这个取舍只有你能定。</p>
+  <div class="dh"><span class="dt">决策 A ✓</span><span class="dv">桌面外壳：<code>Tauri 2</code></span></div>
+  <p>三个硬需求同时满足：原生菜单栏挂件、原生窗口 chrome、UI 用 TS 与 packages 共享事件类型。Rust 只出现在 <code>src-tauri/</code>，不碰领域逻辑。</p>
+  <p><b>承担的代价：</b>Tauri 渲染在 WebView 里，「macOS 原生质感」是<b>要做的设计工作</b>而不是白拿的。滚动惯性、右键菜单、窗口行为都得专门调——排期时留出这部分，别当成 0 成本。</p>
 </div>
 
 <div class="dec">
-  <div class="dh"><span class="dt">决策 B</span><span class="dv">单机，还是从一开始就考虑多人？</span></div>
-  <p>我按<b>单机桌面应用</b>设计的（SQLite、本地事件日志、无服务端）。如果半年内要做多人协作，事件存储层的抽象要不一样——现在多花两天，比之后改内核便宜得多。</p>
+  <div class="dh"><span class="dt">决策 B ✓</span><span class="dv">单机</span></div>
+  <p>一个人、一台 Mac、一份本地事件日志。无服务端、无多写者协调。</p>
+  <p><b>这个假设只在一个地方承重：</b>事件存储的 <code>seq</code> 分配和冲突处理。真要做多人，改动集中在那里，不会散落到各个包——到时候重开一条 ADR，别绕着补丁。</p>
 </div>
 
 <div class="dec">
-  <div class="dh"><span class="dt">决策 C</span><span class="dv">Supervisor 的成本档位</span></div>
-  <p>目标拆解和记忆摘要都要调 LLM。我默认 <code>claude-opus-5</code> + <code>effort: "high"</code>（拆解质量直接决定整个系统的输出质量）。如果要压成本，记忆摘要那条链路可以降到 <code>medium</code>——但拆解不建议动。</p>
+  <div class="dh"><span class="dt">决策 C ✓</span><span class="dv"><code>claude-opus-5</code> · adaptive thinking · <code>effort: "high"</code></span></div>
+  <p>目标拆解、记忆摘要、脉冲头条统一用这一档。记忆摘要降到 <code>medium</code> 仍然是留着的省钱手段，但现在不动——混档位会让质量回归更难归因。</p>
 </div>
 
 <div class="dec">
-  <div class="dh"><span class="dt">决策 D</span><span class="dv">要不要 CI？</span></div>
-  <p>Phase 0 里我放了 GitHub Actions。如果这是个人项目、你只在本机跑，可以砍掉省半天；但<b>重放测试</b>那条最好留着——它是防止 reducer 悄悄改变历史状态的唯一保险。</p>
+  <div class="dh"><span class="dt">决策 D ✓</span><span class="dv">不做 CI</span></div>
+  <p>GitHub Actions 砍掉。<b>但两样东西没跟着丢：</b></p>
+  <p>① <b>重放测试</b>本来就是 1.3 的完成判据，由 Vitest（0.2）承载，和 CI 无关，一行没少。</p>
+  <p>② 原本挂在 CI 上的 <b>分层 grep 检查</b>（ADR-004 的厂商名、包依赖方向）改成本地脚本 <code>pnpm check:layers</code>——见 0.3。它是 ADR-004/005 唯一的机械保障，不能因为砍 CI 就一起没了。想接 CI 或 pre-commit 时它是现成的。</p>
 </div>
 </section>
 
@@ -204,7 +208,7 @@ td code{white-space:nowrap}
   <div class="dh"><span class="dt">桌面外壳</span><span class="dv"><code>Tauri 2</code></span></div>
   <p><b>为什么：</b>三个硬需求同时满足——原生菜单栏挂件（规格里是对等界面，不是快捷方式）、原生窗口 chrome、UI 用 TS 从而与 packages 共享事件类型。体积约 10MB。</p>
   <p><b>诚实的代价：</b>Tauri 的 UI 层是 WebView。设计语言里写的「macOS 原生质感」会变成<b>设计工作</b>，而不是白拿的东西——滚动惯性、控件手感都得自己调。</p>
-  <div class="rej"><b>否决 Electron：</b>能力相同但 150MB 起步，没有换来任何优势。<b>否决 SwiftUI：</b>见决策 A。</div>
+  <div class="rej"><b>否决 Electron：</b>能力相同但 150MB 起步，没有换来任何优势。<b>否决 SwiftUI：</b>原生手感最好，但必须在 Swift 里重实现全部 reducer——两份实现会漂移，而且漂移在投影和日志对不上之前是看不见的，这正是 ADR-005 要防的失败。完整取舍见 <code>ADR-007</code>。</div>
 </div>
 
 <div class="dec">
@@ -320,15 +324,16 @@ td code{white-space:nowrap}
   </label></li>
 
   <li><input type="checkbox" id="t-0-2"><label for="t-0-2" class="tb">
-    <span class="tt"><span class="tid">0.2</span>Vitest + Biome + <code>.gitignore</code></span>
-    <span class="td">仓库现在<b>连 .gitignore 都没有</b>。至少要有 <code>node_modules/</code>、<code>dist/</code>、<code>.DS_Store</code>、<code>.claude/</code>、<code>target/</code>。</span>
+    <span class="tt"><span class="tid">0.2</span>Vitest + Biome</span>
+    <span class="td"><code>.gitignore</code> 已经补上了（含 <code>node_modules/</code>、<code>dist/</code>、<code>.DS_Store</code>、<code>.claude/</code>、<code>target/</code>），这项只剩测试与格式化工具。</span>
     <span class="tm"><span class="tag sz">2 小时</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-0-3"><label for="t-0-3" class="tb">
-    <span class="tt"><span class="tid">0.3</span>CI：build + test + 分层检查</span>
-    <span class="td">GitHub Actions。除了常规 build/test，加一条 <b>grep 检查</b>：<code>event-core</code> 和 <code>task-engine</code> 里不得出现任何厂商名字符串（ADR-004）。</span>
-    <span class="tm"><span class="tag dep">依赖 0.1</span><span class="tag sz">半天</span></span>
+    <span class="tt"><span class="tid">0.3</span>分层检查脚本 <code>pnpm check:layers</code></span>
+    <span class="td">CI 已砍（决策 D），但检查本身留着，落成本地脚本：① <code>event-core</code>/<code>task-engine</code> 不得出现厂商名（ADR-004）；② <code>task-engine</code> 与 <code>memory-core</code> 不得互相引用；③ 事件类型字符串不得绕过目录。<b>这是 ADR-004/005 唯一的机械保障</b>——想接 CI 或 pre-commit 时它是现成的。</span>
+    <span class="tm"><span class="tag crit">别省这个</span><span class="tag dep">依赖 0.1</span><span class="tag sz">2 小时</span></span>
+    <span class="done-when"><b>完成判据：</b>故意在 event-core 里写一行 <code>openai</code>，脚本非零退出</span>
   </label></li>
 
   <li><input type="checkbox" id="t-0-4"><label for="t-0-4" class="tb">
@@ -631,7 +636,7 @@ td code{white-space:nowrap}
 
 <table>
 <tr><th>天</th><th>做什么</th><th>产出</th></tr>
-<tr><td><b>1</b></td><td>0.1 + 0.2 —— workspace 骨架、Vitest、Biome、<code>.gitignore</code></td><td><code>pnpm -r build</code> 通过</td></tr>
+<tr><td><b>1</b></td><td>0.1 + 0.2 + 0.3 —— workspace 骨架、Vitest、Biome、分层检查脚本</td><td><code>pnpm -r build</code> 与 <code>pnpm check:layers</code> 均通过</td></tr>
 <tr><td><b>2</b></td><td>1.1 —— 事件信封 + 22 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
 <tr><td><b>3–4</b></td><td>1.2 —— SQLite 存储、seq 分配、幂等 token</td><td>并发 append 测试通过</td></tr>
 <tr><td><b>5</b></td><td>1.3 —— 总线 + 重放 + reducer 注册</td><td><b>重放等价性测试通过 → 内核成立</b></td></tr>
@@ -639,7 +644,8 @@ td code{white-space:nowrap}
 
 <div class="note"><b>第 5 天的那条测试是整个项目的分水岭。</b>「从 seq 0 重放整条日志，得到与增量归约完全一致的状态」——这条一旦通过，ADR-005 就从一句原则变成了一个被机器守住的性质。后面所有派生状态的正确性都挂在它上面。先写这条测试，再写实现。</div>
 
-<h3>三条随时可以自查的命令</h3>
+<h3>三条自查命令 —— 就是 <code>check:layers</code> 的内容</h3>
+<p>没有 CI，这三条就是分层约束的全部强制力。0.3 把它们脚本化，但在 <code>packages/</code> 存在之前你可以直接跑。</p>
 <pre><code># 1. 内核有没有被厂商污染（ADR-004）
 grep -rniE 'openai|anthropic|gemini|xai' packages/event-core packages/task-engine
 
@@ -659,8 +665,9 @@ grep -rhoE "'[a-z]+\.[a-z.]+'" packages/*/src | sort -u</code></pre>
 
 <table>
 <tr><th>风险</th><th>征兆</th><th>对策</th></tr>
-<tr><td><b>reducer 被绕过</b></td><td>出现「先写表，再补一条事件给 UI 看」的代码</td><td>事件日志退化成通知通道，历史不可重建 → CI 里禁止 event-core 之外的模块直接写库</td></tr>
-<tr><td><b>厂商名泄进内核</b></td><td><code>if (provider === 'openai')</code></td><td>抽象已经漏了。CI grep 检查</td></tr>
+<tr><td><b>reducer 被绕过</b></td><td>出现「先写表，再补一条事件给 UI 看」的代码</td><td>事件日志退化成通知通道，历史不可重建 → 除 event-core 外任何模块不得直接写库，评审时按这条看</td></tr>
+<tr><td><b>厂商名泄进内核</b></td><td><code>if (provider === 'openai')</code></td><td>抽象已经漏了。<code>pnpm check:layers</code>（0.3）</td></tr>
+<tr><td><b>砍了 CI 之后检查也没人跑</b></td><td><code>check:layers</code> 写完就再没执行过</td><td>没有 CI 就没有强制点。挂 pre-commit，或至少写进每次提交前的例行动作——决策 D 砍的是 Actions，不是检查</td></tr>
 <tr><td><b>重放性能</b></td><td>项目跑几个月后启动变慢</td><td>快照就是为这个存在的（1.4）。别等到慢了才做</td></tr>
 <tr><td><b>Tauri 的原生手感落差</b></td><td>用户说「感觉像网页」</td><td>预期之内的代价。滚动、右键菜单、窗口行为要专门调，预留时间</td></tr>
 <tr><td><b>LLM 成本失控</b></td><td>记忆摘要对每条事件都调一次</td><td>2.2 的窗口化设计就是为这个。另外考虑 <code>task_budget</code> 给 Supervisor 设上限</td></tr>
@@ -671,7 +678,7 @@ grep -rhoE "'[a-z]+\.[a-z.]+'" packages/*/src | sort -u</code></pre>
 
 <p style="margin-top:26px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px">
 勾选状态存在浏览器 <code>localStorage</code>，换设备不同步。工作量估算是单人全职的粗略量级，不是承诺。<br>
-规格依据：<code>docs/development/roadmap.md</code> · <code>docs/architecture/packages.md</code> · <code>docs/product/threads.md</code> · ADR-001 至 ADR-006。
+规格依据：<code>docs/development/roadmap.md</code> · <code>docs/architecture/packages.md</code> · <code>docs/product/threads.md</code> · ADR-001 至 ADR-007。
 </p>
 </section>
 
