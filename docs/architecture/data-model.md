@@ -1,43 +1,53 @@
-# Agent OS Data Model
+# Data Model
 
-## Core Objects
+## Objects
 
-### Project
+```
+Project ── the container: code, docs, decisions, agents, history
+   │
+Goal ───── a human-stated outcome
+   │
+Task ───── an executable unit of work
+   │
+Agent ──── the AI worker that executes it
+   │
+Event ──── an immutable record of something that happened
+   │
+Knowledge  durable, sourced conclusion
+```
 
-Contains goals, tasks, agents and knowledge.
+Message and Approval hang off this spine: a Message is agent-to-agent
+communication scoped to a task, an Approval is a suspended action awaiting a
+human. A Thread is the derived grouping of a task's messages — see
+[product/threads.md](../product/threads.md).
 
-### Goal
+## Definitions
 
-High-level objective.
+| Object | Key fields | Notes |
+| --- | --- | --- |
+| **Project** | `id, name, state, stack, cover, lastActivity` | `state` ∈ active / paused / archived / completed |
+| **Goal** | `id, project, statement, status` | Decomposed by the Supervisor into tasks |
+| **Task** | see [task-schema](../protocol/task-schema.md) | The unit routing and progress attach to |
+| **Agent** | see [agent-schema](../protocol/agent-schema.md) | Identity is per-project registration |
+| **Message** | `id, from, to, type, task?, content, replyTo?, attachments?` | Types: instruction, question, answer, progress, report, review, warning |
+| **Thread** | `project, task?` | **Derived, not stored.** One per task plus one project thread. See [ADR-006](../decisions/ADR-006-threads-as-a-view-in-agents.md) |
+| **Event** | see [event-catalog](../protocol/event-catalog.md) | The only writable object |
+| **Knowledge** | see [memory](memory.md) | Typed, sourced, supersedable |
+| **Approval** | `id, action, requestedBy, risk, status` | status ∈ pending / granted / rejected / expired |
 
-### Task
+## Ownership
 
-Executable unit of work.
+Only Event is written directly. Everything else in this table is a *projection* —
+a reducer's output over the event log. Creating a task means appending
+`task.created`; the task row appears because a reducer put it there.
 
-### Agent
+This is the single most important property to preserve while implementing. See
+[ADR-005](../decisions/ADR-005-derived-state-only.md).
 
-AI worker responsible for tasks.
+## Identity
 
-### Message
-
-Communication between agents.
-
-### Event
-
-Immutable record of system changes.
-
-### Knowledge
-
-Persistent project memory.
-
-## Relationship
-
-Goal
-|
-Task
-|
-Agent
-|
-Event
-|
-Memory
+- Projects, goals, agents: stable string ids, human-readable where useful
+  (`proj_oldwebsite`, `codex-developer`).
+- Tasks: `TASK-nnn`, unique per project, never reused.
+- Events: sortable unique ids plus a per-project `seq`.
+- Knowledge: `KN-nnn`, per project.
