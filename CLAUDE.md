@@ -2,11 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Commands
+
+pnpm is provided by corepack (`corepack pnpm …`); there is no global install.
+
+| Command | Does |
+| --- | --- |
+| `pnpm install` | Install workspace deps. `pnpm-workspace.yaml` allowlists install scripts — approve new ones deliberately. |
+| `pnpm build` | `tsc --build` across project references |
+| `pnpm test` | Vitest. `pnpm test -- tests/layering.test.ts` for one file |
+| `pnpm check` / `check:fix` | Biome lint + format |
+| `pnpm check:layers` | Layering guard — see below |
+| `pnpm verify` | build + check + check:layers + test. Run before every commit. |
+
+**There is no CI by decision.** `pnpm verify` is the only gate, and it is manual — run it. `check:layers` enforces four rules mechanically: no vendor names below `agent-sdk` (ADR-004), dependency direction, `task-engine` ⇄ `memory-core` isolation, and no event type absent from the catalog. It also runs inside `pnpm test`, so the suite cannot go green while a layering rule is broken.
+
 ## Repository status
 
-This repo is **specification-only**. There is no source code, no `package.json`, no build system, no tests, and no CI — the content is Markdown specs under `docs/`, high-fidelity design renders under `ui/`, a generated walkthrough at `doc.html`, an implementation plan at `todo.html`, plus [AGENTS.md](AGENTS.md) and [README.md](README.md). There are therefore no build/lint/test commands to run yet; do not invent them.
+Phase 0 done: workspace skeleton, five empty packages, tooling. **No behavior implemented yet** — `packages/*/src/index.ts` hold contracts and foundational types, not logic.
 
-The stack is chosen but not yet built: TypeScript + Tauri 2 + SQLite, single-machine ([ADR-007](docs/decisions/ADR-007-implementation-stack.md)). Phase 0 creates the tooling. When it does, replace this section with the real commands.
+Alongside the code: Markdown specs under `docs/`, high-fidelity renders under `ui/`, a generated walkthrough at `doc.html`, an implementation plan at `todo.html`.
+
+Stack: TypeScript + Tauri 2 + SQLite, single-machine ([ADR-007](docs/decisions/ADR-007-implementation-stack.md)). Next is Phase 1.1 — the event envelope ([roadmap](docs/development/roadmap.md)).
 
 ## What Agent OS is
 
@@ -52,11 +69,15 @@ Object spine: `Project → Goal → Task → Agent → Event → Knowledge`.
 
 Target layout: `apps/macos/`, `packages/`, `docs/`, `ui/`, `tests/`.
 
+`A → B` reads **A imports B**:
+
 ```
-apps/macos → mcp-server → agent-sdk → event-core → { task-engine, memory-core }
+apps/macos → mcp-server → { agent-sdk, task-engine, memory-core } → event-core
 ```
 
-Strictly downward. `event-core` must compile with no knowledge that a UI or an AI vendor exists; `task-engine` and `memory-core` are siblings and must not import each other. Build in that order — a UI written before the reducers exist will invent state.
+`event-core` is the bottom of the stack and depends on nothing — it exports `registerReducer` and the domain packages register into it, never the reverse. `task-engine` and `memory-core` are siblings and must not import each other. Enforced by `pnpm check:layers`.
+
+Build order is `event-core → task-engine → mcp-server → agent-sdk → memory-core` — a UI written before the reducers exist will invent state.
 
 | Package | Owns |
 | --- | --- |
