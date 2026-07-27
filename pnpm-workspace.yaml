@@ -1,0 +1,10 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+
+# Both need their install script to fetch a platform-native binary; neither
+# works without it. Reviewed and approved deliberately — pnpm blocks install
+# scripts by default, and that default should stay on for anything added later.
+allowBuilds:
+  "@biomejs/biome": true
+  esbuild: true

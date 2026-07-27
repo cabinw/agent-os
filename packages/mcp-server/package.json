@@ -1,0 +1,22 @@
+{
+  "name": "@agent-os/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@agent-os/agent-sdk": "workspace:*",
+    "@agent-os/event-core": "workspace:*",
+    "@agent-os/memory-core": "workspace:*",
+    "@agent-os/task-engine": "workspace:*"
+  }
+}
