@@ -22,24 +22,36 @@ agent-os/
 
 ## Dependency direction
 
+`A ──▶ B` reads **A imports B**. Arrows only ever point downward.
+
 ```
-        apps/macos
-             │
-        mcp-server
-             │
-        agent-sdk
-             │
-        event-core
-         ┌───┴────┐
-   task-engine  memory-core
+                    apps/macos
+                         │
+                         ▼
+                    mcp-server
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+     agent-sdk     task-engine     memory-core
+          └──────────────┼──────────────┘
+                         ▼
+                    event-core          ← kernel, zero dependencies
 ```
 
-Strictly downward. Two consequences worth stating explicitly:
+`event-core` is the **bottom** of the stack, not the middle. It exports
+`registerReducer`; the domain packages register into it. A kernel that imported
+its own consumers could not be tested in a bare runtime, and could not be the
+thing every projection is derived from.
 
-- `event-core` has no dependency on any AI vendor SDK and no UI import. It should
-  be testable in a bare runtime.
+Three consequences worth stating explicitly:
+
+- `event-core` depends on nothing in this repo. No vendor SDK, no UI import, no
+  sibling package. It should be testable with the other four absent.
 - `task-engine` and `memory-core` are siblings and must not import each other.
   They communicate only by emitting and reducing events.
+- `agent-sdk` sits beside them, not above them. It needs the log to emit onto;
+  it does not need task state.
+
+Mechanically checked by `pnpm check:layers`.
 
 ## Package contracts
 

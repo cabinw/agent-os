@@ -44,22 +44,23 @@ events the Task Engine used to advance state. There is no second source of truth
 ## Layers
 
 ```
-┌──────────────────────────────────────────────┐
-│  apps/macos          Pulse, Canvas, Library  │  presentation
-├──────────────────────────────────────────────┤
-│  mcp-server          protocol ingress        │  boundary
-├──────────────────────────────────────────────┤
-│  agent-sdk           adapters, capability    │  integration
-├──────────────────────────────────────────────┤
-│  event-core          bus, store, reducers    │  kernel
-├──────────────────────────────────────────────┤
-│  task-engine  memory-core                    │  domain
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  apps/macos                Pulse, Canvas, Library    │  presentation
+├──────────────────────────────────────────────────────┤
+│  mcp-server                protocol ingress          │  boundary
+├──────────────────────────────────────────────────────┤
+│  agent-sdk  ·  task-engine  ·  memory-core           │  integration + domain
+├──────────────────────────────────────────────────────┤
+│  event-core                bus, store, reducers      │  kernel
+└──────────────────────────────────────────────────────┘
 ```
 
-Rule: a layer may depend downward only. `event-core` must compile with no
-knowledge that a UI or an AI vendor exists. See
-[ADR-005](../decisions/ADR-005-derived-state-only.md).
+Rule: a layer may depend downward only, so `event-core` sits at the **bottom**
+and depends on nothing. It must compile with no knowledge that a UI, an AI
+vendor, or even the other four packages exist. The domain packages register
+reducers into it, never the reverse. See
+[ADR-005](../decisions/ADR-005-derived-state-only.md) and
+[packages.md](packages.md).
 
 ## Components
 
