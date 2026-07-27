@@ -1,51 +1,64 @@
-# Project Library UI Specification
+# Project Library UI Design
 
-## Overview
+## Visual Direction
 
-Project Library is the top-level project management interface of Agent OS.
+Follow the Agent OS white design language:
 
-## Main Areas
+- clean white canvas
+- subtle borders
+- soft shadows
+- blue/purple accent colors
+- macOS native feeling
 
-### Project Overview
+## Main Page
 
-Shows:
+Project Library is the entry point for managing all projects.
 
-- total projects
-- active projects
-- paused projects
-- archived projects
-- completion trends
+Sections:
 
-### Project Item
+- All Projects
+- Active Projects
+- Paused Projects
+- Archived Projects
+- Completed Projects
 
-Each project displays:
+## Project Card
 
-- project image
-- name
-- description
+Each project shows:
+
+- cover image
+- project name
+- AI generated summary
 - progress
 - technology stack
+- active agents
 - last activity
-- next recommended action
+- recommended next step
 
-### Project Detail Panel
+## Project Detail Panel
 
 Contains:
 
 - project snapshot
-- AI generated summary
+- AI generated brief
 - timeline
 - memory
 - files
+- decisions
+- unfinished tasks
+
+## Project Revival Mode
+
+When reopening an old project, Agent OS generates a welcome-back report:
+
+- what was built
+- current state
 - previous decisions
+- unresolved issues
+- recommended restart plan
 
-## Revival Mode
+## UI Reference
 
-When a user reopens an old project:
+High fidelity reference:
 
-Agent OS provides a welcome back summary:
-
-- what was completed
-- what remains unfinished
-- known issues
-- suggested next actions
+`assets/ui/project-library.png`
