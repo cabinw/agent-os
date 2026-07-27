@@ -1,51 +1,69 @@
-# Agent OS Project Library
+# Project Library
 
-## Purpose
+Manages every project across its full lifecycle, including the parts of the
+lifecycle where nothing is happening.
 
-Project Library manages all projects across their entire lifecycle.
+## Problem
 
-It solves the problem of restarting old projects by preserving project history, decisions, progress, and AI-generated summaries.
+Personal and small-team projects do not end. They go quiet. Six months later the
+code is still there but the context is gone: what worked, what was half-built,
+why the architecture is the way it is, what to do first. The cost of restarting
+exceeds the cost of the remaining work, so the project stays dead.
 
-## Core Concepts
+Agent OS holds the context that makes restarting cheap.
 
-A project is not only code. It contains:
+## A project is not code
 
-- source code
-- documents
-- decisions
-- research
-- agent activities
-- timeline
-- memory
+```
+Project
+├── source code
+├── documents
+├── decisions        ← why it looks like this
+├── research
+├── agent activity
+├── timeline
+└── memory
+```
 
-## Project States
+## States
 
-- active
-- paused
-- archived
-- completed
+| State | Meaning |
+| --- | --- |
+| `active` | Agents are working |
+| `paused` | Deliberately stopped, intended to resume |
+| `archived` | Finished with, kept for reference |
+| `completed` | Shipped |
 
-## Project Revival
+## Library view
 
-When reopening an old project, Agent OS should generate:
+Filter tabs by state, a stat row across the top, then one row per project:
 
-- project summary
-- current status
-- previous decisions
-- unfinished tasks
-- recommended next steps
+- cover image
+- name and state badge
+- AI-generated one-line summary
+- progress bar with current phase
+- technology stack chips
+- active agent avatars
+- last activity, in human terms ("312 天前")
+- recommended next step
 
-## Example
+Below the list, a **Project Insights** strip: activity trend, stack
+distribution across the portfolio, and AI suggestions at portfolio level — for
+example flagging that two projects have been paused past three months and
+should be evaluated for archival.
 
-Old Website:
+## Detail panel
 
-- Next.js application
-- Authentication completed
-- Payment integration unfinished
-- Dependencies outdated
+Opens beside the grid without leaving the Library. Tabs: Overview, Timeline,
+Memory, Files, Settings. Overview carries the snapshot, the AI brief, the
+technology stack, the recommended next steps and the project timeline.
 
-Recommended restart plan:
+For a dormant project the Overview leads with the Revival Mode card — see
+[revival-mode.md](revival-mode.md).
 
-1. Review dependencies
-2. Update architecture
-3. Continue payment module
+## Snapshots
+
+A project accumulates dated visual checkpoints (`project.snapshot.captured`),
+rendered as a filmstrip in the detail view. Seeing what the product looked like
+at each stage restores context faster than any summary — it is the difference
+between reading that the blog system shipped and recognizing it.

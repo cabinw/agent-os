@@ -1,29 +1,44 @@
-# Agent OS Canvas Design
+# Canvas
 
-## Concept
-
-Canvas is the visual operating space of Agent OS.
+The spatial view of a project. Where Pulse answers "what happened", Canvas
+answers "how does this fit together".
 
 ## Nodes
 
-- Goal Node
-- Task Node
-- Agent Node
-- Resource Node
-- Knowledge Node
+| Node | Represents | Shows |
+| --- | --- | --- |
+| Goal | A stated outcome | Statement, completion rollup |
+| Task | A unit of work | Title, status color, progress, executor avatar |
+| Agent | A worker | Identity, status dot, current task |
+| Resource | A document, file, or external source | Type, name |
+| Knowledge | A decision or finding | Type, title |
 
-## Zoom Levels
+## Edges
 
-Level 0: Project Universe
+`assign` · `report` · `block` · `review` · `depend` · `derive`
 
-Level 1: Mission View
+Edges are drawn from `causedBy` in the event log, so the graph is generated
+rather than authored. Nobody arranges the canvas by hand and nobody has to keep
+it current.
 
-Level 2: Agent Workspace
+## Zoom levels
 
-## Relations
+```
+Level 0  Project Universe   all projects, health at a glance
+Level 1  Mission View       goals and their task graphs
+Level 2  Agent Workspace    one agent, its task, its context and outputs
+```
 
-- assign
-- report
-- block
-- review
-- depend
+Zoom changes the level of detail, not just the scale. Moving in reveals
+structure that was aggregated, never just a bigger version of the same picture.
+
+## Live behavior
+
+Nodes update from the event stream. A task turning `blocked` pulses its edge to
+the agent once and settles into the risk color — noticeable peripherally,
+without motion that pulls the eye away from work.
+
+## Layout
+
+Force-directed within a goal, ordered left-to-right by dependency. Completed
+branches recede in opacity so the active frontier stays prominent.
