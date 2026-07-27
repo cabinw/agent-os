@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/event-core" },
+    { "path": "packages/task-engine" },
+    { "path": "packages/memory-core" },
+    { "path": "packages/agent-sdk" },
+    { "path": "packages/mcp-server" }
+  ]
+}
