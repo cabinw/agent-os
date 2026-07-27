@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+
+# Local tool state
+.claude/
+
+# Node (Phase 1 onward — see docs/development/roadmap.md)
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Rust / Tauri (apps/macos/src-tauri)
+target/
