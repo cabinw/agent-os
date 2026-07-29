@@ -30,6 +30,24 @@ Requires `codex` on PATH (verified against codex-cli 0.142.5) and a logged-in
 Codex account. The agent runs `sandbox: read-only`, `approval-policy: never`,
 with its working directory pinned to `apps/chat-spike/workspace/`.
 
+## Four vendors
+
+Codex, Claude, Grok and Kimi all run behind one adapter contract — switch in the
+header. Measurements and the full comparison are in
+[FINDINGS.md](FINDINGS.md); the short version is that they differ on three of
+four integration capabilities, so adapters **declare** what they can do and the
+UI branches on the declaration:
+
+| | streaming | reasoning | session | usage |
+| --- | --- | --- | --- | --- |
+| Codex | ✅ | ❌ | ✅ | ✅ |
+| Claude | ✅ | ❌ | ✅ | ✅ |
+| Grok | ✅ | ✅ | ✅ | ✅ |
+| Kimi | ❌ | ❌ | ✅ | ❌ |
+
+Switching provider keeps the transcript and drops the vendor session — the
+cheapest demonstration of why context belongs in the log.
+
 ## Measured behaviour
 
 | | |
@@ -45,7 +63,7 @@ That trade-off is what stage 3 measures.
 
 ## Stages
 
-- [x] **0 — dispatch works.** This code. In-memory only, no event log, no MCP server of our own.
+- [x] **0 — dispatch works, across four vendors.** This code. In-memory only, no event log, no MCP server of our own.
 - [ ] **1 — event log.** Every message becomes `message.sent`; the UI projects the log; restart replays it.
 - [ ] **2 — participation channel.** Our MCP server (`register_agent` / `get_context` / `send_message`); the adapter translates Codex's reply into a `send_message` request. Also worth trying against Claude Code, which surfaces MCP tools directly — two providers, two integration shapes, one core ([ADR-004](../../docs/decisions/ADR-004-capability-first-agent-catalog.md)).
 - [ ] **3 — the experiment.** Persistent session vs. rebuilding from `get_context`. Compare coherence *and* latency.

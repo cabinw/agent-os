@@ -295,6 +295,10 @@ figcaption b{color:var(--doc-text);font-weight:600}
 .agcard .nm{font-size:12.5px;font-weight:660}
 .agcard .rl{font-size:10.5px;color:#9CA3AF}
 .caps{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}
+.integ{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 8px;align-items:center}
+.integ .lb{font-size:9px;color:#C3C8D2;margin-right:2px}
+.ic{font-size:9px;padding:1px 6px;border-radius:4px;font-weight:600;background:#EEF2FF;color:#4F46E5}
+.ic.off{background:#F3F4F6;color:#C3C8D2;text-decoration:line-through}
 .mtr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:9px;border-top:1px solid #F0F1F3}
 .mtr .m .n{font-size:13px;font-weight:680;font-variant-numeric:tabular-nums}
 .mtr .m .l{font-size:9.5px;color:#9CA3AF}
@@ -387,6 +391,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
   <a href="#mcp">MCP 协议</a>
   <a href="#memory">记忆系统</a>
   <a href="#rules">五条铁律</a>
+  <a href="#providers">四家接入实测</a>
   <h4>使用指南</h4>
   <a href="#u-start">① 建项目、下目标</a>
   <a href="#u-day">② 日常：看脉冲</a>
@@ -417,7 +422,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
   <div class="hero-badges">
     <span class="badge">规格阶段 · 尚未实现</span>
     <span class="badge">MCP 协议 v0.3</span>
-    <span class="badge">7 个界面 · 35 份规格</span>
+    <span class="badge">7 个界面 · 36 份规格</span>
     <span class="badge">7 条 ADR</span>
   </div>
 </div>
@@ -772,6 +777,48 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 <li><h4>进度不触发转移</h4><p>100% 的任务仍然是 running。</p></li>
 <li><h4>审批永不自动放行</h4><p>无人应答的请求发出 <code>approval.expired</code>，任务保持阻塞。这就是这道闸门存在的全部意义。</p></li>
 </ol>
+</section>
+
+<section id="providers">
+<h2>四家接入实测</h2>
+<p class="lede">上面的架构此前只是推理。这一节是把 Codex、Claude、Grok、Kimi 四家真的接进来跑通之后的结果——<strong>全部数字来自本机实测</strong>，厂商没有文档的事件格式是靠 dump 真实流量学的。</p>
+
+<div class="note"><b>为什么值得做：</b>ADR-004「按能力而非厂商」此前是纯推理。一家厂商验证不了它——单一厂商的行为会被当成通用假设写进规格。四家一起接，抽象错在哪里立刻现形。</div>
+
+<h3>对照表</h3>
+<table>
+<tr><th></th><th>Codex</th><th>Claude</th><th>Grok</th><th>Kimi</th></tr>
+<tr><td><b>传输</b></td><td><b>MCP 长连接</b></td><td>子进程 + JSONL</td><td>子进程 + JSONL</td><td>子进程 + JSONL</td></tr>
+<tr><td><b>事件键</b></td><td><code>msg.type</code></td><td><code>type</code></td><td><code>type</code></td><td><b><code>role</code></b></td></tr>
+<tr><td><b>逐字流</b></td><td>✅</td><td>✅<span class="tiny mut">（需加参数）</span></td><td>✅</td><td><b>❌ 一次性</b></td></tr>
+<tr><td><b>思考流</b></td><td>❌</td><td>❌</td><td><b>✅ 唯一一家</b></td><td>❌</td></tr>
+<tr><td><b>会话续接</b></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+<tr><td><b>用量</b></td><td>✅ 带上下文窗口</td><td>✅</td><td>✅ <b>带美元成本</b></td><td>❌</td></tr>
+<tr><td><b>冷启动</b></td><td>7.1s</td><td>4.6s</td><td>5.7s</td><td>8.7s</td></tr>
+<tr><td><b>续话</b></td><td><b>1.5s</b></td><td>—</td><td>—</td><td>—</td></tr>
+</table>
+
+<h3>发现一：有两条通道，规格只描述了一条</h3>
+<pre><code>唤醒   Agent OS ──▶ agent      厂商各异，永远需要适配器
+参与   agent ──▶ Agent OS      走 MCP，我们的 server，ADR-001 在这里成立</code></pre>
+<p><strong>唤醒通道上只有 Codex 说 MCP</strong>，而且它是以<b>服务端</b>身份说的——所以 Agent OS 是客户端。另外三家都是「起一个进程、读一条流」。ADR-001 说的「已经会说 MCP 的 agent 零适配器接入」，在参与通道上成立，在唤醒通道上<b>四家全都不成立</b>。</p>
+<p>这也把 <code>agent-sdk</code> 里悬空的 <code>receiveTask</code> 解决了：<b>接收不是 MCP 工具，是适配器的出站调用。</b></p>
+
+<h3>发现二：能力有两个轴</h3>
+<p><code>agent-schema.md</code> 原本只有<b>任务能力</b>（coding、research…）。但「能不能流式、有没有思考过程、会话能不能续」是另一个轴，独立变化，而且界面必须按它分支：</p>
+<div class="grid2">
+  <div class="tile"><h4>Kimi 不能流式</h4><p>假设有 delta 的界面会冻住约 9 秒。必须显式降级成「等待中」，而不是空流。</p></div>
+  <div class="tile"><h4>Grok 思考:正文 ≈ 20:1</h4><p>42 条思考对 2 条正文。内联铺开会淹没答案，完全丢掉又浪费了它唯一的差异信号——所以默认折叠、可展开。</p></div>
+  <div class="tile"><h4>Codex 续话便宜 4.7 倍</h4><p>7.1s 冷启动 vs 1.5s 续话。这是丢弃厂商会话、从日志重建上下文的<b>实测代价</b>。</p></div>
+  <div class="tile"><h4>只接一家会错三次</h4><p>照 Codex 建界面，上面三条假设全部会被错误地当成通用行为写进规格。</p></div>
+</div>
+<p>所以适配器<strong>声明</strong>集成能力，界面按声明分支——和 ADR-004 是同一条原则，只是用在第二个轴上。</p>
+
+<h3>发现三：记忆优先有了价码</h3>
+<p>Phase 3 的实验问题原本只有「靠 <code>get_context</code> 重建够不够连贯」。现在多了一问：<strong>值不值 4.7 倍延迟</strong>。答案很可能分场景——长任务内部让 agent 常驻，跨任务、跨天才重建。<code>agent-runtime.md</code> 里「智能体进程是短暂的，这是常态」这句话，现在有数字了。</p>
+
+<h3>一个负面结果</h3>
+<div class="note warn"><b>Codex 不会把我们的 MCP 工具暴露给它的模型。</b>在调用时注入 <code>config.mcp_servers</code> <b>进程级是生效的</b>——Codex 读配置、拉起进程、完成握手、请求 <code>tools/list</code>。但工具从没被调用：<code>tool_search_always_defer_mcp_tools</code> 生效值为 <code>true</code> 且已 <code>removed</code>（关不掉），MCP 工具被压在搜索步骤后面。四次尝试零调用，其中两次卡满四分钟。<br><br><b>后果：</b>参与通道改走<b>适配器翻译</b>——它把厂商回复翻成 <code>send_message</code> 请求。这本来就是适配器该干的事，信任边界没变：适配器在里面，厂商在外面。</div>
 </section>
 
 <!-- ============ 使用指南 ============ -->
@@ -1450,24 +1497,28 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
         <div class="t"><span class="ab" style="background:#2563EB">C</span><div><div class="nm">Codex</div><div class="rl">developer · openai</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
         <div class="tiny mut">TASK-014 · 实现 webhook 处理</div>
         <div class="caps"><span class="chip">coding</span><span class="chip">testing</span><span class="chip">git</span></div>
+        <div class="integ"><span class="lb">集成</span><span class="ic">流式</span><span class="ic off">思考</span><span class="ic">会话</span><span class="ic">用量</span></div>
         <div class="mtr"><div class="m"><div class="n">18</div><div class="l">完成</div></div><div class="m"><div class="n">2/2</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#059669">98%</div><div class="l">健康</div></div></div>
       </div>
       <div class="agcard">
         <div class="t"><span class="ab" style="background:#D97757">✳</span><div><div class="nm">Claude</div><div class="rl">architect · anthropic</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
         <div class="tiny mut">TASK-019 · 已提交待验收</div>
         <div class="caps"><span class="chip">architecture</span><span class="chip">coding</span><span class="chip">review</span></div>
+        <div class="integ"><span class="lb">集成</span><span class="ic">流式</span><span class="ic off">思考</span><span class="ic">会话</span><span class="ic">用量</span></div>
         <div class="mtr"><div class="m"><div class="n">14</div><div class="l">完成</div></div><div class="m"><div class="n">1/2</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#059669">99%</div><div class="l">健康</div></div></div>
       </div>
       <div class="agcard" style="border-color:#FECACA;background:#FFFCFC">
         <div class="t"><span class="ab" style="background:#111827">✕</span><div><div class="nm">Grok</div><div class="rl">developer · xai</div></div><span class="chip r" style="margin-left:auto">● 已阻塞</span></div>
         <div class="tiny" style="color:#DC2626">TASK-017 · 等待世界模式定义 · 2 天 4 小时</div>
         <div class="caps"><span class="chip">coding</span><span class="chip">data</span></div>
+        <div class="integ"><span class="lb">集成</span><span class="ic">流式</span><span class="ic">思考</span><span class="ic">会话</span><span class="ic">用量</span></div>
         <div class="mtr"><div class="m"><div class="n">7</div><div class="l">完成</div></div><div class="m"><div class="n">1/1</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#B45309">72%</div><div class="l">健康</div></div></div>
       </div>
       <div class="agcard">
-        <div class="t"><span class="ab" style="background:#4285F4">◆</span><div><div class="nm">Gemini</div><div class="rl">analyst · google</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
+        <div class="t"><span class="ab" style="background:#7C3AED">K</span><div><div class="nm">Kimi</div><div class="rl">analyst · moonshot</div></div><span class="chip g" style="margin-left:auto">● 运行中</span></div>
         <div class="tiny mut">TASK-021 · 玩家遥测分析</div>
         <div class="caps"><span class="chip">data</span><span class="chip">research</span></div>
+        <div class="integ"><span class="lb">集成</span><span class="ic off">流式</span><span class="ic off">思考</span><span class="ic">会话</span><span class="ic off">用量</span></div>
         <div class="mtr"><div class="m"><div class="n">9</div><div class="l">完成</div></div><div class="m"><div class="n">1/3</div><div class="l">并发</div></div><div class="m"><div class="n" style="color:#059669">96%</div><div class="l">健康</div></div></div>
       </div>
       <div class="agcard">
@@ -1488,6 +1539,17 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
         <div><div class="tiny mut">design</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i style="width:4%;background:#EF4444"></i></div><span class="tiny nums" style="color:#DC2626">0</span></div></div>
       </div>
       <div class="tiny" style="margin-top:9px;padding-top:8px;border-top:1px solid #F0F1F3;color:#DC2626">⚠ 能力 <code style="font-size:10px">design</code> 无任何已注册智能体——依赖该能力的任务会滞留在 created，Supervisor 已将其升级。</div>
+
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid #F0F1F3">
+        <div class="hd" style="margin-bottom:8px">◲ 集成能力<span class="all">界面按这一行降级，不按厂商</span></div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
+          <div><div class="tiny mut">流式</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="g" style="width:75%"></i></div><span class="tiny nums">3/4</span></div></div>
+          <div><div class="tiny mut">思考</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="a" style="width:25%"></i></div><span class="tiny nums">1/4</span></div></div>
+          <div><div class="tiny mut">会话</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="g" style="width:100%"></i></div><span class="tiny nums">4/4</span></div></div>
+          <div><div class="tiny mut">用量</div><div style="display:flex;align-items:center;gap:6px;margin-top:3px"><div class="bar"><i class="g" style="width:75%"></i></div><span class="tiny nums">3/4</span></div></div>
+        </div>
+        <div class="tiny mut" style="margin-top:8px">Kimi 无逐字流 → 会话界面显式降级为「等待中」而不是空流；Grok 是唯一有思考流的 → 只有它渲染折叠块。<b>实测数据，非假设。</b></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1632,6 +1694,15 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
           <div class="fold">⋯ Codex 的 6 条进度更新（0% → 65%）<span class="ex">展开</span></div>
 
           <div class="msg">
+            <span class="av" style="background:#111827">✕</span>
+            <div class="bd">
+              <div class="mh"><span class="nm">Grok</span><span class="mtag rev">review</span><span class="tt2">09:28</span></div>
+              <div class="ct">幂等键方案没问题，但要注意 Stripe 的 event id 在重放时会复用。</div>
+              <div class="fold" style="margin-top:6px">▸ 思考过程（1,284 字）<span class="ex">展开</span></div>
+            </div>
+          </div>
+
+          <div class="msg">
             <span class="av" style="background:#2563EB">C</span>
             <div class="bd">
               <div class="mh"><span class="nm">Codex</span><span class="mtag qst">question</span><span class="tt2">09:41</span></div>
@@ -1676,7 +1747,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
   </div>
 </div>
 </div>
-<div class="mockcap"><b>智能体 · 对话。</b>注意三处：<b>生命周期分隔线</b>用发丝线而不是气泡，把「问题→阻塞→回答→解除」这条因果链直接摆出来；<b>6 条 progress 折成一行</b>，它们在长运行里占了大部分体量却几乎没有信息量；底部那条待审批只给「在审批界面处理」的链接，<b>输入框里没有批准按钮</b>——一句「行，你继续」不能满足待审批。人的消息也是左对齐的，只用强调色左边框区分：这是一支团队的逐字记录，右对齐会错误暗示人是对话的一方。</div>
+<div class="mockcap"><b>智能体 · 对话。</b>Grok 那条的<b>思考过程默认折叠</b>——实测它的思考:正文约 20:1（42 条 vs 2 条），内联铺开会淹没答案。注意三处：<b>生命周期分隔线</b>用发丝线而不是气泡，把「问题→阻塞→回答→解除」这条因果链直接摆出来；<b>6 条 progress 折成一行</b>，它们在长运行里占了大部分体量却几乎没有信息量；底部那条待审批只给「在审批界面处理」的链接，<b>输入框里没有批准按钮</b>——一句「行，你继续」不能满足待审批。人的消息也是左对齐的，只用强调色左边框区分：这是一支团队的逐字记录，右对齐会错误暗示人是对话的一方。</div>
 </figure>
 </section>
 
@@ -1941,6 +2012,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 <tr><td><b>005</b></td><td>只有派生状态</td><td>「事件驱动」原则此前没有约束力，实现时必然退化成"先写表再补事件"</td></tr>
 <tr><td><b>006</b></td><td>对话折进智能体，按任务分组</td><td>新增功能：智能体对话记录该放哪儿、会话该怎么划分</td></tr>
 <tr><td><b>007</b></td><td>实现栈：TypeScript + Tauri 2 + SQLite，单机</td><td>开工前必须定的前置问题：外壳、范围、模型档位</td></tr>
+<tr><td><b>004 补</b></td><td>能力有两个轴：任务能力 + 集成能力</td><td>四家实测发现单一厂商会把自己的行为变成通用假设</td></tr>
 </table>
 
 <h3>其他收敛</h3>
