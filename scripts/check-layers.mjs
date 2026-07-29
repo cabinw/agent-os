@@ -163,29 +163,36 @@ if (safeStat(CATALOG)) {
 }
 
 const EVENT_LIKE = /["']([a-z]+\.[a-z]+(?:\.[a-z]+)*)["']/g;
-const NOT_EVENTS = /^(node|src|dist|index|package|tsconfig)\./;
+/** Module specifiers and filenames look like event types; they are not. */
+const NOT_EVENTS =
+  /^(node|src|dist|index|package|tsconfig)\.|\.(mjs|cjs|js|ts|tsx|json|md|html|css|toml|yaml|yml|lock|jsonl|txt|sock)$/;
+
+// Applies to apps/ too — the chat spike emits real events, so it must not be
+// able to invent a type the catalog has never heard of.
+const EVENT_ROOTS = [
+  ...Object.keys(ALLOWED_DEPS).map((p) => join(PACKAGES, p, "src")),
+  join(ROOT, "apps"),
+];
 
 if (catalogTypes.size > 0) {
-  for (const pkg of Object.keys(ALLOWED_DEPS)) {
-    for (const file of sourceFiles(join(PACKAGES, pkg, "src"))) {
-      const code = stripComments(readFileSync(file, "utf8"));
-      code.split("\n").forEach((text, idx) => {
-        for (const m of text.matchAll(EVENT_LIKE)) {
-          const type = m[1];
-          if (NOT_EVENTS.test(type)) continue;
-          if (text.includes("import") || text.includes("require(")) continue;
-          if (!catalogTypes.has(type)) {
-            report(
-              "事件类型绕过目录",
-              relative(ROOT, file),
-              idx + 1,
-              text,
-              `"${type}" 不在 docs/protocol/event-catalog.md 里。先写目录条目，再写 reducer，再写重放测试，最后才发`,
-            );
-          }
+  for (const file of EVENT_ROOTS.flatMap((r) => sourceFiles(r))) {
+    const code = stripComments(readFileSync(file, "utf8"));
+    code.split("\n").forEach((text, idx) => {
+      for (const m of text.matchAll(EVENT_LIKE)) {
+        const type = m[1];
+        if (NOT_EVENTS.test(type)) continue;
+        if (text.includes("import") || text.includes("require(")) continue;
+        if (!catalogTypes.has(type)) {
+          report(
+            "事件类型绕过目录",
+            relative(ROOT, file),
+            idx + 1,
+            text,
+            `"${type}" 不在 docs/protocol/event-catalog.md 里。先写目录条目，再写 reducer，再写重放测试，最后才发`,
+          );
         }
-      });
-    }
+      }
+    });
   }
 }
 
