@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Agent OS — chat spike</title>
+<style>
+:root{
+  --bg:#F7F8FA;--surface:#fff;--border:#E8EAED;--text:#111827;--muted:#6B7280;--faint:#9CA3AF;
+  --accent:#6366F1;--accent2:#8B5CF6;--ok:#10B981;--warn:#F59E0B;--risk:#EF4444;--code:#F3F4F6;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#0E1014;--surface:#161A21;--border:#252A33;--text:#E6E8EB;--muted:#9BA3AF;--faint:#79818C;--code:#1B2029}
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;font-size:15px;-webkit-font-smoothing:antialiased}
+header{padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:11px;flex:none}
+.mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700}
+header h1{font-size:14.5px;font-weight:650;letter-spacing:-.01em}
+header .sub{font-size:11.5px;color:var(--faint)}
+.spacer{margin-left:auto}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block;margin-right:5px}
+.dot.on{background:var(--ok)}.dot.busy{background:var(--warn);animation:pulse 1.1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+#state{font-size:11.5px;color:var(--muted)}
+#usage{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.msg.streaming .ct::after{content:"▍";color:var(--accent);animation:blink .9s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+button{font-family:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+button:hover{color:var(--text)}
+
+main{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;max-width:860px;width:100%;margin:0 auto}
+.msg{display:flex;gap:11px;animation:in .2s ease-out}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.av{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}
+.msg.human .av{background:linear-gradient(135deg,#A5B4FC,#818CF8)}
+.msg.agent .av{background:#2563EB}
+.msg.system .av{background:var(--faint)}
+.bd{flex:1;min-width:0}
+.msg.human .bd{border-left:2.5px solid var(--accent);padding-left:10px}
+.hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.nm{font-size:12px;font-weight:650}
+.meta{font-size:10.5px;color:var(--faint);margin-left:auto;font-variant-numeric:tabular-nums}
+.tag{font-size:10px;padding:1.5px 7px;border-radius:5px;background:var(--code);color:var(--muted);font-weight:560}
+.tag.cold{background:color-mix(in srgb,var(--warn) 16%,transparent);color:#B45309}
+.ct{font-size:14px;line-height:1.65;margin-top:4px;white-space:pre-wrap;word-break:break-word}
+.msg.system .ct{color:var(--muted);font-size:13px}
+.msg.system.error .ct{color:var(--risk)}
+
+#progress{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding:0 20px 6px;max-width:860px;width:100%;margin:0 auto;min-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+footer{border-top:1px solid var(--border);background:var(--surface);padding:12px 20px;flex:none}
+.composer{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+textarea{flex:1;resize:none;font-family:inherit;font-size:14px;line-height:1.5;padding:10px 13px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);max-height:150px}
+textarea:focus{outline:none;border-color:var(--accent)}
+.send{background:linear-gradient(135deg,var(--accent),#7C5CF0);color:#fff;border:none;padding:10px 18px;font-size:13px;font-weight:620;border-radius:10px}
+.send:disabled{opacity:.45;cursor:not-allowed}
+.hint{max-width:860px;margin:7px auto 0;font-size:11px;color:var(--faint)}
+.empty{color:var(--faint);font-size:13.5px;text-align:center;margin-top:60px;line-height:1.9}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="mark">◈</span>
+  <div>
+    <h1>Agent OS · chat spike</h1>
+    <div class="sub">派发通道验证 —— Agent OS 作为 MCP client 调用 codex mcp-server</div>
+  </div>
+  <div class="spacer"></div>
+  <span id="usage"></span>
+  <span id="state"><span class="dot" id="dot"></span><span id="stateText">连接中…</span></span>
+  <button id="reset" title="丢弃 threadId，下一轮冷启动">重置会话</button>
+</header>
+
+<main id="log">
+  <div class="empty" id="empty">
+    还没有消息。<br>
+    说点什么，Agent OS 会把它派发给 Codex。<br>
+    <span style="font-size:12px">首轮约 20 秒（冷启动），之后约 7 秒。</span>
+  </div>
+</main>
+
+<div id="progress"></div>
+
+<footer>
+  <div class="composer">
+    <textarea id="input" rows="1" placeholder="说点什么…（⌘↵ 发送）"></textarea>
+    <button class="send" id="send">发送</button>
+  </div>
+  <div class="hint">沙箱 read-only · 审批 never · 一次一轮，思考中发出的消息会排队</div>
+</footer>
+
+<script>
+const log = document.getElementById("log");
+const empty = document.getElementById("empty");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+const progress = document.getElementById("progress");
+const usage = document.getElementById("usage");
+const dot = document.getElementById("dot");
+const stateText = document.getElementById("stateText");
+
+const NAMES = { human: "你", agent: "Codex", system: "系统" };
+const AVATARS = { human: "你", agent: "C", system: "◈" };
+
+function render(m) {
+  empty?.remove();
+  const el = document.createElement("div");
+  el.className = `msg ${m.role}${m.error ? " error" : ""}`;
+
+  const av = document.createElement("span");
+  av.className = "av";
+  av.textContent = AVATARS[m.role] ?? "?";
+
+  const bd = document.createElement("div");
+  bd.className = "bd";
+
+  const hd = document.createElement("div");
+  hd.className = "hd";
+  const nm = document.createElement("span");
+  nm.className = "nm";
+  nm.textContent = NAMES[m.role] ?? m.role;
+  hd.appendChild(nm);
+
+  if (m.fresh) {
+    const t = document.createElement("span");
+    t.className = "tag cold";
+    t.textContent = "冷启动";
+    hd.appendChild(t);
+  }
+
+  const meta = document.createElement("span");
+  meta.className = "meta";
+  meta.textContent = [
+    m.ms ? `${(m.ms / 1000).toFixed(1)}s` : "",
+    new Date(m.at).toLocaleTimeString("zh-CN", { hour12: false }),
+  ].filter(Boolean).join("  ·  ");
+  hd.appendChild(meta);
+
+  // textContent throughout: agent output is untrusted input, never innerHTML.
+  const ct = document.createElement("div");
+  ct.className = "ct";
+  ct.textContent = m.text;
+
+  bd.append(hd, ct);
+  el.append(av, bd);
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+}
+
+function setState(s) {
+  const busy = s === "thinking";
+  dot.className = `dot ${busy ? "busy" : "on"}`;
+  stateText.textContent = busy ? "思考中" : "空闲";
+  sendBtn.disabled = busy;
+  if (!busy) progress.textContent = "";
+}
+
+/**
+ * Live preview built from `agent_message_content_delta`. It is a scratch buffer:
+ * when the authoritative message arrives it is discarded, not reconciled.
+ */
+let streaming = null;
+
+function streamDelta(text) {
+  if (!streaming) {
+    empty?.remove();
+    const el = document.createElement("div");
+    el.className = "msg agent streaming";
+    el.innerHTML =
+      '<span class="av">C</span><div class="bd">' +
+      '<div class="hd"><span class="nm">Codex</span>' +
+      '<span class="meta">正在输入…</span></div>' +
+      '<div class="ct"></div></div>';
+    log.appendChild(el);
+    streaming = { el, ct: el.querySelector(".ct") };
+  }
+  streaming.ct.textContent += text;
+  log.scrollTop = log.scrollHeight;
+}
+
+function clearStream() {
+  streaming?.el.remove();
+  streaming = null;
+}
+
+const es = new EventSource("/events");
+es.onopen = () => setState("idle");
+es.onerror = () => {
+  dot.className = "dot";
+  stateText.textContent = "已断开";
+};
+es.onmessage = (e) => {
+  const d = JSON.parse(e.data);
+  if (d.type === "hello") {
+    for (const m of d.messages) render(m);
+    setState("idle");
+  } else if (d.type === "message") {
+    if (d.message.role === "agent") clearStream();
+    render(d.message);
+  } else if (d.type === "delta") {
+    streamDelta(d.text);
+  } else if (d.type === "usage") {
+    usage.textContent = `${d.total} tok · 上下文 ${Math.round((d.total / d.window) * 100)}%`;
+  } else if (d.type === "progress") {
+    progress.textContent = `⋯ ${d.kind}${d.detail ? ` — ${d.detail}` : ""}`;
+  } else if (d.type === "status") {
+    if (d.state === "idle") clearStream();
+    setState(d.state);
+  }
+};
+
+async function send() {
+  const text = input.value.trim();
+  if (!text || sendBtn.disabled) return;
+  input.value = "";
+  input.style.height = "auto";
+  await fetch("/send", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+}
+
+sendBtn.onclick = send;
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault();
+    send();
+  }
+});
+input.addEventListener("input", () => {
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
+});
+document.getElementById("reset").onclick = () =>
+  fetch("/reset", { method: "POST" });
+</script>
+</body>
+</html>
