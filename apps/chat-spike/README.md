@@ -63,8 +63,8 @@ That trade-off is what stage 3 measures.
 
 ## Stages
 
-- [x] **0 — dispatch works, across four vendors.** This code. In-memory only, no event log, no MCP server of our own.
-- [ ] **1 — event log.** Every message becomes `message.sent`; the UI projects the log; restart replays it.
+- [x] **0 — dispatch works, across four vendors.** No event log, no MCP server of our own.
+- [x] **1 — event log.** Every message becomes `message.sent`; the UI projects the log; restart replays it. **Verified: kill the process, restart, the conversation comes back.**
 - [ ] **2 — participation channel.** Our MCP server (`register_agent` / `get_context` / `send_message`); the adapter translates Codex's reply into a `send_message` request. Also worth trying against Claude Code, which surfaces MCP tools directly — two providers, two integration shapes, one core ([ADR-004](../../docs/decisions/ADR-004-capability-first-agent-catalog.md)).
 - [ ] **3 — the experiment.** Persistent session vs. rebuilding from `get_context`. Compare coherence *and* latency.
 
@@ -80,6 +80,32 @@ call does launch a server and completes the MCP handshake — no need to touch
 attempts (two of them hanging for four minutes). This is why stage 2 routes the
 reply through the **adapter** rather than expecting Codex to call our tools —
 which is what an adapter is for anyway.
+
+## The event log
+
+`data/events.jsonl`, append-only, using the **real envelope** from
+[event-core.md](../../docs/architecture/event-core.md) rather than a simplified
+one — so what it teaches transfers to Phase 1.1 instead of being re-learned.
+
+```
+{ id: "evt_01K…", type: "message.sent", seq: 3, project, actor, subject, at, causedBy, payload }
+```
+
+Two rules it enforces, both testable:
+
+- **Nothing reaches the UI that was not written to the log first.** Rendering is
+  a projection of `src/thread.mjs`, a pure `(state, event) => state` fold.
+- **Anything derivable is derived, never stored.** Turn latency comes from the
+  `causedBy` chain's timestamps. Cold-start (`fresh`) is not in the log at all —
+  it describes the adapter's vendor session, not the project, so replay
+  correctly forgets it.
+
+Live-only signals — token deltas, reasoning, progress — bypass the log by
+design. They are previews; the logged `message.sent` is the fact.
+
+`log.mjs` is the throwaway part: Phase 1.2 replaces JSONL with SQLite + WAL,
+transactional seq allocation, idempotency tokens and snapshots. Nothing above it
+knows how events are stored.
 
 ## What is deliberately absent
 

@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 /**
- * Chat spike — the dispatch path, across four vendors.
+ * Chat spike — stage 1: the event log.
  *
- *   browser ──POST /send──▶ this server ──▶ Adapter ──▶ vendor CLI
- *      ▲                                                    │
- *      └──────────GET /events (SSE)◀── normalised events ────┘
+ *   browser ──POST /send──▶ append(message.sent) ──▶ Adapter ──▶ vendor CLI
+ *      ▲                          │                                 │
+ *      │                          ▼                                 │
+ *      └── GET /events (SSE) ── thread reducer ◀── append(message.sent) ◀┘
  *
- * Switching provider keeps the transcript but drops the vendor session, which
- * is the cheapest possible demonstration of why context has to live in the log
- * rather than inside an agent.
+ * The rule this stage exists to enforce: **the server never sends the UI a
+ * message it did not first write to the log.** Rendering happens off the
+ * reducer's projection, so a restart reproduces the conversation exactly
+ * (ADR-005). Live-only signals — token deltas, reasoning, progress — bypass the
+ * log on purpose; they are previews, not facts.
  *
- * Deliberately absent: the event log, our own MCP server, tasks, memory.
+ * Still absent: our own MCP server, tasks, memory. Stage 2.
  */
 
 import { appendFileSync } from "node:fs";
@@ -19,33 +22,66 @@ import { createServer } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describeAdapters, getAdapter } from "./adapters/index.mjs";
+import { makeEvent } from "./events.mjs";
+import { EventLog } from "./log.mjs";
+import { project } from "./thread.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = resolve(HERE, "../public");
 const PORT = Number(process.env.PORT ?? 4173);
 const AGENT_CWD = process.env.AGENT_CWD ?? resolve(HERE, "../workspace");
+const LOG_PATH = process.env.LOG_PATH ?? resolve(HERE, "../data/events.jsonl");
 
 /** `DUMP_EVENTS=path` records raw vendor traffic — how these schemas were learned. */
 const DUMP = process.env.DUMP_EVENTS;
 
-/** In-memory only at stage 0; stage 1 replaces this with a replayable log. */
-const messages = [];
+/** One project, one thread — the spike has no tasks (ADR-006). */
+const PROJECT = "proj_spike";
+const HUMAN = { kind: "human", id: "you" };
+
+const log = new EventLog(LOG_PATH);
 const clients = new Set();
-let seq = 0;
+const registered = new Set();
 
 let providerId = process.env.PROVIDER ?? "codex";
 let adapter = null;
+/** Id of the human message the current turn is answering, for `causedBy`. */
+let answering = null;
 
 function broadcast(type, data) {
   const frame = `data: ${JSON.stringify({ type, ...data })}\n\n`;
   for (const res of clients) res.write(frame);
 }
 
-function record(role, text, meta = {}) {
-  const msg = { seq: ++seq, role, text, at: new Date().toISOString(), ...meta };
-  messages.push(msg);
-  broadcast("message", { message: msg });
-  return msg;
+/** The only way anything reaches the UI as a fact. */
+function emit(event) {
+  const stored = log.append(event);
+  broadcast("event", { event: stored });
+  return stored;
+}
+
+function ensureRegistered(id) {
+  if (registered.has(id)) return;
+  const Cls = getAdapter(id);
+  if (!Cls) return;
+  registered.add(id);
+  emit(
+    makeEvent({
+      type: "agent.registered",
+      project: PROJECT,
+      actor: { kind: "system", id: "runtime" },
+      subject: { kind: "agent", id },
+      payload: {
+        id,
+        name: Cls.label,
+        provider: id,
+        // Task capability is unknown in a chat spike; integration capability is
+        // measured. Two axes — docs/protocol/agent-schema.md.
+        capabilities: [],
+        integration: Cls.capabilities,
+      },
+    }),
+  );
 }
 
 function currentAdapter() {
@@ -56,6 +92,7 @@ function currentAdapter() {
     cwd: AGENT_CWD,
     onEvent: (e) => {
       if (DUMP) appendFileSync(DUMP, `${JSON.stringify({ providerId, ...e })}\n`);
+      // Deliberately not logged: previews and telemetry, not project facts.
       if (e.kind === "delta") broadcast("delta", { text: e.text });
       else if (e.kind === "thought") broadcast("thought", { text: e.text });
       else if (e.kind === "usage") broadcast("usage", e);
@@ -78,28 +115,40 @@ function providerState() {
 /** One turn at a time; a message sent mid-turn queues behind it. */
 let turn = Promise.resolve();
 
-function enqueue(text) {
+function enqueue(causeId, text) {
   turn = turn
-    .then(() => runTurn(text))
+    .then(() => runTurn(causeId, text))
     .catch((err) => {
-      record("system", `派发失败：${err?.message ?? err}`, { error: true });
+      broadcast("error", { message: String(err?.message ?? err) });
     });
   return turn;
 }
 
-async function runTurn(text) {
+async function runTurn(causeId, text) {
   broadcast("status", { state: "thinking" });
+  answering = causeId;
   try {
-    const a = currentAdapter();
-    const reply = await a.send(text);
-    // Streamed deltas were a preview; this is the authoritative message.
-    record("agent", reply.text || "（空回复）", {
-      ms: reply.ms,
-      fresh: reply.fresh,
-      provider: providerId,
-      providerLabel: getAdapter(providerId)?.label,
-    });
+    ensureRegistered(providerId);
+    const reply = await currentAdapter().send(text);
+    emit(
+      makeEvent({
+        type: "message.sent",
+        project: PROJECT,
+        actor: { kind: "agent", id: providerId },
+        subject: { kind: "project", id: PROJECT },
+        causedBy: causeId,
+        payload: {
+          from: providerId,
+          to: HUMAN.id,
+          type: "answer",
+          content: reply.text || "（空回复）",
+        },
+      }),
+    );
+    // Cold-start is adapter state, not project state — live signal only.
+    broadcast("turn", { fresh: reply.fresh, ms: reply.ms });
   } finally {
+    answering = null;
     broadcast("status", { state: "idle" });
     broadcast("provider", providerState());
   }
@@ -109,18 +158,10 @@ async function switchProvider(id) {
   if (!getAdapter(id)) throw new Error(`未知 provider：${id}`);
   if (id === providerId) return;
 
-  const from = getAdapter(providerId)?.label ?? providerId;
   await adapter?.close().catch(() => {});
   adapter = null;
   providerId = id;
-
-  const to = getAdapter(id).label;
-  // The transcript survives; the vendor session does not. Say so plainly —
-  // this is the point of the switcher, not a side effect.
-  record(
-    "system",
-    `已切换 ${from} → ${to}。对话记录保留，但 vendor 会话不可转移——${to} 对之前的内容一无所知。`,
-  );
+  ensureRegistered(id);
   broadcast("provider", providerState());
 }
 
@@ -139,12 +180,14 @@ const server = createServer(async (req, res) => {
       "cache-control": "no-cache",
       connection: "keep-alive",
     });
+    // The whole thread, rebuilt from seq 0 on every connect. No cache to go stale.
     res.write(
       `data: ${JSON.stringify({
         type: "hello",
-        messages,
+        thread: project(log.replay()),
         providers: describeAdapters(),
         provider: providerState(),
+        logged: log.size,
       })}\n\n`,
     );
     clients.add(res);
@@ -163,8 +206,17 @@ const server = createServer(async (req, res) => {
       res.writeHead(400, { "content-type": "application/json" });
       return res.end(JSON.stringify({ error: "empty" }));
     }
-    record("human", text);
-    enqueue(text);
+    ensureRegistered(providerId);
+    const stored = emit(
+      makeEvent({
+        type: "message.sent",
+        project: PROJECT,
+        actor: HUMAN,
+        subject: { kind: "project", id: PROJECT },
+        payload: { from: HUMAN.id, to: providerId, type: "instruction", content: text },
+      }),
+    );
+    enqueue(stored.id, text);
     res.writeHead(202, { "content-type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }
@@ -183,8 +235,8 @@ const server = createServer(async (req, res) => {
 
   if (req.method === "POST" && url.pathname === "/reset") {
     adapter?.resetSession();
-    record("system", "会话已重置——下一轮冷启动，无历史上下文");
     broadcast("provider", providerState());
+    broadcast("notice", { text: "vendor 会话已丢弃——下一轮冷启动。日志不受影响。" });
     res.writeHead(200, { "content-type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }
@@ -211,7 +263,7 @@ function readBody(req) {
 
 server.listen(PORT, () => {
   console.log(`chat-spike  →  http://localhost:${PORT}`);
-  console.log(`agent cwd   →  ${AGENT_CWD}`);
+  console.log(`日志        →  ${LOG_PATH}（已有 ${log.size} 条，seq ${log.seq}）`);
   console.log(
     `providers   →  ${describeAdapters()
       .map((p) => p.id)
