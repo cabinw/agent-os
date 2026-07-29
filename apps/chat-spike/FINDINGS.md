@@ -86,8 +86,39 @@ calls, two of them hanging for four minutes.
 **Consequence:** the participate channel routes through the **adapter**, which
 translates a vendor reply into a `send_message` request. That is what an adapter
 is for, and the trust boundary is unchanged — the adapter is inside it, the
-vendor is outside. Worth retrying against Claude Code, which does not force
-deferral.
+vendor is outside.
+
+## Positive result: the zero-adapter path works against Claude Code
+
+Same MCP server, no adapter, no translation — Claude Code spawned
+`bin/agent-os-mcp.mjs` itself and drove the protocol:
+
+```
+$ claude -p '…注册、读上下文、发消息…' --mcp-config mcp.json
+seq 1  agent.registered  system:runtime     Claude Code
+       capabilities = ['coding', 'review']
+seq 2  message.sent      agent:claude-code  Claude Code registered and context loaded…
+```
+
+Three tool calls, five turns, 17s. **This is the ADR-001 evidence**: an agent
+that never heard of Agent OS participates by reading the tool descriptions. The
+adapter is a workaround for vendors like Codex, not the architecture.
+
+Both authorization branches were then confirmed against the same live agent —
+the refusals below are Claude Code quoting our server back:
+
+| Attempt | Server's answer |
+| --- | --- |
+| `from: "codex"`, unregistered | `未注册的发送者 "codex"——必须先调用 register_agent` |
+| `from: "codex"`, registered, caller `claude-code` | `不能以 "codex" 的身份发言：调用方注册为 "claude-code"` |
+
+The interesting part is what it did next: it reported the refusal rather than
+retrying with a different framing. A boundary that returns a readable reason
+gets cooperation; one that returns `400` gets a retry loop.
+
+**Vendor support for the participate channel is now a third integration
+capability**, alongside streaming and reasoning — and unlike those it is
+pass/fail rather than nice-to-have. Codex fails it. Claude Code passes.
 
 ## Operational notes
 

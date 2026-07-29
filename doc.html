@@ -818,7 +818,33 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 <p>Phase 3 的实验问题原本只有「靠 <code>get_context</code> 重建够不够连贯」。现在多了一问：<strong>值不值 4.7 倍延迟</strong>。答案很可能分场景——长任务内部让 agent 常驻，跨任务、跨天才重建。<code>agent-runtime.md</code> 里「智能体进程是短暂的，这是常态」这句话，现在有数字了。</p>
 
 <h3>一个负面结果</h3>
-<div class="note warn"><b>Codex 不会把我们的 MCP 工具暴露给它的模型。</b>在调用时注入 <code>config.mcp_servers</code> <b>进程级是生效的</b>——Codex 读配置、拉起进程、完成握手、请求 <code>tools/list</code>。但工具从没被调用：<code>tool_search_always_defer_mcp_tools</code> 生效值为 <code>true</code> 且已 <code>removed</code>（关不掉），MCP 工具被压在搜索步骤后面。四次尝试零调用，其中两次卡满四分钟。<br><br><b>后果：</b>参与通道改走<b>适配器翻译</b>——它把厂商回复翻成 <code>send_message</code> 请求。这本来就是适配器该干的事，信任边界没变：适配器在里面，厂商在外面。</div>
+<div class="note warn"><b>Codex 不会把我们的 MCP 工具暴露给它的模型。</b>在调用时注入 <code>config.mcp_servers</code> <b>进程级是生效的</b>——Codex 读配置、拉起进程、完成握手、请求 <code>tools/list</code>。但工具从没被调用：<code>tool_search_always_defer_mcp_tools</code> 生效值为 <code>true</code> 且已 <code>removed</code>（关不掉），MCP 工具被压在搜索步骤后面。四次尝试零调用，其中两次卡满四分钟。<br><br><b>后果：</b>这一家的参与通道改走<b>适配器翻译</b>——它把厂商回复翻成 <code>send_message</code> 请求。这本来就是适配器该干的事，信任边界没变：适配器在里面，厂商在外面。</div>
+
+<h3>以及一个正面结果：零适配器路径成立</h3>
+<p>同一个 MCP server，换 Claude Code 来接——<b>没有适配器，没有翻译，没有一行为 Agent OS 写的代码</b>。它只读到三个工具的描述，然后自己走完了协议：</p>
+<pre><code>$ claude -p '注册进 Agent OS，读上下文，发一条消息' --mcp-config mcp.json
+
+seq 1  agent.registered  system:runtime     Claude Code
+       capabilities = ['coding', 'review']
+seq 2  message.sent      agent:claude-code  Claude Code registered and context loaded…</code></pre>
+<p>三次工具调用，五轮，17 秒。<strong>这就是 ADR-001 的证据</strong>：一个从没听说过 Agent OS 的 agent，靠读工具描述就参与了进来。适配器是给 Codex 这类厂商的兜底，不是架构本身。</p>
+
+<p>紧接着我们让它<b>尝试越界</b>，两条授权分支都在真实 agent 上被拒——下面是它把我们服务器的原话转述回来：</p>
+<table class="tbl">
+<tr><th>它试图做的事</th><th>服务器的回答</th></tr>
+<tr><td><code>from: "codex"</code>，该 id 未注册</td><td><code>未注册的发送者 "codex"——必须先调用 register_agent</code></td></tr>
+<tr><td><code>from: "codex"</code>，已注册，但调用方是 claude-code</td><td><code>不能以 "codex" 的身份发言：调用方注册为 "claude-code"</code></td></tr>
+</table>
+<p>有意思的是它接下来做了什么：<b>它把拒绝原因报告出来，而不是换个说法重试</b>。一个会讲清楚理由的边界能换来配合；一个只返回 <code>400</code> 的边界换来的是重试循环。这条对所有面向 agent 的错误信息都成立。</p>
+
+<h3>发现四：「能参与」本身是一项能力</h3>
+<p>于是集成能力多了第四个字段 <code>participates</code>，而且它和另外三个不是一类东西：streaming / reasoning / usage 为假只是<b>降级展示</b>，<code>participates</code> 为假意味着这个 agent <b>根本够不着运行时</b>，必须有人替它说话。</p>
+<table class="tbl">
+<tr><th>厂商</th><th>握手</th><th>把工具给模型</th><th>结论</th></tr>
+<tr><td>Claude Code</td><td>✅</td><td>✅ 首次尝试三个全调</td><td><b>零适配器</b></td></tr>
+<tr><td>Codex</td><td>✅</td><td>❌ 四次零调用</td><td>需要适配器翻译</td></tr>
+</table>
+<p>它<b>只能测出来，不能靠厂商声明</b>——Codex 在传输层完全合规，问题出在它自己决定不把工具交给模型。所以「会说 MCP」推不出「能参与」，这两件事必须分开记。</p>
 </section>
 
 <!-- ============ 使用指南 ============ -->
@@ -2013,6 +2039,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 <tr><td><b>006</b></td><td>对话折进智能体，按任务分组</td><td>新增功能：智能体对话记录该放哪儿、会话该怎么划分</td></tr>
 <tr><td><b>007</b></td><td>实现栈：TypeScript + Tauri 2 + SQLite，单机</td><td>开工前必须定的前置问题：外壳、范围、模型档位</td></tr>
 <tr><td><b>004 补</b></td><td>能力有两个轴：任务能力 + 集成能力</td><td>四家实测发现单一厂商会把自己的行为变成通用假设</td></tr>
+<tr><td><b>001 补</b></td><td>「会说 MCP」不等于「能参与」，后者是一项要实测的能力</td><td>Claude Code 零适配器跑通全流程；Codex 握手正常却从不把工具交给模型</td></tr>
 </table>
 
 <h3>其他收敛</h3>

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Chat spike — stage 1: the event log.
+ * Chat spike — stage 2: the participation channel.
  *
  *   browser ──POST /send──▶ append(message.sent) ──▶ Adapter ──▶ vendor CLI
  *      ▲                          │                                 │
@@ -13,7 +13,8 @@
  * (ADR-005). Live-only signals — token deltas, reasoning, progress — bypass the
  * log on purpose; they are previews, not facts.
  *
- * Still absent: our own MCP server, tasks, memory. Stage 2.
+ * Agents reach the log only through the MCP tools (src/mcp-tools.mjs), which
+ * validate and authorize. Still absent: tasks, memory, approvals.
  */
 
 import { appendFileSync } from "node:fs";
@@ -24,7 +25,9 @@ import { fileURLToPath } from "node:url";
 import { describeAdapters, getAdapter } from "./adapters/index.mjs";
 import { makeEvent } from "./events.mjs";
 import { EventLog } from "./log.mjs";
+import { createToolRouter } from "./mcp-tools.mjs";
 import { project } from "./thread.mjs";
+import { ValidationError } from "./validate.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = resolve(HERE, "../public");
@@ -60,28 +63,94 @@ function emit(event) {
   return stored;
 }
 
+/**
+ * The runtime behind the MCP tools. Agents request; this decides and emits.
+ * Note every handler builds the envelope itself — no caller-supplied field ever
+ * reaches `actor`, `seq`, `id` or `at`.
+ */
+const runtime = {
+  registeredIds: () => registered,
+
+  registerAgent(p) {
+    registered.add(p.id);
+    const evt = emit(
+      makeEvent({
+        type: "agent.registered",
+        project: PROJECT,
+        actor: { kind: "system", id: "runtime" },
+        subject: { kind: "agent", id: p.id },
+        payload: {
+          id: p.id,
+          name: p.name,
+          provider: p.provider ?? p.id,
+          role: p.role,
+          // Task capability is unknown in a chat spike; integration capability
+          // is measured. Two axes — docs/protocol/agent-schema.md.
+          capabilities: p.capabilities ?? [],
+          integration: getAdapter(p.id)?.capabilities,
+        },
+      }),
+    );
+    return { registered: p.id, seq: evt.seq };
+  },
+
+  sendMessage(p) {
+    const evt = emit(
+      makeEvent({
+        type: "message.sent",
+        project: PROJECT,
+        actor: { kind: "agent", id: p.from },
+        subject: { kind: "project", id: PROJECT },
+        causedBy: p.replyTo ?? answering ?? undefined,
+        payload: {
+          from: p.from,
+          to: p.to,
+          type: p.type,
+          content: p.content,
+          ...(p.attachments ? { attachments: p.attachments } : {}),
+        },
+      }),
+    );
+    return { id: evt.id, seq: evt.seq };
+  },
+
+  /**
+   * The memory-first mechanism. An agent woken with no vendor session gets its
+   * context from here — from the log, not from its own history.
+   */
+  getContext(p) {
+    const thread = project(log.replay());
+    const limit = p.limit ?? 50;
+    return {
+      project: PROJECT,
+      messages: thread.items
+        .filter((i) => i.kind === "message")
+        .slice(-limit)
+        .map((i) => ({
+          from: i.from,
+          to: i.to,
+          type: i.messageType,
+          content: i.text,
+          at: i.at,
+        })),
+      agents: Object.values(thread.agents).map((a) => ({ id: a.id, name: a.name })),
+    };
+  },
+};
+
+const tools = createToolRouter(runtime);
+
 function ensureRegistered(id) {
   if (registered.has(id)) return;
   const Cls = getAdapter(id);
   if (!Cls) return;
-  registered.add(id);
-  emit(
-    makeEvent({
-      type: "agent.registered",
-      project: PROJECT,
-      actor: { kind: "system", id: "runtime" },
-      subject: { kind: "agent", id },
-      payload: {
-        id,
-        name: Cls.label,
-        provider: id,
-        // Task capability is unknown in a chat spike; integration capability is
-        // measured. Two axes — docs/protocol/agent-schema.md.
-        capabilities: [],
-        integration: Cls.capabilities,
-      },
-    }),
-  );
+  tools.call("register_agent", {
+    id,
+    name: Cls.label,
+    provider: id,
+    role: "assistant",
+    capabilities: [],
+  });
 }
 
 function currentAdapter() {
@@ -130,20 +199,20 @@ async function runTurn(causeId, text) {
   try {
     ensureRegistered(providerId);
     const reply = await currentAdapter().send(text);
-    emit(
-      makeEvent({
-        type: "message.sent",
-        project: PROJECT,
-        actor: { kind: "agent", id: providerId },
-        subject: { kind: "project", id: PROJECT },
-        causedBy: causeId,
-        payload: {
-          from: providerId,
-          to: HUMAN.id,
-          type: "answer",
-          content: reply.text || "（空回复）",
-        },
-      }),
+    // The adapter translates a vendor reply into a `send_message` request. It
+    // does not write the event — it asks, exactly as an external agent would.
+    // Codex will not call our tools itself (FINDINGS.md), so the adapter speaks
+    // the protocol on its behalf; the trust boundary is unchanged.
+    await tools.call(
+      "send_message",
+      {
+        from: providerId,
+        to: HUMAN.id,
+        type: "answer",
+        content: reply.text || "（空回复）",
+        replyTo: causeId,
+      },
+      providerId,
     );
     // Cold-start is adapter state, not project state — live signal only.
     broadcast("turn", { fresh: reply.fresh, ms: reply.ms });
@@ -172,6 +241,14 @@ const server = createServer(async (req, res) => {
     const html = await readFile(join(PUBLIC, "index.html"), "utf8");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     return res.end(html);
+  }
+
+  // The browser imports the reducer rather than reimplementing it. Serving the
+  // module is the cheapest way to keep one rule in one place.
+  if (req.method === "GET" && url.pathname === "/src/thread.mjs") {
+    const js = await readFile(join(HERE, "thread.mjs"), "utf8");
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+    return res.end(js);
   }
 
   if (req.method === "GET" && url.pathname === "/events") {
@@ -229,6 +306,27 @@ const server = createServer(async (req, res) => {
       return res.end(JSON.stringify({ ok: true }));
     } catch (e) {
       res.writeHead(400, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ error: e.message }));
+    }
+  }
+
+  // The participation channel, reachable by any external agent. bin/agent-os-mcp.mjs
+  // is a thin stdio↔HTTP bridge onto exactly these two routes.
+  if (req.method === "GET" && url.pathname === "/mcp/tools") {
+    res.writeHead(200, { "content-type": "application/json" });
+    return res.end(JSON.stringify({ tools: tools.list() }));
+  }
+
+  if (req.method === "POST" && url.pathname === "/mcp/call") {
+    const body = await readBody(req);
+    try {
+      const result = await tools.call(body?.name, body?.arguments, body?.caller ?? null);
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ result }));
+    } catch (e) {
+      // A rejected call is a normal outcome at a trust boundary, not a crash.
+      const status = e instanceof ValidationError ? 400 : 500;
+      res.writeHead(status, { "content-type": "application/json" });
       return res.end(JSON.stringify({ error: e.message }));
     }
   }

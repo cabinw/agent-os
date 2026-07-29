@@ -414,13 +414,13 @@ td code{white-space:nowrap}
 
   <li><input type="checkbox" id="t-1-8"><label for="t-1-8" class="tb">
     <span class="tt"><span class="tid">1.8</span>MCP Server：11 个工具 + strict 校验</span>
-    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。</span>
+    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。<br><b>spike 已跑通其中三个</b>（<code>register_agent / get_context / send_message</code>），Claude Code 零适配器接入验证过——<code>apps/chat-spike/src/mcp-tools.mjs</code> 的形状可以直接搬。</span>
     <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.7</span><span class="tag sz">4 天</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-9"><label for="t-1-9" class="tb">
     <span class="tt"><span class="tid">1.9</span>授权边界：智能体不能做的三件事</span>
-    <span class="td">不能直接写事件、不能设置任务状态、不能批准任何请求（包括别的智能体的）。这三条要有独立测试——它们是信任边界的全部内容。</span>
+    <span class="td">不能直接写事件、不能设置任务状态、不能批准任何请求（包括别的智能体的）。这三条要有独立测试——它们是信任边界的全部内容。<br><b>spike 的做法值得沿用：靠「没有这个字段 / 没有这个工具」实现，而不是靠检查</b>，测试断言的是表面上不存在。再加一条不能结构化的：<code>from</code> 必须等于调用方身份，否则一个 agent 能冒充另一个。<b>拒绝理由要写成人话</b>——实测中真实 agent 会把可读的拒绝<b>报告</b>出来，而 <code>400</code> 换来的是重试循环。</span>
     <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.8</span><span class="tag sz">2 天</span></span>
   </label></li>
 

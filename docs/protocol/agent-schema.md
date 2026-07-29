@@ -56,6 +56,7 @@ registration, never inferred.
 ```json
 {
   "integration": {
+    "participates": true,
     "streaming": true,
     "reasoning": false,
     "session": true,
@@ -66,6 +67,7 @@ registration, never inferred.
 
 | Field | Meaning | If false |
 | --- | --- | --- |
+| `participates` | Will actually call our MCP tools when they are offered | **An adapter must translate on its behalf** — see below |
 | `streaming` | Emits answer tokens as they are produced | Surfaces must show a pending state, not an empty stream |
 | `reasoning` | Emits a separate reasoning trace | No thinking fold is rendered |
 | `session` | A prior turn can be continued by id | Every turn is cold; context must come from `get_context` |
@@ -73,8 +75,20 @@ registration, never inferred.
 
 **Surfaces branch on the declaration, never on `provider`.** The four vendors
 measured in [apps/chat-spike/FINDINGS.md](../../apps/chat-spike/FINDINGS.md)
-differ on three of these four fields, so a UI built against any single one of
-them is wrong for the others.
+differ on three of these fields, so a UI built against any single one of them is
+wrong for the others.
+
+`participates` is not like the others. The rest degrade presentation; this one
+decides whether the agent can reach the runtime unaided. It is measured, not
+declared by the vendor: Claude Code registers and speaks through the tools with
+no adapter, while Codex completes the MCP handshake and then never surfaces the
+tools to its model (`tool_search_always_defer_mcp_tools`, stage `removed`).
+
+When it is false the adapter translates the vendor's reply into a `send_message`
+request. That does not weaken the boundary — the adapter is inside it, the vendor
+is outside, and the same validation runs either way. What it costs is generality:
+a non-participating vendor needs code written for it, and one that participates
+needs none.
 
 Routing still reads `capabilities` only —
 [ADR-004](../decisions/ADR-004-capability-first-agent-catalog.md). Integration
