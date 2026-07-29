@@ -16,27 +16,37 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--sans);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;font-size:15px;-webkit-font-smoothing:antialiased}
-header{padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:11px;flex:none}
-.mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700}
-header h1{font-size:14.5px;font-weight:650;letter-spacing:-.01em}
-header .sub{font-size:11.5px;color:var(--faint)}
+
+header{padding:10px 20px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:12px;flex:none;flex-wrap:wrap}
+.mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:#fff;font-size:13px;font-weight:700;flex:none}
+header h1{font-size:14px;font-weight:650;letter-spacing:-.01em}
+header .sub{font-size:11px;color:var(--faint)}
 .spacer{margin-left:auto}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);display:inline-block;margin-right:5px}
 .dot.on{background:var(--ok)}.dot.busy{background:var(--warn);animation:pulse 1.1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 #state{font-size:11.5px;color:var(--muted)}
 #usage{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
-.msg.streaming .ct::after{content:"▍";color:var(--accent);animation:blink .9s steps(1) infinite}
-@keyframes blink{50%{opacity:0}}
 button{font-family:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
 button:hover{color:var(--text)}
+button:disabled{opacity:.4;cursor:not-allowed}
 
-main{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;max-width:860px;width:100%;margin:0 auto}
+/* provider switcher */
+.providers{display:flex;gap:5px;padding:8px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex:none;align-items:center;flex-wrap:wrap}
+.providers .lbl{font-size:11px;color:var(--faint);margin-right:3px}
+.pv{display:flex;align-items:center;gap:7px;padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-size:12.5px;color:var(--muted)}
+.pv:hover{border-color:var(--accent)}
+.pv.on{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:var(--accent);color:var(--accent);font-weight:640}
+.pv .caps{display:flex;gap:3px}
+.cap{font-size:9px;padding:1px 5px;border-radius:4px;background:var(--code);color:var(--faint);font-weight:600}
+.pv.on .cap{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+.cap.no{opacity:.3;text-decoration:line-through}
+
+main{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;max-width:880px;width:100%;margin:0 auto}
 .msg{display:flex;gap:11px;animation:in .2s ease-out}
 @keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.av{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:700}
+.av{width:26px;height:26px;border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-size:10.5px;font-weight:700}
 .msg.human .av{background:linear-gradient(135deg,#A5B4FC,#818CF8)}
-.msg.agent .av{background:#2563EB}
 .msg.system .av{background:var(--faint)}
 .bd{flex:1;min-width:0}
 .msg.human .bd{border-left:2.5px solid var(--accent);padding-left:10px}
@@ -48,17 +58,28 @@ main{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:
 .ct{font-size:14px;line-height:1.65;margin-top:4px;white-space:pre-wrap;word-break:break-word}
 .msg.system .ct{color:var(--muted);font-size:13px}
 .msg.system.error .ct{color:var(--risk)}
+.msg.streaming .ct::after{content:"▍";color:var(--accent);animation:blink .9s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
 
-#progress{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding:0 20px 6px;max-width:860px;width:100%;margin:0 auto;min-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* reasoning fold — Grok streams 20x more thought than answer, so it collapses */
+.think{margin-top:6px;border:1px dashed var(--border);border-radius:8px;overflow:hidden}
+.think summary{cursor:pointer;padding:5px 10px;font-size:11px;color:var(--faint);list-style:none;user-select:none;display:flex;align-items:center;gap:6px}
+.think summary::-webkit-details-marker{display:none}
+.think summary::before{content:"▸";font-size:9px;transition:transform .15s}
+.think[open] summary::before{transform:rotate(90deg)}
+.think summary:hover{color:var(--muted)}
+.think .body{padding:0 10px 9px 10px;font-size:11.5px;line-height:1.6;color:var(--faint);white-space:pre-wrap;max-height:260px;overflow-y:auto;font-family:var(--mono)}
+
+.nostream{font-size:11px;color:var(--faint);margin-top:5px;font-style:italic}
+#progress{font-family:var(--mono);font-size:11.5px;color:var(--faint);padding:0 20px 6px;max-width:880px;width:100%;margin:0 auto;min-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 footer{border-top:1px solid var(--border);background:var(--surface);padding:12px 20px;flex:none}
-.composer{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+.composer{max-width:880px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
 textarea{flex:1;resize:none;font-family:inherit;font-size:14px;line-height:1.5;padding:10px 13px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);max-height:150px}
 textarea:focus{outline:none;border-color:var(--accent)}
 .send{background:linear-gradient(135deg,var(--accent),#7C5CF0);color:#fff;border:none;padding:10px 18px;font-size:13px;font-weight:620;border-radius:10px}
-.send:disabled{opacity:.45;cursor:not-allowed}
-.hint{max-width:860px;margin:7px auto 0;font-size:11px;color:var(--faint)}
-.empty{color:var(--faint);font-size:13.5px;text-align:center;margin-top:60px;line-height:1.9}
+.hint{max-width:880px;margin:7px auto 0;font-size:11px;color:var(--faint)}
+.empty{color:var(--faint);font-size:13.5px;text-align:center;margin-top:50px;line-height:1.9}
 </style>
 </head>
 <body>
@@ -67,19 +88,20 @@ textarea:focus{outline:none;border-color:var(--accent)}
   <span class="mark">◈</span>
   <div>
     <h1>Agent OS · chat spike</h1>
-    <div class="sub">派发通道验证 —— Agent OS 作为 MCP client 调用 codex mcp-server</div>
+    <div class="sub">派发通道 —— 同一套核心，四种厂商接入形状</div>
   </div>
   <div class="spacer"></div>
   <span id="usage"></span>
   <span id="state"><span class="dot" id="dot"></span><span id="stateText">连接中…</span></span>
-  <button id="reset" title="丢弃 threadId，下一轮冷启动">重置会话</button>
+  <button id="reset" title="丢弃 vendor 会话，下一轮冷启动">重置会话</button>
 </header>
+
+<div class="providers" id="providers"><span class="lbl">智能体</span></div>
 
 <main id="log">
   <div class="empty" id="empty">
-    还没有消息。<br>
-    说点什么，Agent OS 会把它派发给 Codex。<br>
-    <span style="font-size:12px">首轮约 20 秒（冷启动），之后约 7 秒。</span>
+    说点什么，Agent OS 会把它派发给选中的智能体。<br>
+    <span style="font-size:12px">切换智能体会保留对话记录，但 vendor 会话不可转移——这正是需要记忆优先的原因。</span>
   </div>
 </main>
 
@@ -90,7 +112,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
     <textarea id="input" rows="1" placeholder="说点什么…（⌘↵ 发送）"></textarea>
     <button class="send" id="send">发送</button>
   </div>
-  <div class="hint">沙箱 read-only · 审批 never · 一次一轮，思考中发出的消息会排队</div>
+  <div class="hint">沙箱 read-only · 一次一轮，思考中发出的消息会排队</div>
 </footer>
 
 <script>
@@ -102,9 +124,48 @@ const progress = document.getElementById("progress");
 const usage = document.getElementById("usage");
 const dot = document.getElementById("dot");
 const stateText = document.getElementById("stateText");
+const providersEl = document.getElementById("providers");
 
-const NAMES = { human: "你", agent: "Codex", system: "系统" };
-const AVATARS = { human: "你", agent: "C", system: "◈" };
+const AV_COLOR = { codex: "#2563EB", claude: "#D97757", grok: "#111827", kimi: "#7C3AED" };
+const CAP_LABEL = { streaming: "流式", thoughts: "思考", session: "会话", usage: "用量" };
+
+let providers = [];
+let current = null;
+let busy = false;
+
+function renderProviders() {
+  providersEl.querySelectorAll(".pv").forEach((n) => n.remove());
+  for (const p of providers) {
+    const el = document.createElement("button");
+    el.className = `pv${p.id === current?.id ? " on" : ""}`;
+    el.disabled = busy;
+
+    const name = document.createElement("span");
+    name.textContent = p.label;
+    el.appendChild(name);
+
+    const caps = document.createElement("span");
+    caps.className = "caps";
+    for (const [key, label] of Object.entries(CAP_LABEL)) {
+      const c = document.createElement("span");
+      c.className = `cap${p.capabilities[key] ? "" : " no"}`;
+      c.textContent = label;
+      c.title = `${label}：${p.capabilities[key] ? "支持" : "不支持"}`;
+      caps.appendChild(c);
+    }
+    el.appendChild(caps);
+
+    el.onclick = () => {
+      if (busy || p.id === current?.id) return;
+      fetch("/provider", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: p.id }),
+      });
+    };
+    providersEl.appendChild(el);
+  }
+}
 
 function render(m) {
   empty?.remove();
@@ -113,7 +174,12 @@ function render(m) {
 
   const av = document.createElement("span");
   av.className = "av";
-  av.textContent = AVATARS[m.role] ?? "?";
+  if (m.role === "agent") {
+    av.style.background = AV_COLOR[m.provider] ?? "#2563EB";
+    av.textContent = (m.providerLabel ?? "A")[0];
+  } else {
+    av.textContent = m.role === "human" ? "你" : "◈";
+  }
 
   const bd = document.createElement("div");
   bd.className = "bd";
@@ -122,7 +188,8 @@ function render(m) {
   hd.className = "hd";
   const nm = document.createElement("span");
   nm.className = "nm";
-  nm.textContent = NAMES[m.role] ?? m.role;
+  nm.textContent =
+    m.role === "human" ? "你" : m.role === "system" ? "系统" : (m.providerLabel ?? "智能体");
   hd.appendChild(nm);
 
   if (m.fresh) {
@@ -152,39 +219,86 @@ function render(m) {
 }
 
 function setState(s) {
-  const busy = s === "thinking";
+  busy = s === "thinking";
   dot.className = `dot ${busy ? "busy" : "on"}`;
   stateText.textContent = busy ? "思考中" : "空闲";
   sendBtn.disabled = busy;
   if (!busy) progress.textContent = "";
+  renderProviders();
 }
 
 /**
- * Live preview built from `agent_message_content_delta`. It is a scratch buffer:
- * when the authoritative message arrives it is discarded, not reconciled.
+ * Live preview from delta/thought events. A scratch buffer: when the
+ * authoritative message arrives it is discarded, not reconciled.
  */
-let streaming = null;
+let stream = null;
 
-function streamDelta(text) {
-  if (!streaming) {
-    empty?.remove();
-    const el = document.createElement("div");
-    el.className = "msg agent streaming";
-    el.innerHTML =
-      '<span class="av">C</span><div class="bd">' +
-      '<div class="hd"><span class="nm">Codex</span>' +
-      '<span class="meta">正在输入…</span></div>' +
-      '<div class="ct"></div></div>';
-    log.appendChild(el);
-    streaming = { el, ct: el.querySelector(".ct") };
+function ensureStream() {
+  if (stream) return stream;
+  empty?.remove();
+  const el = document.createElement("div");
+  el.className = "msg agent streaming";
+
+  const av = document.createElement("span");
+  av.className = "av";
+  av.style.background = AV_COLOR[current?.id] ?? "#2563EB";
+  av.textContent = (current?.label ?? "A")[0];
+
+  const bd = document.createElement("div");
+  bd.className = "bd";
+  const hd = document.createElement("div");
+  hd.className = "hd";
+  hd.innerHTML = `<span class="nm"></span><span class="meta">正在输入…</span>`;
+  hd.querySelector(".nm").textContent = current?.label ?? "智能体";
+  const ct = document.createElement("div");
+  ct.className = "ct";
+  bd.append(hd, ct);
+  el.append(av, bd);
+  log.appendChild(el);
+
+  stream = { el, ct, think: null, thinkBody: null };
+
+  // No token streaming (Kimi): say so rather than showing a frozen pane.
+  if (current && !current.capabilities.streaming) {
+    const n = document.createElement("div");
+    n.className = "nostream";
+    n.textContent = `${current.label} 不支持逐字流式，回复会一次性到达`;
+    bd.appendChild(n);
+    el.classList.remove("streaming");
   }
-  streaming.ct.textContent += text;
+  return stream;
+}
+
+function pushDelta(text) {
+  ensureStream().ct.textContent += text;
   log.scrollTop = log.scrollHeight;
 }
 
+/** Reasoning is folded by default — Grok emitted 42 thoughts against 2 answers. */
+function pushThought(text) {
+  const s = ensureStream();
+  if (!s.think) {
+    const d = document.createElement("details");
+    d.className = "think";
+    const sum = document.createElement("summary");
+    sum.textContent = "思考过程";
+    const body = document.createElement("div");
+    body.className = "body";
+    d.append(sum, body);
+    s.ct.after(d);
+    s.think = d;
+    s.thinkBody = body;
+    s.thinkChars = 0;
+  }
+  s.thinkBody.textContent += text;
+  s.thinkChars += text.length;
+  s.think.querySelector("summary").textContent = `思考过程（${s.thinkChars} 字）`;
+  if (s.think.open) s.thinkBody.scrollTop = s.thinkBody.scrollHeight;
+}
+
 function clearStream() {
-  streaming?.el.remove();
-  streaming = null;
+  stream?.el.remove();
+  stream = null;
 }
 
 const es = new EventSource("/events");
@@ -195,27 +309,46 @@ es.onerror = () => {
 };
 es.onmessage = (e) => {
   const d = JSON.parse(e.data);
-  if (d.type === "hello") {
-    for (const m of d.messages) render(m);
-    setState("idle");
-  } else if (d.type === "message") {
-    if (d.message.role === "agent") clearStream();
-    render(d.message);
-  } else if (d.type === "delta") {
-    streamDelta(d.text);
-  } else if (d.type === "usage") {
-    usage.textContent = `${d.total} tok · 上下文 ${Math.round((d.total / d.window) * 100)}%`;
-  } else if (d.type === "progress") {
-    progress.textContent = `⋯ ${d.kind}${d.detail ? ` — ${d.detail}` : ""}`;
-  } else if (d.type === "status") {
-    if (d.state === "idle") clearStream();
-    setState(d.state);
+  switch (d.type) {
+    case "hello":
+      providers = d.providers;
+      current = d.provider;
+      renderProviders();
+      for (const m of d.messages) render(m);
+      setState("idle");
+      break;
+    case "provider":
+      current = d;
+      renderProviders();
+      break;
+    case "message":
+      if (d.message.role === "agent") clearStream();
+      render(d.message);
+      break;
+    case "delta":
+      pushDelta(d.text);
+      break;
+    case "thought":
+      pushThought(d.text);
+      break;
+    case "usage":
+      usage.textContent = d.window
+        ? `${d.total} tok · 上下文 ${Math.round((d.total / d.window) * 100)}%`
+        : `${d.total} tok${d.costUsd ? ` · $${d.costUsd.toFixed(4)}` : ""}`;
+      break;
+    case "progress":
+      progress.textContent = `⋯ ${d.kind}`;
+      break;
+    case "status":
+      if (d.state === "idle") clearStream();
+      setState(d.state);
+      break;
   }
 };
 
 async function send() {
   const text = input.value.trim();
-  if (!text || sendBtn.disabled) return;
+  if (!text || busy) return;
   input.value = "";
   input.style.height = "auto";
   await fetch("/send", {
@@ -236,8 +369,7 @@ input.addEventListener("input", () => {
   input.style.height = "auto";
   input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
 });
-document.getElementById("reset").onclick = () =>
-  fetch("/reset", { method: "POST" });
+document.getElementById("reset").onclick = () => fetch("/reset", { method: "POST" });
 </script>
 </body>
 </html>

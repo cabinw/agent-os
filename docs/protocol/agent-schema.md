@@ -47,6 +47,39 @@ text. Extending it is a protocol change.
 | `ops` | Build, deploy, infrastructure |
 | `git` | Version control operations |
 
+## Integration capability
+
+A second, independent axis. Task capability says *what work an agent can do*;
+integration capability says *how it can be driven*. Declared by the adapter at
+registration, never inferred.
+
+```json
+{
+  "integration": {
+    "streaming": true,
+    "reasoning": false,
+    "session": true,
+    "usage": true
+  }
+}
+```
+
+| Field | Meaning | If false |
+| --- | --- | --- |
+| `streaming` | Emits answer tokens as they are produced | Surfaces must show a pending state, not an empty stream |
+| `reasoning` | Emits a separate reasoning trace | No thinking fold is rendered |
+| `session` | A prior turn can be continued by id | Every turn is cold; context must come from `get_context` |
+| `usage` | Reports token counts | No usage display |
+
+**Surfaces branch on the declaration, never on `provider`.** The four vendors
+measured in [apps/chat-spike/FINDINGS.md](../../apps/chat-spike/FINDINGS.md)
+differ on three of these four fields, so a UI built against any single one of
+them is wrong for the others.
+
+Routing still reads `capabilities` only —
+[ADR-004](../decisions/ADR-004-capability-first-agent-catalog.md). Integration
+capability governs *presentation and orchestration*, not task assignment.
+
 ## Provider neutrality
 
 See [ADR-004](../decisions/ADR-004-capability-first-agent-catalog.md). The shipped
