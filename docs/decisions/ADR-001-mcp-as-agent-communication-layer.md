@@ -27,17 +27,25 @@ us, which is backwards.
 Measured in [apps/chat-spike](../../apps/chat-spike/FINDINGS.md), and it split
 the decision in two.
 
-**The claim holds.** Claude Code, given only the tool descriptions, registered
-itself, fetched context and sent a message — three tool calls, no adapter, no
-Agent OS-specific code. It also refused to work around the boundary: told to send
-as another agent, it reported our refusal instead of retrying.
+**The claim holds, for three vendors of four.** Claude Code, Kimi and Grok — each
+given only the tool descriptions — registered themselves, fetched context and sent
+a message. No adapter, no Agent OS-specific code. None tried to work around the
+boundary: told to send as another agent, each reported our refusal rather than
+retrying.
+
+One of them read a message written by another whose process had already exited,
+with the log as the only channel between them.
 
 **But MCP ingress and MCP participation are different things.** Codex accepts an
 injected server, completes the handshake and requests `tools/list`, then never
 surfaces the tools to its model. Nothing is wrong with the transport; the vendor
-declines to offer the tools. So "speaks MCP" does not imply "can participate,"
-and the difference is a per-vendor fact — `integration.participates` in
+declines to offer the tools. All four handshake successfully, so the handshake
+predicts nothing — "speaks MCP" does not imply "can participate," and the
+difference is a measured per-vendor fact: `integration.participates` in
 [agent-schema.md](../protocol/agent-schema.md).
+
+The three that do participate were attached by three unrelated mechanisms, so
+*connecting* an agent stays adapter work even when *talking* to it does not.
 
 The decision survives because the fallback stays inside the boundary: when a
 vendor will not call the tools, its adapter calls them on its behalf, through

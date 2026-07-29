@@ -134,6 +134,7 @@ td code{white-space:nowrap}
   <a href="#arch-notes">③ 四个关键判断</a>
   <h4>清单</h4>
   <a href="#p0">Phase 0 地基<span class="pc" data-pc="p0"></span></a>
+  <a href="#hub">Agent Hub（插入）<span class="pc" data-pc="hub"></span></a>
   <a href="#p1">Phase 1 核心循环<span class="pc" data-pc="p1"></span></a>
   <a href="#p2">Phase 2 记忆<span class="pc" data-pc="p2"></span></a>
   <a href="#p3">Phase 3 界面<span class="pc" data-pc="p3"></span></a>
@@ -355,10 +356,70 @@ td code{white-space:nowrap}
 </ul>
 </section>
 
+
+<section id="hub">
+<div class="phase-hd">
+  <h3 id="hubh">Agent Hub — 人当 Supervisor 的最小验证</h3>
+  <span class="badge now">← 待确认范围</span>
+  <span class="phase-count" data-count="hub"></span>
+</div>
+<p class="phase-goal">插在 Phase 1 之前的 side project。<b>唯一要验的是两条通道的接缝</b>：一条消息从 A 发出，经过事件日志，把 B 叫醒并让 B 干了活。其余都是为了让这句话可观察。人扮演 Supervisor，agent 之间可以互相委派。</p>
+
+<div class="note"><b>为什么现在做。</b>spike 分别证了唤醒通道（四家都通）和参与通道（四家里三家零适配器），但<b>从没测过把它们接起来</b>——spike 里 <code>to</code> 永远是 <code>you</code>，人是唯一收件人。这个接缝不通，Agent OS 就只是一个多窗口聊天工具。</div>
+
+<div class="note"><b>预检已跑，结论改了形态。</b>原以为只有 Claude Code 能当协调者，实测 <b>Claude Code / Kimi / Grok 三家都能</b>，只有 Codex 不行（它得靠适配器翻译）。另外撞见一件没料到的事：Grok 通过 <code>get_context</code> 读到了 Kimi 半小时前留下的消息，而两个进程从没同时存在过——<b>B 阶段的「读」那一半已经天然通了</b>，剩下只有「写触发唤醒」。</div>
+
+<ul class="tasks" data-phase="hub">
+  <li><input type="checkbox" id="t-h-1"><label for="t-h-1" class="tb">
+    <span class="tt"><span class="tid">A.1</span>适配器池：多个 agent 同时在线</span>
+    <span class="td">现在 spike 是 <code>let adapter = null</code>，切换时关掉上一个。改成每个 agent 一条独立会话、一条独立队列。<b>这会提前引爆一个 Phase 1.2 的问题：并发 append 下 seq 还单不单调</b>——JSONL + 内存计数器扛不住真并发。早点撞上比在 1.2 撞上便宜。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">关键路径</span><span class="tag sz">1 天</span></span>
+    <span class="done-when"><b>完成判据：</b>两个 agent 同时在跑，日志里 seq 无重复无空洞</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-2"><label for="t-h-2" class="tb">
+    <span class="tt"><span class="tid">B.1</span>接缝：收件人是 agent 就唤醒它</span>
+    <span class="td"><code>send_message(to: X)</code> → 落事件 → 运行时发现收件人是 agent → 用 <code>get_context</code> 组上下文把 X 叫醒。<b>做完这一步 agent→agent 自动就通了</b>，因为它和人发消息走同一条路。这是整个 hub 的理由。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 A.1</span><span class="tag sz">1–2 天</span></span>
+    <span class="done-when"><b>完成判据：</b>人只对 A 说话，B 因为 A 的消息被叫醒并回了话——全程只有事件日志，没有直接调用</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-3"><label for="t-h-3" class="tb">
+    <span class="tt"><span class="tid">B.2</span>回环预算</span>
+    <span class="td">A 叫 B、B 叫 A，无限。需要跳数/预算上限，超了就停下并让人介入。<b>规格里目前没有这个机制</b>——hub 是发现它该长什么样的地方，结论要回写进 protocol。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag dep">依赖 B.1</span><span class="tag sz">半天</span></span>
+    <span class="done-when"><b>完成判据：</b>故意造一个互相甩锅的循环，系统在预算内停住而不是烧钱</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-4"><label for="t-h-4" class="tb">
+    <span class="tt"><span class="tid">B.3</span>委派只能按能力，不能点名</span>
+    <span class="td">协调者若直接写 <code>assign_task(executor: "grok")</code>，ADR-004 就在应用层被绕过了。做法：<code>find_agent(capabilities)</code> 先返回候选，协调者<b>只能从候选里选</b>。顺带这是个便宜的可用性测试——<b>LLM 到底愿不愿意配合「描述你要什么能力、别点名」</b>，目前纯属猜测。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">验 ADR-004</span><span class="tag dep">依赖 B.1</span><span class="tag sz">半天</span></span>
+    <span class="done-when"><b>完成判据：</b>协调者发出的委派里不含它自己编造的 agent id</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-5"><label for="t-h-5" class="tb">
+    <span class="tt"><span class="tid">B.4</span>Hub 界面：花名册 + 定向发消息 + 按任务分线程</span>
+    <span class="td">最小可观察面：谁在线、谁在忙、人对谁说话、消息的因果链。<b>按任务分线程要早做</b>（ADR-006）——协调者同时对人和对 agent 说话，混在一条线程里会立刻变得读不懂。<b>不做审批</b>：规则 5 说人在会话里说的话是指导、永远不是批准，原型里做错不如不做。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag dep">依赖 B.1</span><span class="tag sz">1 天</span></span>
+    <span class="done-when"><b>完成判据：</b>一次三方协作（人 → 协调者 → 执行者）在界面上能被完整读懂</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-6"><label for="t-h-6" class="tb">
+    <span class="tt"><span class="tid">C</span>任务对象 —— <b>先不做，B 通了再决定</b></span>
+    <span class="td">只有消息没有任务，就看不到状态、没有闭环、<code>report_result</code> 无处可去。倾向做，但砍到四态（<code>created → assigned → running → review</code>），用真实状态名和真实事件类型，让它替 1.5 探需求。<b>B 一旦通了，缺不缺任务对象会自己显出来</b>，那时判断比现在准。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag dep">依赖 B.1</span><span class="tag sz">待定</span></span>
+    <span class="done-when"><b>先不勾。</b>B 阶段跑通后重新评估</span>
+  </label></li>
+</ul>
+
+<div class="note warn"><b>成本要心里有数。</b>每一跳委派都是一次上下文重建，实测约 2× 溢价（<a href="doc.html">阶段 3 数据</a>）。三跳委派的账现在能算了——hub 跑长链路时别惊讶。</div>
+</section>
+
 <section id="p1">
 <div class="phase-hd">
   <h3>Phase 1 — 核心循环（无 UI）</h3>
-  <span class="badge now">← 现在这里</span>
+  <span class="badge">Agent Hub 之后</span>
   <span class="phase-count" data-count="p1"></span>
 </div>
 <p class="phase-goal">目标：headless 跑通完整运行循环。<b>刻意不做任何界面</b>。预计 3–4 周。骨架已就绪，<code>packages/*/src/index.ts</code> 里已有各包契约和基础类型（<code>ProjectId</code>/<code>Seq</code>/<code>EventId</code>、<code>TaskStatus</code> 全八态、<code>Capability</code> 受控词表），从 1.1 接着写即可。</p>

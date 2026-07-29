@@ -156,7 +156,7 @@ translates a vendor reply into a `send_message` request. That is what an adapter
 is for, and the trust boundary is unchanged — the adapter is inside it, the
 vendor is outside.
 
-## Positive result: the zero-adapter path works against Claude Code
+## Positive result: three of four vendors participate with no adapter
 
 Same MCP server, no adapter, no translation — Claude Code spawned
 `bin/agent-os-mcp.mjs` itself and drove the protocol:
@@ -172,6 +172,47 @@ Three tool calls, five turns, 17s. **This is the ADR-001 evidence**: an agent
 that never heard of Agent OS participates by reading the tool descriptions. The
 adapter is a workaround for vendors like Codex, not the architecture.
 
+The same server was then pointed at the other three:
+
+| | handshake | called all three tools | refused impersonation |
+| --- | --- | --- | --- |
+| Claude Code | ✅ | ✅ | ✅ |
+| Kimi | ✅ | ✅ *(no approval flag needed)* | — |
+| Grok | ✅ | ✅ | ✅ |
+| Codex | ✅ | ❌ zero calls in four attempts | — |
+
+**Three of four.** The earlier guess — that Claude Code might be the only one —
+was too pessimistic, and it was load-bearing: it would have forced the coordinator
+role onto a single vendor.
+
+### The context was already shared, across processes that never coexisted
+
+Grok registered, called `get_context`, and read this back:
+
+```json
+{ "project": "proj_spike",
+  "messages": [{ "from": "kimi", "content": "…" }],
+  "agents": [{ "id": "kimi" }, { "id": "grok" }] }
+```
+
+Kimi's process had exited long before Grok started. Nothing was handed between
+them; the log was the only channel. **That is memory-first working across
+vendors**, which the stage 3 experiment did not cover — it measured one agent
+rebuilding its own past, not one agent inheriting another's.
+
+### Mounting the server differs per vendor, with nothing in common
+
+| | how | trap |
+| --- | --- | --- |
+| Claude Code | `--mcp-config <file>` | an inline JSON string makes the CLI read the following prompt as a second config path — a file is mandatory |
+| Kimi | `.mcp.json` in cwd | none |
+| Grok | `.grok/config.toml`, via `grok mcp add -s project` | project-scoped servers do not start in an untrusted folder (`GROK_FOLDER_TRUST=false` bypasses it for a probe); `grok mcp add` silently drops `env`, which must be appended by hand |
+
+Three mechanisms, zero overlap. **So an adapter owns connection configuration,
+not just invocation** — a detail `agent-sdk`'s contract does not yet mention, and
+one that decides whether "attach Agent OS to this agent" is a one-liner or a
+per-vendor procedure.
+
 Both authorization branches were then confirmed against the same live agent —
 the refusals below are Claude Code quoting our server back:
 
@@ -184,9 +225,14 @@ The interesting part is what it did next: it reported the refusal rather than
 retrying with a different framing. A boundary that returns a readable reason
 gets cooperation; one that returns `400` gets a retry loop.
 
-**Vendor support for the participate channel is now a third integration
-capability**, alongside streaming and reasoning — and unlike those it is
-pass/fail rather than nice-to-have. Codex fails it. Claude Code passes.
+The same refusal was confirmed against Grok, quoting our server back verbatim:
+`不能以 "kimi" 的身份发言：调用方注册为 "grok"`. Three vendors, one boundary,
+identical behaviour — each reported the refusal instead of retrying around it.
+
+**Vendor support for the participate channel is an integration capability**
+alongside streaming and reasoning, and unlike those it is pass/fail rather than
+nice-to-have — see `participates` in
+[agent-schema.md](../../docs/protocol/agent-schema.md).
 
 ## Operational notes
 

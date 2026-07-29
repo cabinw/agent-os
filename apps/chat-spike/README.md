@@ -43,12 +43,12 @@ header. Measurements and the full comparison are in
 four integration capabilities, so adapters **declare** what they can do and the
 UI branches on the declaration:
 
-| | streaming | reasoning | session | usage |
-| --- | --- | --- | --- | --- |
-| Codex | ✅ | ❌ | ✅ | ✅ |
-| Claude | ✅ | ❌ | ✅ | ✅ |
-| Grok | ✅ | ✅ | ✅ | ✅ |
-| Kimi | ❌ | ❌ | ✅ | ❌ |
+| | participates | streaming | reasoning | session | usage |
+| --- | --- | --- | --- | --- | --- |
+| Codex | ❌ | ✅ | ❌ | ✅ | ✅ |
+| Claude | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Grok | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Kimi | ✅ | ❌ | ❌ | ✅ | ❌ |
 
 Switching provider keeps the transcript and drops the vendor session — the
 cheapest demonstration of why context belongs in the log.

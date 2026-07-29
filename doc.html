@@ -871,14 +871,32 @@ seq 2  message.sent      agent:claude-code  Claude Code registered and context l
 </table>
 <p>有意思的是它接下来做了什么：<b>它把拒绝原因报告出来，而不是换个说法重试</b>。一个会讲清楚理由的边界能换来配合；一个只返回 <code>400</code> 的边界换来的是重试循环。这条对所有面向 agent 的错误信息都成立。</p>
 
-<h3>发现四：「能参与」本身是一项能力</h3>
+<h3>发现四：「能参与」本身是一项能力，四家里三家有</h3>
 <p>于是集成能力多了第四个字段 <code>participates</code>，而且它和另外三个不是一类东西：streaming / reasoning / usage 为假只是<b>降级展示</b>，<code>participates</code> 为假意味着这个 agent <b>根本够不着运行时</b>，必须有人替它说话。</p>
 <table class="tbl">
-<tr><th>厂商</th><th>握手</th><th>把工具给模型</th><th>结论</th></tr>
-<tr><td>Claude Code</td><td>✅</td><td>✅ 首次尝试三个全调</td><td><b>零适配器</b></td></tr>
-<tr><td>Codex</td><td>✅</td><td>❌ 四次零调用</td><td>需要适配器翻译</td></tr>
+<tr><th>厂商</th><th>握手</th><th>把工具给模型</th><th>越权被拒</th><th>结论</th></tr>
+<tr><td>Claude Code</td><td>✅</td><td>✅ 三个全调</td><td>✅</td><td><b>零适配器</b></td></tr>
+<tr><td>Kimi</td><td>✅</td><td>✅ 连放开审批都不用</td><td>—</td><td><b>零适配器</b></td></tr>
+<tr><td>Grok</td><td>✅</td><td>✅ 三个全调</td><td>✅</td><td><b>零适配器</b></td></tr>
+<tr><td>Codex</td><td>✅</td><td>❌ 四次零调用</td><td>—</td><td>需要适配器翻译</td></tr>
 </table>
-<p>它<b>只能测出来，不能靠厂商声明</b>——Codex 在传输层完全合规，问题出在它自己决定不把工具交给模型。所以「会说 MCP」推不出「能参与」，这两件事必须分开记。</p>
+<p><b>四家全都握手成功，所以握手什么也预测不了。</b>Codex 在传输层完全合规，问题出在它自己决定不把工具交给模型。「会说 MCP」推不出「能参与」，这两件事必须分开记，而且后者<b>只能测出来</b>。</p>
+
+<h3>顺带撞见的：上下文已经跨进程共享了</h3>
+<p>Grok 注册后调 <code>get_context</code>，读回来的是这个：</p>
+<pre><code>{ "project": "proj_spike",
+  "messages": [{ "from": "kimi", "content": "…" }],
+  "agents": [{ "id": "kimi" }, { "id": "grok" }] }</code></pre>
+<p>Kimi 的进程早就退出了，两个进程从没同时存在过，中间也没有任何传递——<b>日志是它们之间唯一的通道</b>。这是记忆优先在<b>跨厂商</b>维度上的第一次实证；上面那个实验只证了同一个 agent 重建自己的过去，这次是一个 agent 继承另一个的。</p>
+
+<h3>但「怎么把 server 挂上去」三家零共性</h3>
+<table class="tbl">
+<tr><th>厂商</th><th>挂载方式</th><th>坑</th></tr>
+<tr><td>Claude Code</td><td><code>--mcp-config &lt;文件&gt;</code></td><td>内联 JSON 会让 CLI 把后面的 prompt 当成第二个配置文件路径，<b>必须给文件</b></td></tr>
+<tr><td>Kimi</td><td>cwd 下的 <code>.mcp.json</code></td><td>无</td></tr>
+<tr><td>Grok</td><td><code>.grok/config.toml</code></td><td>项目级 server 在「未信任目录」里不启动；<code>grok mcp add</code> 会<b>静默丢掉 env</b>，得手工补</td></tr>
+</table>
+<p>三种机制，零重叠。<strong>所以适配器管的不只是「怎么调用」，还有「怎么接上」</strong>——这一点 <code>agent-sdk</code> 的契约目前没写，而它决定了「把 Agent OS 接到这个 agent 上」是一行配置还是一套厂商专属流程。</p>
 </section>
 
 <!-- ============ 使用指南 ============ -->
@@ -2074,7 +2092,7 @@ seq 2  message.sent      agent:claude-code  Claude Code registered and context l
 <tr><td><b>007</b></td><td>实现栈：TypeScript + Tauri 2 + SQLite，单机</td><td>开工前必须定的前置问题：外壳、范围、模型档位</td></tr>
 <tr><td><b>004 补</b></td><td>能力有两个轴：任务能力 + 集成能力</td><td>四家实测发现单一厂商会把自己的行为变成通用假设</td></tr>
 <tr><td><b>记忆优先</b></td><td>代价是每轮「重新进入」的约 2 倍固定溢价，与上下文体量几乎无关</td><td>四家 × 三种日志规模全部 4/4 召回；截断上下文是错的优化，压轮数才是对的</td></tr>
-<tr><td><b>001 补</b></td><td>「会说 MCP」不等于「能参与」，后者是一项要实测的能力</td><td>Claude Code 零适配器跑通全流程；Codex 握手正常却从不把工具交给模型</td></tr>
+<tr><td><b>001 补</b></td><td>「会说 MCP」不等于「能参与」，后者是一项要实测的能力；接入配置也归适配器管</td><td>四家全握手成功，但只有三家把工具交给模型；三家的挂载机制零共性</td></tr>
 </table>
 
 <h3>其他收敛</h3>
