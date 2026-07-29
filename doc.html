@@ -814,8 +814,42 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 </div>
 <p>所以适配器<strong>声明</strong>集成能力，界面按声明分支——和 ADR-004 是同一条原则，只是用在第二个轴上。</p>
 
-<h3>发现三：记忆优先有了价码</h3>
-<p>Phase 3 的实验问题原本只有「靠 <code>get_context</code> 重建够不够连贯」。现在多了一问：<strong>值不值 4.7 倍延迟</strong>。答案很可能分场景——长任务内部让 agent 常驻，跨任务、跨天才重建。<code>agent-runtime.md</code> 里「智能体进程是短暂的，这是常态」这句话，现在有数字了。</p>
+<h3>发现三：记忆优先有了价码，而且和预期相反</h3>
+<p>Phase 3 的实验问题原本有两问：「靠 <code>get_context</code> 重建够不够连贯」和「值不值 4.7 倍延迟」。两问都跑完了，<strong>结论把问题本身推翻了</strong>。</p>
+
+<p>探针：种四个<b>猜不出来</b>的事实（青铜麋鹿 / 7734 / Vera / 周四 02:00），中间插一轮无关话题，再回头问。<code>resident</code> 保留厂商会话，<code>rebuild</code> 每轮丢掉会话、把 <code>get_context</code> 的输出拼在前面——是真机制，不是模拟。</p>
+
+<table class="tbl">
+<tr><th>模式</th><th>Codex</th><th>Claude</th><th>Grok</th><th>Kimi</th></tr>
+<tr><td>resident</td><td>4/4 · 14.2s</td><td>4/4 · 61.7s</td><td>4/4 · 24.5s</td><td>4/4 · 22.3s</td></tr>
+<tr><td>rebuild</td><td>4/4 · 31.1s</td><td>4/4 · 35.0s</td><td>4/4 · 28.7s</td><td>4/4 · 20.0s</td></tr>
+</table>
+<p><strong>八次全中。</strong>于是问题变成「能撑多大」——往日志里埋 N 条<b>同主题</b>的无关消息（不相关的填充太容易跳过，真实项目的日志全都看起来相关）：</p>
+<table class="tbl">
+<tr><th>埋入</th><th>每轮送出</th><th>Codex</th><th>Claude</th><th>Grok</th><th>Kimi</th></tr>
+<tr><td>0</td><td>1.1k 字</td><td>4/4 · 31.1s</td><td>4/4 · 35.0s</td><td>4/4 · 28.7s</td><td>4/4 · 20.0s</td></tr>
+<tr><td>200 条</td><td>18.7k 字</td><td>4/4 · 33.8s</td><td>4/4 · 70.2s</td><td>4/4 · 28.6s</td><td>4/4 · 26.6s</td></tr>
+<tr><td>1200 条</td><td>108.7k 字</td><td>4/4 · 34.0s</td><td>4/4 · 48.2s</td><td>4/4 · 30.6s</td><td>4/4 · 32.1s</td></tr>
+</table>
+<p><b>日志大 100 倍，一个事实都没丢，时间也几乎没变。</b>连贯性从头到尾就不是约束。</p>
+
+<h3>那代价在哪：在账单上，而这是我们原本没在看的一根轴</h3>
+<p>各家 token 口径不可比——Codex 报会话累计，Claude 报未命中缓存的部分，Kimi 什么都不报。只有 Grok 直接把一轮折成美元，所以这条结论由它承担：</p>
+<table class="tbl">
+<tr><th></th><th>5 轮成本</th><th>耗时</th></tr>
+<tr><td>resident</td><td>$0.052 – $0.062</td><td>24.4s</td></tr>
+<tr><td>rebuild，不埋</td><td>$0.092 – $0.121</td><td>28.7s</td></tr>
+<tr><td>rebuild，埋 200</td><td>$0.116</td><td>28.6s</td></tr>
+<tr><td>rebuild，埋 1200</td><td>$0.139</td><td>28.7s</td></tr>
+</table>
+<p><strong>重建贵约 2 倍；在这基础上把日志放大 100 倍，只再多约 50%。</strong>贵的是<b>重新进入</b>这件事本身，不是送进去多少上下文——常驻的一轮复用热前缀，重建的每轮都得重新买一次。</p>
+
+<div class="note"><b>这改掉了三件事。</b><br>
+① <b>不要为省钱截断 <code>get_context</code>。</b>最顺手的那个优化恰好是错的：上下文放大 100 倍只多花 50%，而重新进入一次就要多花 100%。截断省不下什么，却可能正好丢掉这一轮需要的那个事实。<br>
+② <b>该压的是轮数，不是上下文。</b>代价按「重新进入」计，所以杠杆在<b>更少、更长的轮次</b>——这是一个关于任务粒度的问题，不是关于上下文窗口的问题。<br>
+③ <b>会话常驻是厂商级优化，不是架构需求。</b>Kimi 重建比续接还<b>快</b>，Grok 基本打平——因为它们的 <code>--resume</code> 本来就要重开进程。只有握着常驻服务的 Codex 有真正的热路径。所以 <code>integration.session</code> 存在时可以用来优化，永远不能变成前提。</div>
+
+<div class="note warn"><b>这个实验没测到的地方。</b>它测的是 1200 条<b>平铺聊天记录</b>。没测知识条目、没测 supersede、没测跨任务上下文——而那恰恰是「把日志直接拼成 prompt」最可能垮掉的地方。Phase 2 做记忆时要重测。</div>
 
 <h3>一个负面结果</h3>
 <div class="note warn"><b>Codex 不会把我们的 MCP 工具暴露给它的模型。</b>在调用时注入 <code>config.mcp_servers</code> <b>进程级是生效的</b>——Codex 读配置、拉起进程、完成握手、请求 <code>tools/list</code>。但工具从没被调用：<code>tool_search_always_defer_mcp_tools</code> 生效值为 <code>true</code> 且已 <code>removed</code>（关不掉），MCP 工具被压在搜索步骤后面。四次尝试零调用，其中两次卡满四分钟。<br><br><b>后果：</b>这一家的参与通道改走<b>适配器翻译</b>——它把厂商回复翻成 <code>send_message</code> 请求。这本来就是适配器该干的事，信任边界没变：适配器在里面，厂商在外面。</div>
@@ -2039,6 +2073,7 @@ seq 2  message.sent      agent:claude-code  Claude Code registered and context l
 <tr><td><b>006</b></td><td>对话折进智能体，按任务分组</td><td>新增功能：智能体对话记录该放哪儿、会话该怎么划分</td></tr>
 <tr><td><b>007</b></td><td>实现栈：TypeScript + Tauri 2 + SQLite，单机</td><td>开工前必须定的前置问题：外壳、范围、模型档位</td></tr>
 <tr><td><b>004 补</b></td><td>能力有两个轴：任务能力 + 集成能力</td><td>四家实测发现单一厂商会把自己的行为变成通用假设</td></tr>
+<tr><td><b>记忆优先</b></td><td>代价是每轮「重新进入」的约 2 倍固定溢价，与上下文体量几乎无关</td><td>四家 × 三种日志规模全部 4/4 召回；截断上下文是错的优化，压轮数才是对的</td></tr>
 <tr><td><b>001 补</b></td><td>「会说 MCP」不等于「能参与」，后者是一项要实测的能力</td><td>Claude Code 零适配器跑通全流程；Codex 握手正常却从不把工具交给模型</td></tr>
 </table>
 

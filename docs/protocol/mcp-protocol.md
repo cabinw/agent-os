@@ -202,6 +202,14 @@ research, upstream results.
 An agent is expected to call this before starting work. Working from an isolated
 context is the failure this protocol exists to prevent.
 
+**Do not add a small default `limit` to save tokens.** Measured across four
+vendors, shipping 100× more context cost ~50% more, while re-entering the agent
+at all cost ~100% — so truncation buys almost nothing and can silently drop the
+fact the turn needed
+([FINDINGS](../../apps/chat-spike/FINDINGS.md#3c-the-bill-was-the-axis-we-were-not-watching)).
+Where the response must be bounded, bound it by relevance, never by recency
+alone.
+
 ### write_memory / query_memory
 
 ```json

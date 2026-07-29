@@ -63,15 +63,44 @@ cheapest demonstration of why context belongs in the log.
 | Session continuity | Confirmed: `codex-reply` with a `threadId` retains context; a fresh `codex` call does not |
 
 The cold-start gap matters beyond latency: it is the price of the memory-first
-model, where an agent rebuilds context from the log instead of holding it.
-That trade-off is what stage 3 measures.
+model, where an agent rebuilds context from the log instead of holding it. Stage
+3 measured that trade-off, and it came out the other way round from the
+assumption — see below.
+
+## The memory-first bet, priced
+
+```bash
+node experiments/context-rebuild.mjs codex claude grok kimi   # resident vs rebuild
+node experiments/context-rebuild.mjs --pad 1200 grok          # bury the facts first
+```
+
+Four arbitrary facts are planted, a distractor turn is pushed in between, then
+they are asked for. `resident` keeps the vendor session; `rebuild` drops it every
+turn and prepends `get_context` output — the real mechanism, off the real log.
+
+**Recall was 4/4 in all eight runs, and stayed 4/4 with 1200 unrelated messages
+(108k chars) buried on top.** Coherence was never the constraint. Full numbers in
+[FINDINGS](FINDINGS.md#3b-measured-rebuilding-from-the-log-never-lost-a-fact).
+
+What it costs (Grok, the only vendor that prices a turn in money):
+
+| | cost/5 turns | wall clock |
+| --- | --- | --- |
+| resident | $0.052 – $0.062 | 24.4s |
+| rebuild | $0.092 – $0.121 | 28.7s |
+| rebuild, 100× the log | $0.139 | 28.7s |
+
+**Re-entering costs ~2×; the context you ship on top of it is nearly free.** So
+the obvious optimization — truncating `get_context` — is the wrong one. The lever
+is fewer, longer turns, which makes this a question about task granularity rather
+than about context windows.
 
 ## Stages
 
 - [x] **0 — dispatch works, across four vendors.** No event log, no MCP server of our own.
 - [x] **1 — event log.** Every message becomes `message.sent`; the UI projects the log; restart replays it. **Verified: kill the process, restart, the conversation comes back.**
 - [x] **2 — participation channel.** Our MCP server (`register_agent` / `get_context` / `send_message`). **Verified: Claude Code registered and spoke through it with no adapter; impersonation was refused.**
-- [ ] **3 — the experiment.** Persistent session vs. rebuilding from `get_context`. Compare coherence *and* latency.
+- [x] **3 — the experiment.** Persistent session vs. rebuilding from `get_context`. **Result: 8/8 perfect recall, and it held under a 100× larger log. The cost is a ~2× per-turn premium for re-entering, almost independent of context volume.**
 
 ## The participation channel
 

@@ -60,10 +60,78 @@ Codex: **7.1s cold vs 1.5s continued — 4.7×**. That is the cost of discarding
 vendor session and rebuilding context from the log.
 
 So the Phase 3 question is no longer only "is `get_context` coherent enough". It
-is also "is it worth 4.7× latency", and the answer is probably per-situation:
-resident sessions inside a long task, rebuild across tasks and across days.
-`agent.disconnected` in `agent-runtime.md` already calls ephemeral agents normal
-— this puts a number on it.
+is also "is it worth 4.7× latency". Both halves are now measured — see below,
+and the answer inverted the question.
+
+### 3b. Measured: rebuilding from the log never lost a fact
+
+`experiments/context-rebuild.mjs` plants four arbitrary facts (`青铜麋鹿`,
+`7734`, `Vera`, `周四 02:00` — unguessable, so a hit is recall and not a
+plausible completion), pushes a distractor turn between planting and asking,
+then grades. `resident` keeps the vendor session; `rebuild` drops it every turn
+and prepends `get_context` output. Same turns, same grader.
+
+| | recall | wall clock | shipped |
+| --- | --- | --- | --- |
+| codex resident | 4/4 | 14.2s | 0.1k chars |
+| codex rebuild | 4/4 | 31.1s | 1.1k |
+| claude resident | 4/4 | 61.7s | 0.1k |
+| claude rebuild | 4/4 | 35.0s | 1.1k |
+| grok resident | 4/4 | 24.5s | 0.1k |
+| grok rebuild | 4/4 | 28.7s | 1.1k |
+| kimi resident | 4/4 | 22.3s | 0.1k |
+| kimi rebuild | 4/4 | 20.0s | 1.1k |
+
+**8/8 perfect.** Coherence is not the constraint, so the interesting question
+became how far it holds. `--pad N` buries the facts under N messages of
+plausible, on-topic project chatter:
+
+| padding | shipped/turn | codex | claude | grok | kimi |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 1.1k chars | 4/4 · 31.1s | 4/4 · 35.0s | 4/4 · 28.7s | 4/4 · 20.0s |
+| 200 | 18.7k | 4/4 · 33.8s | 4/4 · 70.2s | 4/4 · 28.6s | 4/4 · 26.6s |
+| 1200 | 108.7k | 4/4 · 34.0s | 4/4 · 48.2s | 4/4 · 30.6s | 4/4 · 32.1s |
+
+**A 100× larger log did not cost a single fact, and barely cost time.** Codex and
+Grok are flat; Kimi grows ~1.5× over that 100×; Claude is too noisy to call.
+
+### 3c. The bill was the axis we were not watching
+
+Token totals are **not comparable across vendors** — Codex reports a running
+session total, Claude reports what missed its cache, Kimi reports nothing. Grok
+is the only one that prices a turn in money, so it carries this result:
+
+| | cost | wall clock |
+| --- | --- | --- |
+| resident | $0.052 – $0.062 | 24.4s |
+| rebuild, pad 0 | $0.092 – $0.121 | 28.7s |
+| rebuild, pad 200 | $0.116 | 28.6s |
+| rebuild, pad 1200 | $0.139 | 28.7s |
+
+**Rebuild costs ~2× — and then a 100× bigger log adds only ~50% on top of that.**
+The premium is in *re-entering* at all, not in how much context is shipped: a
+resident turn reuses a warm prefix, a rebuilt one pays for a fresh one every
+time. Context volume is the cheap part.
+
+### What that changes
+
+The roadmap assumed the memory-first bet would be paid as a coherence risk, and
+priced it at Codex's 4.7× cold start. Both are wrong in the same direction:
+
+- **Do not truncate `get_context` to save money.** The obvious optimization is
+  the wrong one — shipping 100× more context cost ~50%, while re-entering cost
+  100%. A `limit` that drops facts buys almost nothing and can lose everything.
+- **Batch work into fewer, longer turns.** That is the lever, because the cost is
+  per re-entry. It is an argument for task granularity, not for context trimming.
+- **Session residency is a per-vendor optimization, not an architectural need.**
+  Kimi was *faster* rebuilding than resuming, and Grok nearly tied — because
+  `--resume` re-spawns a process anyway. Only Codex, which holds a live server,
+  has a real warm path. So `integration.session` should drive an optimization
+  when present, never a requirement.
+- **Coherence still needs re-testing when the log stops being a flat transcript.**
+  This measured 1200 messages of chat. It did not measure knowledge items,
+  superseding, or cross-task context — which is where a naive concatenation is
+  most likely to break.
 
 ## Negative result: Codex will not expose our MCP tools to its model
 
@@ -136,4 +204,8 @@ pass/fail rather than nice-to-have. Codex fails it. Claude Code passes.
 corepack pnpm --filter @agent-os/chat-spike start
 # switch provider in the header, or PROVIDER=grok to start there
 DUMP_EVENTS=/tmp/events.jsonl corepack pnpm --filter @agent-os/chat-spike start
+
+# stage 3 — resident vs rebuild, and the haystack sweep
+node apps/chat-spike/experiments/context-rebuild.mjs codex claude grok kimi
+node apps/chat-spike/experiments/context-rebuild.mjs --pad 1200 grok
 ```

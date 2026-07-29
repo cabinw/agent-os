@@ -488,7 +488,7 @@ td code{white-space:nowrap}
 
   <li><input type="checkbox" id="t-2-4"><label for="t-2-4" class="tb">
     <span class="tt"><span class="tid">2.4</span><code>get_context</code>：把决策注入智能体</span>
-    <span class="td">智能体开工前拿到约束它的那些决策，从而不重新讨论已定的问题。<b>这是整个协议存在的理由</b>，别做成可选项。</span>
+    <span class="td">智能体开工前拿到约束它的那些决策，从而不重新讨论已定的问题。<b>这是整个协议存在的理由</b>，别做成可选项。<br><b>spike 实测：不要为省钱加一个小的默认 <code>limit</code>。</b>四家 × 三种日志规模全部 4/4 召回，上下文放大 100 倍只多花约 50%，而重新进入一次就多花 100%——截断省不下什么，却可能正好丢掉这轮需要的事实。必须限量时按<b>相关性</b>限，别只按时间。<br><b>另：这个实验只测了平铺聊天记录。</b>知识条目、supersede、跨任务上下文没测，而那正是「直接拼成 prompt」最可能垮的地方——2.4 做完要用同一个探针重测一遍。</span>
     <span class="tm"><span class="tag pkg">memory-core</span><span class="tag crit">关键</span><span class="tag dep">依赖 2.2</span><span class="tag sz">3 天</span></span>
   </label></li>
 
