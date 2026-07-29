@@ -159,7 +159,12 @@ const CATALOG = join(ROOT, "docs/protocol/event-catalog.md");
 const catalogTypes = new Set();
 if (safeStat(CATALOG)) {
   const md = readFileSync(CATALOG, "utf8");
-  for (const m of md.matchAll(/`([a-z]+\.[a-z.]+)`/g)) catalogTypes.add(m[1]);
+  // Only the first cell of a table row counts as a catalog entry. Scanning the
+  // whole document was too permissive: it also accepted field paths mentioned in
+  // prose (`actor.kind`) and retired names the catalog names only to say they
+  // are retired (`news.generated`), so the guard would have waved through an
+  // event type the catalog explicitly does not define.
+  for (const m of md.matchAll(/^\| `([a-z]+(?:\.[a-z]+)+)`/gm)) catalogTypes.add(m[1]);
 }
 
 const EVENT_LIKE = /["']([a-z]+\.[a-z]+(?:\.[a-z]+)*)["']/g;

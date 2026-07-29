@@ -366,7 +366,7 @@ td code{white-space:nowrap}
 <ul class="tasks" data-phase="p1">
   <li><input type="checkbox" id="t-1-1"><label for="t-1-1" class="tb">
     <span class="tt"><span class="tid">1.1</span>事件信封类型 + Zod schema + ULID</span>
-    <span class="td">按 <code>event-core.md</code> 的信封：<code>id / type / seq / project / actor / subject / at / causedBy / payload</code>。事件目录里的 22 个类型各写一个 payload schema，用 discriminated union 收口。</span>
+    <span class="td">按 <code>event-core.md</code> 的信封：<code>id / type / seq / project / actor / subject / at / causedBy / payload</code>。事件目录里的 <b>26</b> 个类型各写一个 payload schema，用 discriminated union 收口。</span>
     <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag sz">2 天</span></span>
     <span class="done-when"><b>完成判据：</b>未知 <code>type</code> 或多余字段在解析时被拒绝</span>
   </label></li>
@@ -647,7 +647,7 @@ td code{white-space:nowrap}
 <table>
 <tr><th>天</th><th>做什么</th><th>产出</th></tr>
 <tr style="opacity:.5"><td><b>1</b> ✓</td><td><s>0.1 + 0.2 + 0.3 + 0.4 —— workspace 骨架、Vitest、Biome、分层检查脚本</s></td><td><s><code>pnpm verify</code> 全绿，11/11 测试通过</s></td></tr>
-<tr><td><b>2</b></td><td>1.1 —— 事件信封 + 22 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
+<tr><td><b>2</b></td><td>1.1 —— 事件信封 + 26 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
 <tr><td><b>3–4</b></td><td>1.2 —— SQLite 存储、seq 分配、幂等 token</td><td>并发 append 测试通过</td></tr>
 <tr><td><b>5</b></td><td>1.3 —— 总线 + 重放 + reducer 注册</td><td><b>重放等价性测试通过 → 内核成立</b></td></tr>
 </table>
