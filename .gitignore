@@ -11,3 +11,7 @@ dist/
 
 # Rust / Tauri (apps/macos/src-tauri)
 target/
+
+# chat-spike: the agent's scratch working directory
+apps/chat-spike/workspace/*
+!apps/chat-spike/workspace/.gitkeep
