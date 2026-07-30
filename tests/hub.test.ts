@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Hub } from "../apps/chat-spike/src/hub.mjs";
 // @ts-expect-error
 import { EventLog } from "../apps/chat-spike/src/log.mjs";
+// @ts-expect-error
+import { project } from "../apps/chat-spike/src/thread.mjs";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -23,7 +25,12 @@ function fakeAdapter(id: string, label: string, opts: { onSend?: Function } = {}
   class Fake {
     static id = id;
     static label = label;
-    static capabilities = { streaming: false, thoughts: false, session: true, usage: false };
+    static capabilities = {
+      streaming: false,
+      thoughts: false,
+      session: true,
+      usage: false,
+    };
     _sessionId: string | null = null;
     mcp: unknown;
     constructor(o: { mcp?: unknown }) {
@@ -58,7 +65,8 @@ function makeHub(
   const hub = new Hub({
     log,
     projectId: "proj_test",
-    broadcast: (type: string, data: Record<string, unknown>) => events.push({ type, data }),
+    broadcast: (type: string, data: Record<string, unknown>) =>
+      events.push({ type, data }),
     getAdapter: (id: string) => adapters[id]?.Fake,
     workspace: join(dir, "ws"),
     url: "http://localhost:0",
@@ -95,7 +103,9 @@ describe("A.1 适配器池", () => {
 
     expect(a.prompts).toHaveLength(1);
     expect(b.prompts).toHaveLength(1);
-    expect(hub.roster().filter((r: { hasSession: boolean }) => r.hasSession)).toHaveLength(2);
+    expect(
+      hub.roster().filter((r: { hasSession: boolean }) => r.hasSession),
+    ).toHaveLength(2);
   });
 
   it("同一个 agent 的两条消息串行，不并发", async () => {
@@ -124,7 +134,10 @@ describe("A.1 适配器池", () => {
     const slow = { onSend: async () => "ok" };
     const a = fakeAdapter("alpha", "Alpha", slow);
     const b = fakeAdapter("beta", "Beta", slow);
-    const { hub, log } = makeHub({ alpha: a, beta: b }, [{ id: "alpha" }, { id: "beta" }]);
+    const { hub, log } = makeHub({ alpha: a, beta: b }, [
+      { id: "alpha" },
+      { id: "beta" },
+    ]);
 
     for (let i = 0; i < 5; i++) {
       hub.say(`a${i}`, "alpha");
@@ -281,9 +294,9 @@ describe("注册幂等", () => {
 
     const again = await hub.tools.call("register_agent", { id: "alpha", name: "Alpha" });
     expect(again).toMatchObject({ reconnected: true });
-    expect(log.replay().filter((e: { type: string }) => e.type === "agent.registered")).toHaveLength(
-      1,
-    );
+    expect(
+      log.replay().filter((e: { type: string }) => e.type === "agent.registered"),
+    ).toHaveLength(1);
   });
 
   it("自己注册的 agent 会进池子，之后能被别人回信唤醒", async () => {
@@ -304,7 +317,11 @@ describe("注册幂等", () => {
     const made = makeHub({ alpha: a, beta: b }, [{ id: "alpha" }]);
     hub = made.hub;
 
-    await hub.tools.call("register_agent", { id: "beta", name: "Beta", capabilities: ["research"] });
+    await hub.tools.call("register_agent", {
+      id: "beta",
+      name: "Beta",
+      capabilities: ["research"],
+    });
     expect(hub.agents.has("beta")).toBe(true);
 
     await hub.tools.call(
@@ -365,5 +382,231 @@ describe("B.3 按能力找人", () => {
     expect(busy.matched).toBe(0);
     release();
     await settle(hub);
+  });
+});
+
+/**
+ * C — tasks. The point is not the state machine (Phase 1.5 owns that) but the
+ * boundary: a task scopes a thread, and no argument an agent can send reaches
+ * `completed`.
+ */
+describe("C 任务对象", () => {
+  it("create_task 不带执行者；assign_task 才指派，并且唤醒他", async () => {
+    const a = fakeAdapter("alpha", "Alpha");
+    const { hub } = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
+
+    const made = (await hub.tools.call("create_task", {
+      title: "写个解析器",
+      requires: ["coding"],
+    })) as { task: string; status: string };
+    expect(made.status).toBe("created");
+    expect(hub.tasks()[made.task].executor).toBeNull();
+
+    await hub.tools.call("assign_task", { task: made.task });
+    await settle(hub);
+
+    expect(hub.tasks()[made.task].executor).toBe("alpha");
+    expect(a.prompts[0]).toContain(made.task);
+    expect(a.prompts[0]).toContain("写个解析器");
+  });
+
+  it("不填 executor 时按能力匹配，匹配不到就拒绝而不是随便挑", async () => {
+    const a = fakeAdapter("alpha", "Alpha");
+    const { hub } = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
+    const t = (await hub.tools.call("create_task", {
+      title: "做份调研",
+      requires: ["research"],
+    })) as { task: string };
+    await expect(hub.tools.call("assign_task", { task: t.task })).rejects.toThrow(
+      /没有具备/,
+    );
+  });
+
+  it("被指派后状态走 assigned → running，而且 started 是运行时发的", async () => {
+    const a = fakeAdapter("alpha", "Alpha");
+    const { hub, log } = makeHub({ alpha: a }, [
+      { id: "alpha", capabilities: ["coding"] },
+    ]);
+    const t = (await hub.tools.call("create_task", {
+      title: "活",
+      requires: ["coding"],
+    })) as {
+      task: string;
+    };
+    await hub.tools.call("assign_task", { task: t.task });
+    await settle(hub);
+
+    const types = log.replay().map((e: { type: string }) => e.type);
+    expect(types).toContain("task.assigned");
+    expect(types).toContain("task.started");
+    const started = log.replay().find((e: { type: string }) => e.type === "task.started");
+    expect(started.actor.kind).toBe("system");
+  });
+
+  /** Rule 3, and the one that has to survive a persuasive agent. */
+  it("agent 报 completed，任务仍然只到 review", async () => {
+    let hub: any;
+    const a = fakeAdapter("alpha", "Alpha", {
+      onSend: async () => {
+        await hub.tools.call(
+          "report_result",
+          { task: "TASK-001", status: "completed", summary: "做完了" },
+          "alpha",
+        );
+        return "";
+      },
+    });
+    const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
+    hub = made.hub;
+
+    await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
+    await hub.tools.call("assign_task", { task: "TASK-001" });
+    await settle(hub);
+
+    expect(hub.tasks()["TASK-001"].status).toBe("review");
+    expect(made.log.replay().map((e: { type: string }) => e.type)).not.toContain(
+      "task.completed",
+    );
+  });
+
+  it("只有人能验收，验收之后才是 completed", async () => {
+    let hub: any;
+    const a = fakeAdapter("alpha", "Alpha", {
+      onSend: async () => {
+        await hub.tools.call(
+          "report_result",
+          { task: "TASK-001", status: "completed", summary: "做完了" },
+          "alpha",
+        );
+        return "";
+      },
+    });
+    const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
+    hub = made.hub;
+    await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
+    await hub.tools.call("assign_task", { task: "TASK-001" });
+    await settle(hub);
+
+    hub.accept("TASK-001");
+    expect(hub.tasks()["TASK-001"].status).toBe("completed");
+    const done = made.log
+      .replay()
+      .find((e: { type: string }) => e.type === "task.completed");
+    expect(done.actor.kind).toBe("human");
+  });
+
+  it("不能替别人交付", async () => {
+    const a = fakeAdapter("alpha", "Alpha");
+    const b = fakeAdapter("beta", "Beta");
+    const { hub } = makeHub({ alpha: a, beta: b }, [
+      { id: "alpha", capabilities: ["coding"] },
+      { id: "beta", capabilities: ["coding"] },
+    ]);
+    await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
+    await hub.tools.call("assign_task", { task: "TASK-001", executor: "alpha" });
+    await settle(hub);
+
+    await expect(
+      hub.tools.call(
+        "report_result",
+        { task: "TASK-001", status: "completed", summary: "我替他交" },
+        "beta",
+      ),
+    ).rejects.toThrow(/不是指派给/);
+  });
+
+  it("非法转移被拒绝，而不是被纠正（ADR-002）", async () => {
+    const a = fakeAdapter("alpha", "Alpha");
+    const { hub } = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
+    await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
+
+    // created, never started — nothing to deliver yet.
+    await expect(
+      hub.tools.call(
+        "report_result",
+        { task: "TASK-001", status: "completed", summary: "还没开始就交" },
+        null,
+      ),
+    ).rejects.toThrow(/不能 task\.review\.requested/);
+    expect(hub.tasks()["TASK-001"].status).toBe("created");
+  });
+
+  it("任务给线程划了边界：消息自动落到执行者当前的任务上", async () => {
+    let hub: any;
+    const a = fakeAdapter("alpha", "Alpha", {
+      onSend: async () => {
+        await hub.tools.call(
+          "send_message",
+          { from: "alpha", to: "you", type: "progress", content: "进行中" },
+          "alpha",
+        );
+        return "";
+      },
+    });
+    const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
+    hub = made.hub;
+    await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
+    await hub.tools.call("assign_task", { task: "TASK-001" });
+    await settle(hub);
+
+    const msg = made.log
+      .replay()
+      .find((e: { type: string }) => e.type === "message.sent");
+    // Never said which task; the runtime scoped it.
+    expect(msg.payload.task).toBe("TASK-001");
+  });
+
+  it("任务 id 从日志推导，重放得到同样的 id", async () => {
+    const a = fakeAdapter("alpha", "Alpha");
+    const { hub, log } = makeHub({ alpha: a }, [
+      { id: "alpha", capabilities: ["coding"] },
+    ]);
+    await hub.tools.call("create_task", { title: "一" });
+    await hub.tools.call("create_task", { title: "二" });
+    expect(Object.keys(hub.tasks()).sort()).toEqual(["TASK-001", "TASK-002"]);
+
+    // The ids live in the log, not in a counter that a restart would reset.
+    const replayed = Object.keys(project(log.replay()).tasks).sort();
+    expect(replayed).toEqual(["TASK-001", "TASK-002"]);
+  });
+});
+
+describe("一轮只写一次（C 的真机 bug）", () => {
+  it("agent 交付了任务，就不再把正文回显成一条消息", async () => {
+    let hub: any;
+    const a = fakeAdapter("alpha", "Alpha", {
+      onSend: async () => {
+        await hub.tools.call(
+          "report_result",
+          { task: "TASK-001", status: "completed", summary: "结论如下" },
+          "alpha",
+        );
+        return "结论如下";
+      },
+    });
+    const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
+    hub = made.hub;
+    await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
+    await hub.tools.call("assign_task", { task: "TASK-001" });
+    await settle(hub);
+
+    // Delivering *is* speaking. The first live run wrote both, so the summary
+    // appeared twice in the thread.
+    expect(messages(made.log)).toHaveLength(0);
+  });
+
+  it("任务唤醒也在因果链上——task.started 是这一轮的 cause", async () => {
+    const a = fakeAdapter("alpha", "Alpha");
+    const { hub, log } = makeHub({ alpha: a }, [
+      { id: "alpha", capabilities: ["coding"] },
+    ]);
+    await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
+    await hub.tools.call("assign_task", { task: "TASK-001" });
+    await settle(hub);
+
+    const reply = log.replay().find((e: { type: string }) => e.type === "message.sent");
+    const started = log.replay().find((e: { type: string }) => e.type === "task.started");
+    expect(reply.causedBy).toBe(started.id);
+    expect(hub.depthOf(reply.id)).toBeGreaterThan(0);
   });
 });

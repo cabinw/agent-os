@@ -360,7 +360,7 @@ td code{white-space:nowrap}
 <section id="hub">
 <div class="phase-hd">
   <h3 id="hubh">Agent Hub — 人当 Supervisor 的最小验证</h3>
-  <span class="badge done">✓ A+B 已完成</span>
+  <span class="badge done">✓ 已完成</span>
   <span class="phase-count" data-count="hub"></span>
 </div>
 <p class="phase-goal">插在 Phase 1 之前的 side project。<b>唯一要验的是两条通道的接缝</b>：一条消息从 A 发出，经过事件日志，把 B 叫醒并让 B 干了活。其余都是为了让这句话可观察。人扮演 Supervisor，agent 之间可以互相委派。</p>
@@ -405,13 +405,15 @@ td code{white-space:nowrap}
     <span class="done-when"><b>已验证：</b>三方协作可读——委派消息带「委派」标记，缩进即跳数，顶栏 <b>3 / 6 跳</b> 与运行时预算同源同算法。花名册显示谁在忙、谁有会话、谁不会调工具</span>
   </label></li>
 
-  <li><input type="checkbox" id="t-h-6"><label for="t-h-6" class="tb">
-    <span class="tt"><span class="tid">C</span>任务对象 —— <b>先不做，B 通了再决定</b></span>
-    <span class="td">只有消息没有任务，就看不到状态、没有闭环、<code>report_result</code> 无处可去。倾向做，但砍到四态（<code>created → assigned → running → review</code>），用真实状态名和真实事件类型，让它替 1.5 探需求。<b>B 一旦通了，缺不缺任务对象会自己显出来</b>，那时判断比现在准。</span>
-    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag dep">依赖 B.1</span><span class="tag sz">待定</span></span>
-    <span class="done-when"><b>先不勾。</b>B 阶段跑通后重新评估</span>
+  <li><input type="checkbox" id="t-h-6" checked><label for="t-h-6" class="tb">
+    <span class="tt"><span class="tid">C</span>任务对象</span>
+    <span class="td">跑完 A+B 之后判断清楚了：<b>缺的不是状态跟踪，是线程边界</b>。四条消息读着没问题，三件事并行就糊。所以 C 的重心是<b>一任务一线程</b>（ADR-006），状态机反而是配角。<code>create_task</code>（<b>没有 executor 字段</b>）/ <code>assign_task</code>（不填 executor 就按能力匹配）/ <code>report_result</code>。生命周期事件<b>交织进线程</b>——只有消息的线程读起来像悬空聊天。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">验规则 3 / 5</span><span class="tag dep">依赖 B.1</span><span class="tag sz">1 天</span></span>
+    <span class="done-when"><b>已验证（真机）：</b>人一句话 → <code>task.created</code> → <code>task.assigned</code>（协调者<b>没填 executor</b>，运行时按 research 匹配到 Grok）→ <code>task.started</code> → <code>task.review.requested</code> → 人点验收 → <code>task.completed</code>。<b>六个事件，一条消息都没有。</b>agent 报 <code>status:"completed"</code> 仍然只到 <code>review</code>；验收<b>没有任何 MCP 工具</b>，只在人的界面上</span>
   </label></li>
 </ul>
+
+<div class="note warn"><b>三个同族 bug，全是真机跑出来的。</b>每一个都是<b>运行时信任了 agent 能控制的字段</b>：① <code>replyTo</code> 不填就脱离因果链，预算失效；② 重复注册写了第二条事件，污染此后所有重放；③ 「这一轮说过话没有」按因果链判断，而任务唤醒没有真实 cause 事件，于是交付内容被回显了两遍。<br><b>共同的修法</b>：改成按运行时自己掌握的东西判断——运行时补链、按 <code>seq</code> 位置判断写没写过。<b>任何以 agent 提供的数据为准的限制都是形同虚设。</b></div>
 
 <div class="note"><b>做完之后新增的两条 protocol 规则</b>（都来自第一次真机运行）：① <code>causedBy</code> 归运行时所有，caller 不填就由运行时补——<b>任何以 agent 提供的数据为准的预算都是形同虚设</b>；② 重复注册<b>不得再写一条事件</b>，事件是永久的，一条重复的「加入会话」会污染此后所有重放。</div>
 

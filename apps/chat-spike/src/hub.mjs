@@ -26,7 +26,7 @@
 import { makeEvent } from "./events.mjs";
 import { mountMcp, participates } from "./mcp-mount.mjs";
 import { HUMAN_ID, createToolRouter } from "./mcp-tools.mjs";
-import { project } from "./thread.mjs";
+import { TRANSITIONS, project } from "./thread.mjs";
 import { ValidationError } from "./validate.mjs";
 
 /** How many agent→agent hops one human message may cause before it is stopped. */
@@ -104,6 +104,8 @@ export class Hub {
       capabilities,
       /** The message this agent is currently answering, for causal linkage. */
       cause: null,
+      /** The task this agent is currently working, so its messages are scoped. */
+      task: null,
       /** Whether `agent.registered` has been written for it. */
       announced: false,
       integration: { ...Cls.capabilities, participates: participates(id) },
@@ -152,6 +154,44 @@ export class Hub {
       busy: a.busy,
       hasSession: a.adapter?.hasSession ?? false,
     }));
+  }
+
+  // ------------------------------------------------------------------- tasks
+
+  /** Current derived task state. Never stored — this is a fold, every time. */
+  tasks() {
+    return project(this.log.replay()).tasks;
+  }
+
+  /**
+   * Legality is checked here, at the boundary, and the illegal move is
+   * *rejected* rather than corrected (ADR-002). Correcting would mean the log
+   * records a transition nobody asked for.
+   */
+  guard(taskId, type) {
+    const task = this.tasks()[taskId];
+    if (!task) throw new ValidationError(`没有任务 ${taskId}`);
+    const rule = TRANSITIONS[type];
+    if (!rule.from.includes(task.status)) {
+      throw new ValidationError(
+        `${taskId} 现在是 ${task.status}，不能 ${type}（只允许从 ${rule.from.join(" / ")}）`,
+      );
+    }
+    return task;
+  }
+
+  taskEvent(type, taskId, payload, actor) {
+    return this.emit(
+      makeEvent({
+        type,
+        project: this.projectId,
+        actor: actor ?? { kind: "system", id: "runtime" },
+        subject: { kind: "task", id: taskId },
+        causedBy:
+          actor?.kind === "agent" ? this.agents.get(actor.id)?.cause?.id : undefined,
+        payload: { task: taskId, ...payload },
+      }),
+    );
   }
 
   // ----------------------------------------------------------------- routing
@@ -215,19 +255,24 @@ export class Hub {
    * memory of its own, and the measured price of that is ~2× per turn, nearly
    * independent of how much context is shipped (FINDINGS 3c).
    */
-  async turn(entry, cause) {
+  async turn(entry, cause, taskId = null) {
     entry.busy = true;
+    entry.task = taskId ?? cause?.payload?.task ?? null;
     // Remembered so the agent cannot detach itself from the causal chain. An
     // agent that omits `replyTo` would otherwise reset its own hop count to zero
     // and loop forever — the budget has to be the runtime's to enforce.
     entry.cause = cause;
     this.broadcast("roster", { agents: this.roster() });
     try {
+      // Everything this agent writes during the turn lands after this mark.
+      const before = this.log.seq;
       const reply = await this.adapterFor(entry).send(this.prompt(entry, cause));
 
-      // An agent that called `send_message` itself has already spoken; echoing
-      // its transcript text as a second message would double every turn.
-      if (this.spokeDuring(entry.id, cause.id)) {
+      // An agent that already acted — sent a message, or delivered a task — has
+      // spoken. Echoing its transcript on top would double every turn, and the
+      // first live run of C did exactly that: `report_result` plus a verbatim
+      // copy of the same summary as a message.
+      if (this.actedDuring(entry.id, before)) {
         this.broadcast("turn", { agent: entry.id, ms: reply.ms, viaTools: true });
         return;
       }
@@ -239,6 +284,7 @@ export class Hub {
           to: cause.payload.from,
           type: "answer",
           content: reply.text || "（空回复）",
+          ...(entry.task ? { task: entry.task } : {}),
           replyTo: cause.id,
         },
         entry.id,
@@ -247,14 +293,20 @@ export class Hub {
     } finally {
       entry.busy = false;
       entry.cause = null;
+      entry.task = null;
       this.broadcast("roster", { agents: this.roster() });
     }
   }
 
-  /** Did this agent emit anything caused by the message we woke it with? */
-  spokeDuring(agentId, causeId) {
+  /**
+   * Did this agent write anything at all during the turn? Keyed on the log's own
+   * position rather than on causal links, because a link is something the agent
+   * can omit and a `seq` is not.
+   */
+  actedDuring(agentId, sinceSeq) {
     for (const e of this.byId.values()) {
-      if (e.causedBy === causeId && e.payload?.from === agentId) return true;
+      if (e.seq > sinceSeq && e.actor?.kind === "agent" && e.actor.id === agentId)
+        return true;
     }
     return false;
   }
@@ -264,11 +316,21 @@ export class Hub {
    * this project, and every tool call it makes has to name itself correctly.
    */
   prompt(entry, cause) {
-    const ctx = this.runtime().getContext({});
+    const ctx = this.runtime().getContext({ task: entry.task });
     const history = ctx.messages
       .slice(0, -1)
       .map((m) => `${m.from} → ${m.to}：${m.content}`)
       .join("\n");
+
+    const task = entry.task ? this.tasks()[entry.task] : null;
+    const brief = task
+      ? [
+          `你正在做任务 ${task.id}：${task.title}`,
+          `做完后调 report_result(task: "${task.id}", status, summary) 交付。`,
+          "**交付不等于完成**——它只会进入待验收，验收是别人的事，你不能验收自己的活。",
+          "",
+        ].join("\n")
+      : "";
 
     const tools = entry.integration.participates
       ? [
@@ -276,6 +338,8 @@ export class Hub {
           "  · find_agent(capabilities) —— 找谁能干某件事。**这是发现同伴的唯一途径**，不要凭印象点名。",
           `  · send_message(from: "${entry.id}", to, type, content) —— 发言或委派。to 填 "${HUMAN_ID}" 是回给人。`,
           "  · get_context() —— 补读上下文。",
+          "  · create_task(title, requires) / assign_task(task, executor) —— 拆活派活。" +
+            "assign_task 不填 executor 就由运行时按能力匹配，这比你自己点名更可靠。",
           "如果你调用了 send_message，就不要在正文里重复同样的话。",
         ].join("\n")
       : "你没有工具，直接把回复写成正文即可，运行时会代你发出。";
@@ -284,6 +348,7 @@ export class Hub {
       `你是 Agent OS 里的 agent「${entry.label}」，id 是 "${entry.id}"。`,
       tools,
       "",
+      brief,
       history ? `此前的项目记录：\n${history}\n` : "",
       `${cause.payload.from} 对你说：${cause.payload.content}`,
     ]
@@ -364,6 +429,84 @@ export class Hub {
         return { candidates, matched: candidates.length };
       },
 
+      executorOf(taskId) {
+        return hub.tasks()[taskId]?.executor ?? null;
+      },
+
+      createTask(p, caller) {
+        // Ids are derived from the log, so a replay produces the same ones.
+        const n = hub.log.replay().filter((e) => e.type === "task.created").length + 1;
+        const id = `TASK-${String(n).padStart(3, "0")}`;
+        const evt = hub.taskEvent(
+          "task.created",
+          id,
+          { title: p.title, requires: p.requires ?? [], detail: p.detail },
+          caller ? { kind: "agent", id: caller } : undefined,
+        );
+        hub.broadcast("tasks", { tasks: hub.tasks() });
+        return { task: id, status: "created", seq: evt.seq };
+      },
+
+      /**
+       * Omitting `executor` is the good path: the runtime matches on capability
+       * and the caller never names a vendor (ADR-004). Naming one is allowed but
+       * still has to be an agent that exists.
+       */
+      assignTask(p, caller) {
+        const task = hub.guard(p.task, "task.assigned");
+        let executor = p.executor;
+        if (!executor) {
+          const [best] = [...hub.agents.values()]
+            .filter((a) => (task.requires ?? []).every((c) => a.capabilities.includes(c)))
+            .sort((x, y) => Number(x.busy) - Number(y.busy));
+          if (!best) {
+            throw new ValidationError(
+              `没有具备 ${(task.requires ?? []).join("、") || "所需"} 能力的 agent`,
+            );
+          }
+          executor = best.id;
+        }
+        const entry = hub.agents.get(executor);
+        if (!entry) throw new ValidationError(`未知执行者 "${executor}"`);
+
+        hub.taskEvent(
+          "task.assigned",
+          p.task,
+          { executor },
+          caller ? { kind: "agent", id: caller } : undefined,
+        );
+        hub.broadcast("tasks", { tasks: hub.tasks() });
+
+        // The seam again: assignment wakes, exactly as a message does.
+        hub.wakeForTask(entry, p.task, {
+          id: null,
+          payload: {
+            from: caller ?? HUMAN_ID,
+            to: executor,
+            task: p.task,
+            content: `你被指派了 ${p.task}：${task.title}`,
+          },
+        });
+        return { task: p.task, executor, status: "assigned" };
+      },
+
+      /**
+       * `status` is the executor's *claim*. The runtime writes
+       * `task.review.requested` either way — rule 3, made structural rather than
+       * checked: there is no argument that reaches `completed`.
+       */
+      reportResult(p, caller) {
+        hub.guard(p.task, "task.review.requested");
+        const evt = hub.taskEvent(
+          "task.review.requested",
+          p.task,
+          { claimed: p.status, summary: p.summary, outputs: p.outputs },
+          caller ? { kind: "agent", id: caller } : undefined,
+        );
+        hub.broadcast("tasks", { tasks: hub.tasks() });
+        return { task: p.task, status: "review", seq: evt.seq };
+      },
+
       sendMessage(p) {
         // `replyTo` is a courtesy; the link is not optional. Falling back to the
         // message this agent was woken with keeps the chain — and the budget —
@@ -381,6 +524,12 @@ export class Hub {
               to: p.to,
               type: p.type,
               content: p.content,
+              // Scoped to the sender's current task unless it says otherwise, so
+              // a delegation chain stays in one thread without every agent
+              // having to remember to say which.
+              ...((p.task ?? hub.agents.get(p.from)?.task)
+                ? { task: p.task ?? hub.agents.get(p.from)?.task }
+                : {}),
               ...(p.attachments ? { attachments: p.attachments } : {}),
             },
           }),
@@ -392,10 +541,19 @@ export class Hub {
       getContext(p) {
         const thread = project(hub.log.replay());
         const limit = p?.limit ?? 200;
+        // Scoping to a task is a filter on the same fold, never a second store.
+        const scope = p?.task ? (i) => i.task === p.task || i.task == null : () => true;
         return {
           project: hub.projectId,
+          tasks: Object.values(thread.tasks).map((t) => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            executor: t.executor,
+          })),
           messages: thread.items
             .filter((i) => i.kind === "message")
+            .filter(scope)
             .slice(-limit)
             .map((i) => ({
               from: i.from,
@@ -407,6 +565,57 @@ export class Hub {
         };
       },
     };
+  }
+
+  /**
+   * Assignment is a wake, the same seam as a message. The executor is told what
+   * it is working on; everything else it needs it reads from the log.
+   */
+  wakeForTask(entry, taskId, cause) {
+    entry.queue = entry.queue
+      .then(async () => {
+        // `task.started` is the real event that woke this turn, so it is the
+        // cause. A synthetic one with no id would detach the whole turn from the
+        // causal chain — the same hole `replyTo` had.
+        const started = this.taskEvent("task.started", taskId, { executor: entry.id });
+        await this.turn(entry, { ...cause, id: started.id }, taskId);
+      })
+      .catch((err) => {
+        this.broadcast("error", {
+          agent: entry.id,
+          message: String(err?.message ?? err),
+        });
+      });
+    return entry.queue;
+  }
+
+  /**
+   * Acceptance is the human's act and has no tool. That is the point: rule 5
+   * says a message in a thread is guidance, never a grant, so there must be no
+   * way to reach `completed` by saying something persuasive.
+   */
+  accept(taskId, ok = true) {
+    this.guard(taskId, ok ? "task.completed" : "task.assigned");
+    if (ok) this.taskEvent("task.completed", taskId, {}, { kind: "human", id: HUMAN_ID });
+    else {
+      const t = this.tasks()[taskId];
+      this.taskEvent(
+        "task.assigned",
+        taskId,
+        { executor: t.executor },
+        { kind: "human", id: HUMAN_ID },
+      );
+      this.wakeForTask(this.agents.get(t.executor), taskId, {
+        id: null,
+        payload: {
+          from: HUMAN_ID,
+          to: t.executor,
+          task: taskId,
+          content: `${taskId} 未通过验收，请重做。`,
+        },
+      });
+    }
+    this.broadcast("tasks", { tasks: this.tasks() });
   }
 
   /** A human message enters through the same door an agent's does. */

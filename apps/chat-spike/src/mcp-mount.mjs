@@ -17,10 +17,16 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { TOOL_SPECS } from "./mcp-tools.mjs";
 
 const BRIDGE = join(dirname(fileURLToPath(import.meta.url)), "../bin/agent-os-mcp.mjs");
 
-const TOOLS = ["register_agent", "find_agent", "get_context", "send_message"];
+/**
+ * Must stay in step with TOOL_SPECS: Claude Code refuses an unlisted tool by
+ * asking a human for permission, which in a headless turn reads as the agent
+ * mysteriously declining to work. Derived rather than retyped for that reason.
+ */
+const TOOLS = Object.keys(TOOL_SPECS);
 
 function serverJson(url, caller) {
   return {

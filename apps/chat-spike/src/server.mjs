@@ -103,6 +103,7 @@ const server = createServer(async (req, res) => {
         type: "hello",
         thread: project(log.replay()),
         agents: hub.roster(),
+        tasks: hub.tasks(),
         providers: describeAdapters(),
         budget: hub.budget,
         human: HUMAN_ID,
@@ -150,6 +151,35 @@ const server = createServer(async (req, res) => {
     } catch (e) {
       // A rejected call is a normal outcome at a trust boundary, not a crash.
       return json(e instanceof ValidationError ? 400 : 500, { error: e.message });
+    }
+  }
+
+  /**
+   * Acceptance has no MCP tool and never will: rule 5 says a message in a thread
+   * is guidance, never a grant. It lives here, on the human's surface only.
+   */
+  if (req.method === "POST" && url.pathname === "/accept") {
+    const body = await readBody(req);
+    try {
+      hub.accept(String(body?.task ?? ""), body?.ok !== false);
+      return json(200, { ok: true });
+    } catch (e) {
+      return json(400, { error: e.message });
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/task") {
+    const body = await readBody(req);
+    try {
+      const made = await hub.tools.call("create_task", {
+        title: String(body?.title ?? ""),
+        requires: body?.requires ?? [],
+      });
+      if (body?.assign !== false)
+        await hub.tools.call("assign_task", { task: made.task });
+      return json(202, made);
+    } catch (e) {
+      return json(400, { error: e.message });
     }
   }
 

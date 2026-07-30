@@ -277,6 +277,53 @@ in a spike. Also found by the same fix: an agent that registers *itself* was
 never added to the pool, so it passed validation and was then unreachable by
 anyone replying to it.
 
+## Tasks: the boundary was the missing piece, not the state machine
+
+C was deferred until the seam worked, on the theory that "does a task object earn
+its place" would be obvious afterwards. It was — but not in the expected way.
+**What A+B lacked was not status tracking, it was a thread boundary.** Four
+messages read fine; three concurrent pieces of work in one thread would not.
+
+The whole loop, one human sentence in and one human decision out:
+
+```
+you    → claude          create_task(requires:["research"])   ← no executor field exists
+claude · task.created    assign_task(task)                    ← no executor given
+claude · task.assigned   → runtime matched grok on capability
+runtime· task.started    → assignment is a wake, same seam as a message
+grok   · task.review.requested                                ← report_result
+you    · task.completed                                       ← the only way to get here
+```
+
+Six events, no messages at all. **The coordinator omitted `executor` as asked and
+the runtime matched by capability** — ADR-004 held on a second, harder case than
+`find_agent`, because here the model had a chance to name a vendor and did not.
+
+`report_result` takes a `status` of `completed | failed`, and the runtime writes
+`task.review.requested` regardless. That is rule 3 made structural rather than
+checked: **there is no argument an agent can send that reaches `completed`.**
+Acceptance has no MCP tool at all and lives only on the human's surface, because
+rule 5 says a message in a thread is guidance and never a grant.
+
+### The live run found a third hole of the same family
+
+Grok delivered via `report_result` **and** the runtime echoed its transcript as a
+message, so the summary appeared twice. The echo suppression asked "did this
+agent send a message caused by the one that woke it" — and a task wake had no
+real cause event (a synthetic one with `id: null`), so the answer was always no.
+
+Two fixes, both generalising past the spike:
+
+- `task.started` is a real event and is now the cause of the turn it starts.
+  Every wake is on the causal chain, or the hop budget has blind spots.
+- The check is now "did this agent write **anything** after this `seq`", not
+  "did it send a message linked to X". **Delivering is speaking**, and a log
+  position is something the agent cannot omit while a link is.
+
+That is the third bug in this family found by running it: `replyTo`, the
+duplicate registration, and now this. All three were places where the runtime
+trusted a field the agent controls.
+
 ## Operational notes
 
 - **Timeouts are mandatory.** Two four-minute hangs during probing. Every adapter

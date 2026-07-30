@@ -179,6 +179,47 @@
   .tag.delegate { color: var(--accent); background: rgba(99,102,241,.08); border-color: rgba(99,102,241,.18); }
   .tag.warn { color: var(--warn); background: rgba(245,158,11,.09); border-color: rgba(245,158,11,.2); }
 
+  /* Thread switcher. ADR-006: one thread per task, plus the project thread for
+     anything not scoped to one. Filtering, not a second grouping rule. */
+  .tabs { display: flex; gap: 6px; overflow-x: auto; padding: 0 20px; height: 42px;
+    align-items: center; border-bottom: 1px solid var(--border); background: var(--surface); flex: none; }
+  .tab {
+    display: flex; align-items: center; gap: 6px; flex: none;
+    border: 1px solid var(--border); background: var(--surface);
+    border-radius: 999px; padding: 3px 11px; font: inherit; font-size: 12px;
+    color: var(--text-muted); cursor: pointer; white-space: nowrap;
+    transition: all 120ms ease-out;
+  }
+  .tab[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,.07); font-weight: 600; }
+  .st { width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex: none; }
+  .st.assigned, .st.created { background: var(--text-muted); }
+  .st.running { background: var(--info); }
+  .st.review { background: var(--warn); }
+  .st.completed { background: var(--ok); }
+  .st.failed, .st.cancelled { background: var(--risk); }
+
+  .banner {
+    display: flex; align-items: center; gap: 12px;
+    margin: 4px 0 10px; padding: 11px 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--warn);
+    border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+  }
+  .banner .grow { flex: 1; min-width: 0; }
+  .banner b { font-size: 13px; }
+  .btn {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: var(--radius-ctl); padding: 6px 13px; font: 600 12px/1 inherit; cursor: pointer;
+    transition: all 120ms ease-out;
+  }
+  .btn.ok { border-color: var(--ok); color: var(--ok); }
+  .btn.ok:hover { background: rgba(16,185,129,.07); }
+  .btn.no:hover { background: rgba(239,68,68,.06); color: var(--risk); border-color: var(--risk); }
+
+  .life { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; padding: 7px 0; }
+  .life::before { content: ""; width: 14px; height: 1px; background: var(--border); flex: none; }
+  .life .st { margin-right: 2px; }
+
   .divider {
     display: flex; align-items: center; gap: 10px;
     color: var(--text-muted); font-size: 12px;
@@ -260,7 +301,7 @@
 
 <main class="main">
   <header class="top">
-    <h1>项目会话</h1>
+    <h1 id="scopeline">全部</h1>
     <span class="meta" id="statusline">连接中…</span>
     <div class="meter">
       <span id="hopnum">0 / 0 跳</span>
@@ -268,7 +309,11 @@
     </div>
   </header>
 
-  <div class="feed" id="scroller"><div class="feed-inner" id="feed"></div></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="feed" id="scroller"><div class="feed-inner">
+    <div id="banner"></div>
+    <div id="feed"></div>
+  </div></div>
 
   <div class="composer"><div class="composer-inner">
     <div class="addr"><span>发给</span><span id="pills"></span></div>
@@ -288,7 +333,19 @@ import { reduce } from "/src/thread.mjs";
  * first release (CLAUDE.md), and retrofitting extraction is the expensive way to
  * do it. Only zh-CN is filled in — having one place to add the second is the point.
  */
+const STATUS = {
+  created: "待指派", assigned: "已指派", running: "进行中", blocked: "阻塞",
+  review: "待验收", completed: "已验收", failed: "失败", cancelled: "已取消",
+};
+
 const T = {
+  projectThread: "项目会话",
+  allTasks: "全部",
+  accept: "验收通过",
+  reject: "打回重做",
+  reviewHint: "交付待你验收——agent 只能交付，不能验收自己的活。",
+  newTask: "＋ 新任务",
+  taskPrompt: "任务标题？（运行时会按能力挑执行者）",
   delegate: "委派",
   budgetStop: "预算停止",
   reasoning: "思考过程",
@@ -321,6 +378,9 @@ let agents = [];
 let budget = 6;
 let human = "you";
 let target = null;
+let tasks = {};
+/** null = the project thread's own view; "*" = everything. */
+let scope = "*";
 /** Live-only, never in the log: streaming previews keyed by agent id. */
 const streams = new Map();
 
@@ -330,6 +390,35 @@ const esc = (s) =>
 const clock = (at) => new Date(at).toLocaleTimeString("zh-CN", { hour12: false });
 const nameOf = (id) =>
   id === human ? T.you : (agents.find((a) => a.id === id)?.label ?? id);
+
+// --------------------------------------------------------------------- tasks
+
+function renderTasks() {
+  const list = Object.values(tasks);
+  $("tabs").innerHTML = [
+    `<button class="tab" data-scope="*" aria-pressed="${scope === "*"}">${T.allTasks}</button>`,
+    `<button class="tab" data-scope="" aria-pressed="${scope === ""}">${T.projectThread}</button>`,
+    ...list.map(
+      (t) => `<button class="tab" data-scope="${esc(t.id)}" aria-pressed="${scope === t.id}"
+        title="${esc(t.title)}"><span class="st ${t.status}"></span>${esc(t.id)} · ${STATUS[t.status]}</button>`,
+    ),
+    `<button class="tab" data-new="1">${T.newTask}</button>`,
+  ].join("");
+
+  // Acceptance is the human's act, so it is a control on the human's surface —
+  // deliberately not reachable through any tool an agent can call (rule 5).
+  const pending = list.filter((t) => t.status === "review");
+  $("banner").innerHTML = pending
+    .map(
+      (t) => `<div class="banner">
+        <span class="grow"><b>${esc(t.id)} · ${esc(t.title)}</b>
+          <div class="meta">${T.reviewHint}</div></span>
+        <button class="btn ok" data-accept="${esc(t.id)}">${T.accept}</button>
+        <button class="btn no" data-reject="${esc(t.id)}">${T.reject}</button>
+      </div>`,
+    )
+    .join("");
+}
 
 // -------------------------------------------------------------------- roster
 
@@ -366,7 +455,35 @@ function renderRoster() {
   $("hint").textContent = T.hintFor(agents.find((a) => a.id === target));
 }
 
-document.addEventListener("click", (e) => {
+document.addEventListener("click", async (e) => {
+  const tab = e.target.closest("[data-scope]");
+  if (tab) {
+    scope = tab.dataset.scope;
+    renderTasks();
+    renderThread();
+    return;
+  }
+  if (e.target.closest("[data-new]")) {
+    const title = prompt(T.taskPrompt);
+    if (title) {
+      const res = await fetch("/task", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) $("statusline").textContent = (await res.json()).error;
+    }
+    return;
+  }
+  const acc = e.target.closest("[data-accept], [data-reject]");
+  if (acc) {
+    await fetch("/accept", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: acc.dataset.accept ?? acc.dataset.reject, ok: !!acc.dataset.accept }),
+    });
+    return;
+  }
   const el = e.target.closest("[data-id]");
   if (!el) return;
   target = el.dataset.id;
@@ -378,6 +495,7 @@ document.addEventListener("click", (e) => {
 
 function renderThread() {
   const deepest = thread.items.reduce((m, i) => Math.max(m, i.depth ?? 0), 0);
+  $("scopeline").textContent = scope === "*" ? T.allTasks : scope === "" ? T.projectThread : scope;
   $("hopnum").textContent = T.hops(deepest, budget);
   const bar = $("hopbar");
   bar.style.width = `${Math.min(100, (deepest / budget) * 100)}%`;
@@ -385,9 +503,15 @@ function renderThread() {
     deepest >= budget ? "var(--risk)" : deepest > budget * 0.6 ? "var(--warn)" : "var(--ok)";
   $("logline").textContent = T.events(thread.items.length);
 
-  const rows = thread.items.map((i) =>
-    i.kind === "divider" ? `<div class="divider">${esc(i.label)}</div>` : messageRow(i),
+  const shown = thread.items.filter(
+    (i) => scope === "*" || i.kind === "divider" || (i.task ?? "") === scope,
   );
+  const rows = shown.map((i) => {
+    if (i.kind === "divider") return `<div class="divider">${esc(i.label)}</div>`;
+    if (i.kind === "lifecycle")
+      return `<div class="life"><span class="st ${i.status}"></span>${esc(i.label)}</div>`;
+    return messageRow(i);
+  });
 
   for (const [id, s] of streams) {
     if (!s.text && !s.thought) continue;
@@ -419,6 +543,7 @@ function messageRow(i) {
         <span class="name">${esc(nameOf(i.from))}</span>
         <span class="to">→ <b>${esc(nameOf(i.to))}</b></span>
         ${delegated ? `<span class="tag delegate">${T.delegate}</span>` : ""}
+        ${i.task && scope === "*" ? `<span class="tag">${esc(i.task)}</span>` : ""}
         ${isSystem ? `<span class="tag warn">${T.budgetStop}</span>` : ""}
         <span class="meta">${clock(i.at)}${i.ms ? ` · ${(i.ms / 1000).toFixed(1)}s` : ""}</span>
       </div>
@@ -439,10 +564,17 @@ es.onmessage = (e) => {
     case "hello":
       thread = d.thread;
       agents = d.agents;
+      tasks = d.tasks ?? {};
       budget = d.budget;
       human = d.human;
       target ??= agents.find((a) => a.role === "coordinator")?.id ?? agents[0]?.id;
       renderRoster();
+      renderTasks();
+      renderThread();
+      break;
+    case "tasks":
+      tasks = d.tasks;
+      renderTasks();
       renderThread();
       break;
     case "event":

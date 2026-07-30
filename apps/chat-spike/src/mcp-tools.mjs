@@ -62,6 +62,36 @@ export const TOOL_SPECS = {
     },
   },
 
+  create_task: {
+    description:
+      "Create a task. Note there is no executor field — assignment is a separate, explicit act, so that who does the work is always a decision someone made rather than a side effect of describing it.",
+    schema: {
+      title: { type: "string", required: true },
+      requires: { type: "string[]" },
+      detail: { type: "string" },
+    },
+  },
+
+  assign_task: {
+    description:
+      "Assign a task to an executor, which wakes it. Omit `executor` to let the runtime match by capability — preferred, because it cannot pick a vendor by name.",
+    schema: {
+      task: { type: "string", required: true },
+      executor: { type: "string" },
+    },
+  },
+
+  report_result: {
+    description:
+      "Report a finished task. This moves it to `review`, never to `completed` — acceptance is someone else's act. You cannot accept your own work.",
+    schema: {
+      task: { type: "string", required: true },
+      status: { type: "string", required: true, enum: ["completed", "failed"] },
+      summary: { type: "string", required: true },
+      outputs: { type: "string[]" },
+    },
+  },
+
   send_message: {
     description:
       "Send a message into the thread. This is how an agent speaks; it does not return text to the caller.",
@@ -70,6 +100,7 @@ export const TOOL_SPECS = {
       to: { type: "string", required: true },
       type: { type: "string", required: true, enum: MESSAGE_TYPES },
       content: { type: "string", required: true },
+      task: { type: "string" },
       replyTo: { type: "string" },
       attachments: { type: "string[]" },
     },
@@ -111,6 +142,24 @@ export function createToolRouter(runtime) {
 
         case "find_agent":
           return runtime.findAgent(params);
+
+        case "create_task":
+          return runtime.createTask(params, caller);
+
+        case "assign_task":
+          return runtime.assignTask(params, caller);
+
+        case "report_result": {
+          // Rule 3, structurally: `status` names the *outcome the executor
+          // claims*, and the runtime still routes it to `review`. An agent
+          // cannot mark its own work done, including by saying so.
+          if (caller && runtime.executorOf(params.task) !== caller) {
+            throw new ValidationError(
+              `${params.task} 不是指派给 "${caller}" 的，不能替别人交付`,
+            );
+          }
+          return runtime.reportResult(params, caller);
+        }
 
         case "get_context":
           return runtime.getContext(params);

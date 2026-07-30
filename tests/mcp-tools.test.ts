@@ -97,6 +97,16 @@ describe("agent 不能做的三件事", () => {
     expect(Object.keys(TOOL_SPECS).join()).not.toMatch(/status|state/i);
   });
 
+  it("create_task 没有 executor 字段——指派必须是单独一次决定", () => {
+    expect(Object.keys(TOOL_SPECS.create_task.schema)).not.toContain("executor");
+  });
+
+  it("report_result 的 status 只能是 completed / failed，且它不是任务状态", () => {
+    // The field is the executor's *claim* about its own work. The runtime still
+    // routes it to `review` — see the hub tests. Nothing here reaches "review".
+    expect(TOOL_SPECS.report_result.schema.status.enum).toEqual(["completed", "failed"]);
+  });
+
   it("没有批准任何东西的工具", () => {
     expect(Object.keys(TOOL_SPECS).join()).not.toMatch(/approv|grant/i);
   });
@@ -155,13 +165,16 @@ describe("授权", () => {
 });
 
 describe("对外的工具清单", () => {
-  it("四个工具，且 JSON Schema 关掉 additionalProperties", () => {
+  it("七个工具，且 JSON Schema 关掉 additionalProperties", () => {
     const { router } = harness();
     const list = router.list();
     expect(list.map((t: { name: string }) => t.name).sort()).toEqual([
+      "assign_task",
+      "create_task",
       "find_agent",
       "get_context",
       "register_agent",
+      "report_result",
       "send_message",
     ]);
     for (const tool of list) {
