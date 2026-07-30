@@ -36,12 +36,19 @@ export class Adapter {
   _sessionId = null;
 
   /**
-   * @param {{ cwd: string, model?: string, onEvent: (e: object) => void }} opts
+   * `mcp` is the connection to Agent OS itself, from src/mcp-mount.mjs. When it
+   * is present the agent can call our tools *during its own turn* — that is the
+   * participate channel opening inside a wake. Null means the vendor will not,
+   * and the adapter speaks for it instead.
+   *
+   * @param {{ cwd: string, model?: string, onEvent?: (e: object) => void,
+   *           mcp?: {args: string[], env: Record<string,string>} | null }} opts
    */
-  constructor({ cwd, model, onEvent }) {
+  constructor({ cwd, model, onEvent, mcp }) {
     this.cwd = cwd;
     this.model = model;
     this.onEvent = onEvent ?? (() => {});
+    this.mcp = mcp ?? null;
   }
 
   get sessionId() {
@@ -93,7 +100,11 @@ export class SubprocessAdapter extends Adapter {
   async send(prompt) {
     const fresh = !this.hasSession;
     const started = Date.now();
-    const { cmd, args } = this.buildCommand(prompt, this._sessionId);
+    const built = this.buildCommand(prompt, this._sessionId);
+    const cmd = built.cmd;
+    // Appended, never woven in: two vendors are sensitive to argument order and
+    // the trailing position is the one that behaves the same everywhere.
+    const args = [...built.args, ...(this.mcp?.args ?? [])];
 
     const collected = { text: "", sessionId: this._sessionId };
 
@@ -101,6 +112,7 @@ export class SubprocessAdapter extends Adapter {
       const child = spawn(cmd, args, {
         cwd: this.cwd,
         stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, ...(this.mcp?.env ?? {}) },
       });
 
       const timer = setTimeout(() => {

@@ -86,6 +86,22 @@ describe("check:layers 能真的抓到违规", () => {
     expect(code).toBe(1);
     expect(out).toContain("事件类型绕过目录");
   });
+
+  /**
+   * The catalog is read from a Markdown table, and a loose reader is worse than
+   * an obvious one: it silently accepts types the catalog never defined. These
+   * two both appear in the document — one as a field path in prose, one as a
+   * name the catalog mentions only to say it was retired.
+   */
+  it("目录只认表格行，不认正文里出现的点分名字", () => {
+    plant("task-engine", 'export const t = "actor.kind";\n');
+    expect(run().out).toContain("事件类型绕过目录");
+  });
+
+  it("已废弃的旧类型名不算目录条目", () => {
+    plant("task-engine", 'export const t = "news.generated";\n');
+    expect(run().out).toContain("事件类型绕过目录");
+  });
 });
 
 /**

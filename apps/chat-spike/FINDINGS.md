@@ -60,10 +60,78 @@ Codex: **7.1s cold vs 1.5s continued — 4.7×**. That is the cost of discarding
 vendor session and rebuilding context from the log.
 
 So the Phase 3 question is no longer only "is `get_context` coherent enough". It
-is also "is it worth 4.7× latency", and the answer is probably per-situation:
-resident sessions inside a long task, rebuild across tasks and across days.
-`agent.disconnected` in `agent-runtime.md` already calls ephemeral agents normal
-— this puts a number on it.
+is also "is it worth 4.7× latency". Both halves are now measured — see below,
+and the answer inverted the question.
+
+### 3b. Measured: rebuilding from the log never lost a fact
+
+`experiments/context-rebuild.mjs` plants four arbitrary facts (`青铜麋鹿`,
+`7734`, `Vera`, `周四 02:00` — unguessable, so a hit is recall and not a
+plausible completion), pushes a distractor turn between planting and asking,
+then grades. `resident` keeps the vendor session; `rebuild` drops it every turn
+and prepends `get_context` output. Same turns, same grader.
+
+| | recall | wall clock | shipped |
+| --- | --- | --- | --- |
+| codex resident | 4/4 | 14.2s | 0.1k chars |
+| codex rebuild | 4/4 | 31.1s | 1.1k |
+| claude resident | 4/4 | 61.7s | 0.1k |
+| claude rebuild | 4/4 | 35.0s | 1.1k |
+| grok resident | 4/4 | 24.5s | 0.1k |
+| grok rebuild | 4/4 | 28.7s | 1.1k |
+| kimi resident | 4/4 | 22.3s | 0.1k |
+| kimi rebuild | 4/4 | 20.0s | 1.1k |
+
+**8/8 perfect.** Coherence is not the constraint, so the interesting question
+became how far it holds. `--pad N` buries the facts under N messages of
+plausible, on-topic project chatter:
+
+| padding | shipped/turn | codex | claude | grok | kimi |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 1.1k chars | 4/4 · 31.1s | 4/4 · 35.0s | 4/4 · 28.7s | 4/4 · 20.0s |
+| 200 | 18.7k | 4/4 · 33.8s | 4/4 · 70.2s | 4/4 · 28.6s | 4/4 · 26.6s |
+| 1200 | 108.7k | 4/4 · 34.0s | 4/4 · 48.2s | 4/4 · 30.6s | 4/4 · 32.1s |
+
+**A 100× larger log did not cost a single fact, and barely cost time.** Codex and
+Grok are flat; Kimi grows ~1.5× over that 100×; Claude is too noisy to call.
+
+### 3c. The bill was the axis we were not watching
+
+Token totals are **not comparable across vendors** — Codex reports a running
+session total, Claude reports what missed its cache, Kimi reports nothing. Grok
+is the only one that prices a turn in money, so it carries this result:
+
+| | cost | wall clock |
+| --- | --- | --- |
+| resident | $0.052 – $0.062 | 24.4s |
+| rebuild, pad 0 | $0.092 – $0.121 | 28.7s |
+| rebuild, pad 200 | $0.116 | 28.6s |
+| rebuild, pad 1200 | $0.139 | 28.7s |
+
+**Rebuild costs ~2× — and then a 100× bigger log adds only ~50% on top of that.**
+The premium is in *re-entering* at all, not in how much context is shipped: a
+resident turn reuses a warm prefix, a rebuilt one pays for a fresh one every
+time. Context volume is the cheap part.
+
+### What that changes
+
+The roadmap assumed the memory-first bet would be paid as a coherence risk, and
+priced it at Codex's 4.7× cold start. Both are wrong in the same direction:
+
+- **Do not truncate `get_context` to save money.** The obvious optimization is
+  the wrong one — shipping 100× more context cost ~50%, while re-entering cost
+  100%. A `limit` that drops facts buys almost nothing and can lose everything.
+- **Batch work into fewer, longer turns.** That is the lever, because the cost is
+  per re-entry. It is an argument for task granularity, not for context trimming.
+- **Session residency is a per-vendor optimization, not an architectural need.**
+  Kimi was *faster* rebuilding than resuming, and Grok nearly tied — because
+  `--resume` re-spawns a process anyway. Only Codex, which holds a live server,
+  has a real warm path. So `integration.session` should drive an optimization
+  when present, never a requirement.
+- **Coherence still needs re-testing when the log stops being a flat transcript.**
+  This measured 1200 messages of chat. It did not measure knowledge items,
+  superseding, or cross-task context — which is where a naive concatenation is
+  most likely to break.
 
 ## Negative result: Codex will not expose our MCP tools to its model
 
@@ -86,8 +154,175 @@ calls, two of them hanging for four minutes.
 **Consequence:** the participate channel routes through the **adapter**, which
 translates a vendor reply into a `send_message` request. That is what an adapter
 is for, and the trust boundary is unchanged — the adapter is inside it, the
-vendor is outside. Worth retrying against Claude Code, which does not force
-deferral.
+vendor is outside.
+
+## Positive result: three of four vendors participate with no adapter
+
+Same MCP server, no adapter, no translation — Claude Code spawned
+`bin/agent-os-mcp.mjs` itself and drove the protocol:
+
+```
+$ claude -p '…注册、读上下文、发消息…' --mcp-config mcp.json
+seq 1  agent.registered  system:runtime     Claude Code
+       capabilities = ['coding', 'review']
+seq 2  message.sent      agent:claude-code  Claude Code registered and context loaded…
+```
+
+Three tool calls, five turns, 17s. **This is the ADR-001 evidence**: an agent
+that never heard of Agent OS participates by reading the tool descriptions. The
+adapter is a workaround for vendors like Codex, not the architecture.
+
+The same server was then pointed at the other three:
+
+| | handshake | called all three tools | refused impersonation |
+| --- | --- | --- | --- |
+| Claude Code | ✅ | ✅ | ✅ |
+| Kimi | ✅ | ✅ *(no approval flag needed)* | — |
+| Grok | ✅ | ✅ | ✅ |
+| Codex | ✅ | ❌ zero calls in four attempts | — |
+
+**Three of four.** The earlier guess — that Claude Code might be the only one —
+was too pessimistic, and it was load-bearing: it would have forced the coordinator
+role onto a single vendor.
+
+### The context was already shared, across processes that never coexisted
+
+Grok registered, called `get_context`, and read this back:
+
+```json
+{ "project": "proj_spike",
+  "messages": [{ "from": "kimi", "content": "…" }],
+  "agents": [{ "id": "kimi" }, { "id": "grok" }] }
+```
+
+Kimi's process had exited long before Grok started. Nothing was handed between
+them; the log was the only channel. **That is memory-first working across
+vendors**, which the stage 3 experiment did not cover — it measured one agent
+rebuilding its own past, not one agent inheriting another's.
+
+### Mounting the server differs per vendor, with nothing in common
+
+| | how | trap |
+| --- | --- | --- |
+| Claude Code | `--mcp-config <file>` | an inline JSON string makes the CLI read the following prompt as a second config path — a file is mandatory |
+| Kimi | `.mcp.json` in cwd | none |
+| Grok | `.grok/config.toml`, via `grok mcp add -s project` | project-scoped servers do not start in an untrusted folder (`GROK_FOLDER_TRUST=false` bypasses it for a probe); `grok mcp add` silently drops `env`, which must be appended by hand |
+
+Three mechanisms, zero overlap. **So an adapter owns connection configuration,
+not just invocation** — a detail `agent-sdk`'s contract does not yet mention, and
+one that decides whether "attach Agent OS to this agent" is a one-liner or a
+per-vendor procedure.
+
+Both authorization branches were then confirmed against the same live agent —
+the refusals below are Claude Code quoting our server back:
+
+| Attempt | Server's answer |
+| --- | --- |
+| `from: "codex"`, unregistered | `未注册的发送者 "codex"——必须先调用 register_agent` |
+| `from: "codex"`, registered, caller `claude-code` | `不能以 "codex" 的身份发言：调用方注册为 "claude-code"` |
+
+The interesting part is what it did next: it reported the refusal rather than
+retrying with a different framing. A boundary that returns a readable reason
+gets cooperation; one that returns `400` gets a retry loop.
+
+The same refusal was confirmed against Grok, quoting our server back verbatim:
+`不能以 "kimi" 的身份发言：调用方注册为 "grok"`. Three vendors, one boundary,
+identical behaviour — each reported the refusal instead of retrying around it.
+
+**Vendor support for the participate channel is an integration capability**
+alongside streaming and reasoning, and unlike those it is pass/fail rather than
+nice-to-have — see `participates` in
+[agent-schema.md](../../docs/protocol/agent-schema.md).
+
+## The seam: routing a message is what wakes an agent
+
+Stage 2 and 3 proved each channel alone. The hub joined them, and the join is
+smaller than expected — **delegation is not a feature, it is what routing
+already does**:
+
+```
+you ──▶ claude          find_agent(["research"]) → send_message(to:"grok")
+        claude ──▶ grok   ← the runtime saw an agent recipient and woke it
+        grok ──▶ claude
+        claude ──▶ you
+```
+
+Four messages, one human turn, no agent handed anything to another — grok was
+woken with context rebuilt from the log. Measured end to end: 7.8s / 14.1s /
+3.6s per hop.
+
+**The coordinator reached for `find_agent` unprompted.** The instruction said
+"find a peer with research capability"; it was not told which tool to use, and
+it did not name an agent it had not been given. That is the cheapest available
+evidence that ADR-004's "ask by capability, never by vendor" is something a model
+will actually cooperate with, rather than a rule the schema has to fight for.
+
+### Two holes the first live run found
+
+**An agent can leave the causal chain by omitting one optional field.** `replyTo`
+is optional in `send_message`, and a message without it has no `causedBy`, so its
+hop depth resets to zero and the runaway budget never fires. A ping-pong between
+two agents would have run forever while every individual message looked fine.
+The fix is that the runtime, not the model, owns the link: the hub remembers
+which message it woke an agent with and uses that when `replyTo` is absent.
+Generalises past this spike — **any budget keyed on data the agent supplies is
+advisory**.
+
+**Re-registration wrote a duplicate `agent.registered`.** The coordinator called
+`register_agent` a second time, unprompted, mid-task. mcp-protocol.md already
+says re-registering "reconnects rather than duplicates"; the implementation
+emitted anyway, which puts a second "X joined" divider into every future replay
+of that log. Events are permanent, so this is the class of bug worth catching
+in a spike. Also found by the same fix: an agent that registers *itself* was
+never added to the pool, so it passed validation and was then unreachable by
+anyone replying to it.
+
+## Tasks: the boundary was the missing piece, not the state machine
+
+C was deferred until the seam worked, on the theory that "does a task object earn
+its place" would be obvious afterwards. It was — but not in the expected way.
+**What A+B lacked was not status tracking, it was a thread boundary.** Four
+messages read fine; three concurrent pieces of work in one thread would not.
+
+The whole loop, one human sentence in and one human decision out:
+
+```
+you    → claude          create_task(requires:["research"])   ← no executor field exists
+claude · task.created    assign_task(task)                    ← no executor given
+claude · task.assigned   → runtime matched grok on capability
+runtime· task.started    → assignment is a wake, same seam as a message
+grok   · task.review.requested                                ← report_result
+you    · task.completed                                       ← the only way to get here
+```
+
+Six events, no messages at all. **The coordinator omitted `executor` as asked and
+the runtime matched by capability** — ADR-004 held on a second, harder case than
+`find_agent`, because here the model had a chance to name a vendor and did not.
+
+`report_result` takes a `status` of `completed | failed`, and the runtime writes
+`task.review.requested` regardless. That is rule 3 made structural rather than
+checked: **there is no argument an agent can send that reaches `completed`.**
+Acceptance has no MCP tool at all and lives only on the human's surface, because
+rule 5 says a message in a thread is guidance and never a grant.
+
+### The live run found a third hole of the same family
+
+Grok delivered via `report_result` **and** the runtime echoed its transcript as a
+message, so the summary appeared twice. The echo suppression asked "did this
+agent send a message caused by the one that woke it" — and a task wake had no
+real cause event (a synthetic one with `id: null`), so the answer was always no.
+
+Two fixes, both generalising past the spike:
+
+- `task.started` is a real event and is now the cause of the turn it starts.
+  Every wake is on the causal chain, or the hop budget has blind spots.
+- The check is now "did this agent write **anything** after this `seq`", not
+  "did it send a message linked to X". **Delivering is speaking**, and a log
+  position is something the agent cannot omit while a link is.
+
+That is the third bug in this family found by running it: `replyTo`, the
+duplicate registration, and now this. All three were places where the runtime
+trusted a field the agent controls.
 
 ## Operational notes
 
@@ -105,4 +340,8 @@ deferral.
 corepack pnpm --filter @agent-os/chat-spike start
 # switch provider in the header, or PROVIDER=grok to start there
 DUMP_EVENTS=/tmp/events.jsonl corepack pnpm --filter @agent-os/chat-spike start
+
+# stage 3 — resident vs rebuild, and the haystack sweep
+node apps/chat-spike/experiments/context-rebuild.mjs codex claude grok kimi
+node apps/chat-spike/experiments/context-rebuild.mjs --pad 1200 grok
 ```
