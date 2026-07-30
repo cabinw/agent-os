@@ -100,6 +100,7 @@ than about context windows.
 - [x] **0 — dispatch works, across four vendors.** No event log, no MCP server of our own.
 - [x] **1 — event log.** Every message becomes `message.sent`; the UI projects the log; restart replays it. **Verified: kill the process, restart, the conversation comes back.**
 - [x] **2 — participation channel.** Our MCP server (`register_agent` / `get_context` / `send_message`). **Verified: Claude Code registered and spoke through it with no adapter; impersonation was refused.**
+- [x] **A+B — the Agent Hub.** A human plays Supervisor; agents delegate to each other. **Verified: one human turn produced `you → claude → grok → claude → you`, with the coordinator choosing `find_agent` unprompted.** Task objects (C) deliberately deferred.
 - [x] **3 — the experiment.** Persistent session vs. rebuilding from `get_context`. **Result: 8/8 perfect recall, and it held under a 100× larger log. The cost is a ~2× per-turn premium for re-entering, almost independent of context volume.**
 
 ## The participation channel

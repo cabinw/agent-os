@@ -234,6 +234,49 @@ alongside streaming and reasoning, and unlike those it is pass/fail rather than
 nice-to-have — see `participates` in
 [agent-schema.md](../../docs/protocol/agent-schema.md).
 
+## The seam: routing a message is what wakes an agent
+
+Stage 2 and 3 proved each channel alone. The hub joined them, and the join is
+smaller than expected — **delegation is not a feature, it is what routing
+already does**:
+
+```
+you ──▶ claude          find_agent(["research"]) → send_message(to:"grok")
+        claude ──▶ grok   ← the runtime saw an agent recipient and woke it
+        grok ──▶ claude
+        claude ──▶ you
+```
+
+Four messages, one human turn, no agent handed anything to another — grok was
+woken with context rebuilt from the log. Measured end to end: 7.8s / 14.1s /
+3.6s per hop.
+
+**The coordinator reached for `find_agent` unprompted.** The instruction said
+"find a peer with research capability"; it was not told which tool to use, and
+it did not name an agent it had not been given. That is the cheapest available
+evidence that ADR-004's "ask by capability, never by vendor" is something a model
+will actually cooperate with, rather than a rule the schema has to fight for.
+
+### Two holes the first live run found
+
+**An agent can leave the causal chain by omitting one optional field.** `replyTo`
+is optional in `send_message`, and a message without it has no `causedBy`, so its
+hop depth resets to zero and the runaway budget never fires. A ping-pong between
+two agents would have run forever while every individual message looked fine.
+The fix is that the runtime, not the model, owns the link: the hub remembers
+which message it woke an agent with and uses that when `replyTo` is absent.
+Generalises past this spike — **any budget keyed on data the agent supplies is
+advisory**.
+
+**Re-registration wrote a duplicate `agent.registered`.** The coordinator called
+`register_agent` a second time, unprompted, mid-task. mcp-protocol.md already
+says re-registering "reconnects rather than duplicates"; the implementation
+emitted anyway, which puts a second "X joined" divider into every future replay
+of that log. Events are permanent, so this is the class of bug worth catching
+in a spike. Also found by the same fix: an agent that registers *itself* was
+never added to the pool, so it passed validation and was then unreachable by
+anyone replying to it.
+
 ## Operational notes
 
 - **Timeouts are mandatory.** Two four-minute hangs during probing. Every adapter

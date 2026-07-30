@@ -48,7 +48,14 @@ Required before any other call. Registration is per project.
 ```
 
 Emits `agent.registered`. Re-registering an existing id reconnects it rather
-than duplicating.
+than duplicating — **and "does not duplicate" means no second event**, not a
+second event the reader is expected to ignore. Agents re-register unprompted
+mid-task; events are permanent, so a duplicate puts a spurious "X joined" into
+every future replay of that log.
+
+Registration must also make the agent *reachable*, not merely valid. An id that
+passes registration but has no way to be woken is a sender everyone can reply to
+and nobody can reach.
 
 ### find_agent
 
@@ -125,12 +132,26 @@ Types: `instruction`, `question`, `answer`, `progress`, `report`, `review`,
 | --- | --- |
 | `to` | An agent id, or `"*"` to address every agent on the task. Not a list — a fan-out is one message with `"*"`, not N messages. |
 | `task` | Determines which thread the message joins. Omitting it lands the message in the project thread; agents should scope to a task whenever one applies. |
-| `replyTo` | Event id of the message being answered. Drives reply quoting and lets `answer` be matched to its `question`. |
+| `replyTo` | Event id of the message being answered. Drives reply quoting and lets `answer` be matched to its `question`. **Optional to send, not optional to record** — see below. |
 | `attachments` | Output paths or `KN-*` knowledge ids. Display-only references — attaching does not transfer or copy anything. |
 
 Messages are the readable record of a task's collaboration. See
 [product/threads.md](../product/threads.md); thread grouping is fixed by
 [ADR-006](../decisions/ADR-006-threads-as-a-view-in-agents.md).
+
+**A message addressed to an agent wakes that agent.** Delegation is not a
+separate mechanism; it is this one. An unknown recipient must be rejected at the
+boundary rather than accepted — a `to` nobody will ever read looks delivered and
+is not.
+
+**The runtime owns `causedBy`, never the caller.** When an agent omits `replyTo`,
+the runtime links the message to the one that woke that agent. Runaway
+protection is keyed on causal depth, so a chain the sender can detach itself
+from is a budget the sender can opt out of — measured in
+[chat-spike](../../apps/chat-spike/FINDINGS.md#two-holes-the-first-live-run-found),
+where two agents would have bounced work forever while every individual message
+looked well-formed. Generalises: **any limit keyed on data the agent supplies is
+advisory.**
 
 ### notify_blocked
 

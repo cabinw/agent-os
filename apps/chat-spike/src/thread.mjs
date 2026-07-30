@@ -56,11 +56,18 @@ export function reduce(state, evt) {
     case "message.sent": {
       const { from, to, content, type } = evt.payload;
 
-      // Latency is the gap to the message this one answers — derived, never stored.
+      // Latency and causal depth are both *derived* from the message this one
+      // answers. Depth is what makes a delegation chain legible — and it is the
+      // same number the runtime budgets on, computed the same way from the same
+      // links, so the UI cannot disagree with the enforcement.
       let ms;
+      let depth = 0;
       if (evt.causedBy) {
         const cause = state.items.find((i) => i.id === evt.causedBy);
-        if (cause) ms = Date.parse(evt.at) - Date.parse(cause.at);
+        if (cause) {
+          ms = Date.parse(evt.at) - Date.parse(cause.at);
+          depth = (cause.depth ?? 0) + 1;
+        }
       }
 
       return {
@@ -78,6 +85,8 @@ export function reduce(state, evt) {
             messageType: type,
             text: content,
             agent: state.agents[from] ?? null,
+            causedBy: evt.causedBy ?? null,
+            depth,
             ...(ms !== undefined ? { ms } : {}),
           },
         ],

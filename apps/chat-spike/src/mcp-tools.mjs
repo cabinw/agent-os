@@ -18,6 +18,9 @@
 
 import { ValidationError, validate } from "./validate.mjs";
 
+/** The human is always addressable and is never a registered agent. */
+export const HUMAN_ID = "you";
+
 const MESSAGE_TYPES = [
   "instruction",
   "question",
@@ -38,6 +41,15 @@ export const TOOL_SPECS = {
       provider: { type: "string" },
       role: { type: "string" },
       capabilities: { type: "string[]" },
+    },
+  },
+
+  find_agent: {
+    description:
+      "Find agents by the capability the work needs. This is the only supported way to discover who can do something — do not name an agent you were not given here, and do not choose by vendor (ADR-004).",
+    schema: {
+      capabilities: { type: "string[]" },
+      available: { type: "boolean" },
     },
   },
 
@@ -68,6 +80,7 @@ export const TOOL_SPECS = {
  * @param {object} runtime
  * @param {(payload: object) => object} runtime.registerAgent
  * @param {(payload: object, caller: string|null) => object} runtime.sendMessage
+ * @param {(payload: object) => object} runtime.findAgent
  * @param {(payload: object) => object} runtime.getContext
  * @param {() => Set<string>} runtime.registeredIds
  */
@@ -96,6 +109,9 @@ export function createToolRouter(runtime) {
         case "register_agent":
           return runtime.registerAgent(params);
 
+        case "find_agent":
+          return runtime.findAgent(params);
+
         case "get_context":
           return runtime.getContext(params);
 
@@ -109,6 +125,14 @@ export function createToolRouter(runtime) {
           if (caller && params.from !== caller) {
             throw new ValidationError(
               `不能以 "${params.from}" 的身份发言：调用方注册为 "${caller}"`,
+            );
+          }
+          // A message addressed to an agent wakes it. Refusing an unknown
+          // recipient here is what keeps `to` from becoming a dead letter that
+          // looks delivered — see the routing note in server.mjs.
+          if (params.to !== HUMAN_ID && !runtime.registeredIds().has(params.to)) {
+            throw new ValidationError(
+              `未知收件人 "${params.to}"——先用 find_agent 查谁在，或发给 "${HUMAN_ID}"`,
             );
           }
           return runtime.sendMessage(params, caller);

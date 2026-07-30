@@ -23,6 +23,10 @@ function harness() {
       calls.push({ fn: "getContext", params: p });
       return { project: "proj_test", messages: [], agents: [] };
     },
+    findAgent(p: Record<string, unknown>) {
+      calls.push({ fn: "findAgent", params: p });
+      return { candidates: [], matched: 0 };
+    },
   });
   return { router, calls, registered };
 }
@@ -151,10 +155,11 @@ describe("授权", () => {
 });
 
 describe("对外的工具清单", () => {
-  it("三个工具，且 JSON Schema 关掉 additionalProperties", () => {
+  it("四个工具，且 JSON Schema 关掉 additionalProperties", () => {
     const { router } = harness();
     const list = router.list();
     expect(list.map((t: { name: string }) => t.name).sort()).toEqual([
+      "find_agent",
       "get_context",
       "register_agent",
       "send_message",
