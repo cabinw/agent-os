@@ -18,6 +18,21 @@ registered ──▶ idle ──▶ working ──▶ idle
 task held by a disconnected agent returns to `assigned` after a grace period and
 is re-matched.
 
+**This is now measured, not assumed.** Dropping the vendor session every turn and
+rebuilding from `get_context` lost none of four planted facts across four vendors,
+and still lost none with 1200 unrelated messages (~108k chars) buried on top
+([FINDINGS](../../apps/chat-spike/FINDINGS.md#3b-measured-rebuilding-from-the-log-never-lost-a-fact)).
+
+The cost is **~2× per turn, paid for re-entering rather than for context volume**
+— a 100× larger log added only ~50% on top. Two consequences for anything that
+schedules agents:
+
+- Keeping a session alive is a per-vendor optimization where one exists, never a
+  correctness requirement. One vendor tested was *faster* rebuilding than
+  resuming, because its `--resume` re-spawns a process anyway.
+- The lever on cost is **fewer, longer turns**, not smaller context. That makes
+  it a question about task granularity.
+
 ## Model
 
 ```json

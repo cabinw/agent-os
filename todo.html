@@ -134,6 +134,7 @@ td code{white-space:nowrap}
   <a href="#arch-notes">③ 四个关键判断</a>
   <h4>清单</h4>
   <a href="#p0">Phase 0 地基<span class="pc" data-pc="p0"></span></a>
+  <a href="#hub">Agent Hub（插入）<span class="pc" data-pc="hub"></span></a>
   <a href="#p1">Phase 1 核心循环<span class="pc" data-pc="p1"></span></a>
   <a href="#p2">Phase 2 记忆<span class="pc" data-pc="p2"></span></a>
   <a href="#p3">Phase 3 界面<span class="pc" data-pc="p3"></span></a>
@@ -355,6 +356,72 @@ td code{white-space:nowrap}
 </ul>
 </section>
 
+
+<section id="hub">
+<div class="phase-hd">
+  <h3 id="hubh">Agent Hub — 人当 Supervisor 的最小验证</h3>
+  <span class="badge done">✓ 已完成</span>
+  <span class="phase-count" data-count="hub"></span>
+</div>
+<p class="phase-goal">插在 Phase 1 之前的 side project。<b>唯一要验的是两条通道的接缝</b>：一条消息从 A 发出，经过事件日志，把 B 叫醒并让 B 干了活。其余都是为了让这句话可观察。人扮演 Supervisor，agent 之间可以互相委派。</p>
+
+<div class="note"><b>为什么现在做。</b>spike 分别证了唤醒通道（四家都通）和参与通道（四家里三家零适配器），但<b>从没测过把它们接起来</b>——spike 里 <code>to</code> 永远是 <code>you</code>，人是唯一收件人。这个接缝不通，Agent OS 就只是一个多窗口聊天工具。</div>
+
+<div class="note"><b>预检已跑，结论改了形态。</b>原以为只有 Claude Code 能当协调者，实测 <b>Claude Code / Kimi / Grok 三家都能</b>，只有 Codex 不行（它得靠适配器翻译）。另外撞见一件没料到的事：Grok 通过 <code>get_context</code> 读到了 Kimi 半小时前留下的消息，而两个进程从没同时存在过——<b>B 阶段的「读」那一半已经天然通了</b>，剩下只有「写触发唤醒」。</div>
+
+<ul class="tasks" data-phase="hub">
+  <li><input type="checkbox" id="t-h-1" checked><label for="t-h-1" class="tb">
+    <span class="tt"><span class="tid">A.1</span>适配器池：多个 agent 同时在线</span>
+    <span class="td">现在 spike 是 <code>let adapter = null</code>，切换时关掉上一个。改成每个 agent 一条独立会话、一条独立队列。<b>这会提前引爆一个 Phase 1.2 的问题：并发 append 下 seq 还单不单调</b>——JSONL + 内存计数器扛不住真并发。早点撞上比在 1.2 撞上便宜。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">关键路径</span><span class="tag sz">1 天</span></span>
+    <span class="done-when"><b>已验证：</b>并发写入下 seq 单调无洞（测试断言全序列等于 1..n）。JSONL + 内存计数器<b>在单进程内够用</b>——Phase 1.2 的事务分配仍然要做，但不是被这里逼出来的</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-2" checked><label for="t-h-2" class="tb">
+    <span class="tt"><span class="tid">B.1</span>接缝：收件人是 agent 就唤醒它</span>
+    <span class="td"><code>send_message(to: X)</code> → 落事件 → 运行时发现收件人是 agent → 用 <code>get_context</code> 组上下文把 X 叫醒。<b>做完这一步 agent→agent 自动就通了</b>，因为它和人发消息走同一条路。这是整个 hub 的理由。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 A.1</span><span class="tag sz">1–2 天</span></span>
+    <span class="done-when"><b>已验证（真机）：</b>人只对 Claude 说了一句，日志里出现 <code>you → claude → grok → claude → you</code>，7.8s / 14.1s / 3.6s。Grok 是被消息叫醒的，上下文从日志重建，两个 agent 之间没有任何直接传递</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-3" checked><label for="t-h-3" class="tb">
+    <span class="tt"><span class="tid">B.2</span>回环预算</span>
+    <span class="td">A 叫 B、B 叫 A，无限。需要跳数/预算上限，超了就停下并让人介入。<b>规格里目前没有这个机制</b>——hub 是发现它该长什么样的地方，结论要回写进 protocol。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag dep">依赖 B.1</span><span class="tag sz">半天</span></span>
+    <span class="done-when"><b>已验证：</b>互相甩锅的两个 agent 在预算内停住，并向人发一条 warning。<b>顺带挖出一个真洞</b>：<code>replyTo</code> 是选填的，agent 只要不填，因果链就断、深度归零、预算永不触发——已改成运行时补链，结论写进 <code>mcp-protocol.md</code></span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-4" checked><label for="t-h-4" class="tb">
+    <span class="tt"><span class="tid">B.3</span>委派只能按能力，不能点名</span>
+    <span class="td">协调者若直接写 <code>assign_task(executor: "grok")</code>，ADR-004 就在应用层被绕过了。做法：<code>find_agent(capabilities)</code> 先返回候选，协调者<b>只能从候选里选</b>。顺带这是个便宜的可用性测试——<b>LLM 到底愿不愿意配合「描述你要什么能力、别点名」</b>，目前纯属猜测。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">验 ADR-004</span><span class="tag dep">依赖 B.1</span><span class="tag sz">半天</span></span>
+    <span class="done-when"><b>已验证（真机）：</b>提示里<b>没有点名工具</b>，只说「找一个有 research 能力的同伴」，协调者自己先调了 <code>find_agent</code> 再 <code>send_message</code>。ADR-004 的「按能力问、别点名」是模型愿意配合的，不需要 schema 硬顶</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-5" checked><label for="t-h-5" class="tb">
+    <span class="tt"><span class="tid">B.4</span>Hub 界面：花名册 + 定向发消息 + 按任务分线程</span>
+    <span class="td">最小可观察面：谁在线、谁在忙、人对谁说话、消息的因果链。<b>按任务分线程要早做</b>（ADR-006）——协调者同时对人和对 agent 说话，混在一条线程里会立刻变得读不懂。<b>不做审批</b>：规则 5 说人在会话里说的话是指导、永远不是批准，原型里做错不如不做。<br><b>走高保真</b>（已定）：按 <code>design-language.md</code> 的 token 和 <code>ui/</code> 的间距做，不用 spike 那种朴素单页——这样它同时能当 Phase 3.4「智能体」界面的实物草稿。代价是这项从 1 天变 2 天。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag dep">依赖 B.1</span><span class="tag sz">2 天</span></span>
+    <span class="done-when"><b>已验证：</b>三方协作可读——委派消息带「委派」标记，缩进即跳数，顶栏 <b>3 / 6 跳</b> 与运行时预算同源同算法。花名册显示谁在忙、谁有会话、谁不会调工具</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-6" checked><label for="t-h-6" class="tb">
+    <span class="tt"><span class="tid">C</span>任务对象</span>
+    <span class="td">跑完 A+B 之后判断清楚了：<b>缺的不是状态跟踪，是线程边界</b>。四条消息读着没问题，三件事并行就糊。所以 C 的重心是<b>一任务一线程</b>（ADR-006），状态机反而是配角。<code>create_task</code>（<b>没有 executor 字段</b>）/ <code>assign_task</code>（不填 executor 就按能力匹配）/ <code>report_result</code>。生命周期事件<b>交织进线程</b>——只有消息的线程读起来像悬空聊天。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">验规则 3 / 5</span><span class="tag dep">依赖 B.1</span><span class="tag sz">1 天</span></span>
+    <span class="done-when"><b>已验证（真机）：</b>人一句话 → <code>task.created</code> → <code>task.assigned</code>（协调者<b>没填 executor</b>，运行时按 research 匹配到 Grok）→ <code>task.started</code> → <code>task.review.requested</code> → 人点验收 → <code>task.completed</code>。<b>六个事件，一条消息都没有。</b>agent 报 <code>status:"completed"</code> 仍然只到 <code>review</code>；验收<b>没有任何 MCP 工具</b>，只在人的界面上</span>
+  </label></li>
+</ul>
+
+<div class="note warn"><b>三个同族 bug，全是真机跑出来的。</b>每一个都是<b>运行时信任了 agent 能控制的字段</b>：① <code>replyTo</code> 不填就脱离因果链，预算失效；② 重复注册写了第二条事件，污染此后所有重放；③ 「这一轮说过话没有」按因果链判断，而任务唤醒没有真实 cause 事件，于是交付内容被回显了两遍。<br><b>共同的修法</b>：改成按运行时自己掌握的东西判断——运行时补链、按 <code>seq</code> 位置判断写没写过。<b>任何以 agent 提供的数据为准的限制都是形同虚设。</b></div>
+
+<div class="note"><b>做完之后新增的两条 protocol 规则</b>（都来自第一次真机运行）：① <code>causedBy</code> 归运行时所有，caller 不填就由运行时补——<b>任何以 agent 提供的数据为准的预算都是形同虚设</b>；② 重复注册<b>不得再写一条事件</b>，事件是永久的，一条重复的「加入会话」会污染此后所有重放。</div>
+
+<div class="note"><b>协调者默认 Claude Code</b>（已定），Kimi / Grok 当备选——三家都实测能参与，但主力固定一家能让「协调行为」这个变量保持稳定。Codex 只能当执行者。</div>
+
+<div class="note warn"><b>成本要心里有数。</b>每一跳委派都是一次上下文重建，实测约 2× 溢价（<a href="doc.html">阶段 3 数据</a>）。三跳委派的账现在能算了——hub 跑长链路时别惊讶。</div>
+</section>
+
 <section id="p1">
 <div class="phase-hd">
   <h3>Phase 1 — 核心循环（无 UI）</h3>
@@ -366,7 +433,7 @@ td code{white-space:nowrap}
 <ul class="tasks" data-phase="p1">
   <li><input type="checkbox" id="t-1-1"><label for="t-1-1" class="tb">
     <span class="tt"><span class="tid">1.1</span>事件信封类型 + Zod schema + ULID</span>
-    <span class="td">按 <code>event-core.md</code> 的信封：<code>id / type / seq / project / actor / subject / at / causedBy / payload</code>。事件目录里的 22 个类型各写一个 payload schema，用 discriminated union 收口。</span>
+    <span class="td">按 <code>event-core.md</code> 的信封：<code>id / type / seq / project / actor / subject / at / causedBy / payload</code>。事件目录里的 <b>29</b> 个类型各写一个 payload schema，用 discriminated union 收口。</span>
     <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag sz">2 天</span></span>
     <span class="done-when"><b>完成判据：</b>未知 <code>type</code> 或多余字段在解析时被拒绝</span>
   </label></li>
@@ -414,13 +481,13 @@ td code{white-space:nowrap}
 
   <li><input type="checkbox" id="t-1-8"><label for="t-1-8" class="tb">
     <span class="tt"><span class="tid">1.8</span>MCP Server：11 个工具 + strict 校验</span>
-    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。</span>
+    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。<br><b>spike 已跑通其中三个</b>（<code>register_agent / get_context / send_message</code>），Claude Code 零适配器接入验证过——<code>apps/chat-spike/src/mcp-tools.mjs</code> 的形状可以直接搬。</span>
     <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.7</span><span class="tag sz">4 天</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-9"><label for="t-1-9" class="tb">
     <span class="tt"><span class="tid">1.9</span>授权边界：智能体不能做的三件事</span>
-    <span class="td">不能直接写事件、不能设置任务状态、不能批准任何请求（包括别的智能体的）。这三条要有独立测试——它们是信任边界的全部内容。</span>
+    <span class="td">不能直接写事件、不能设置任务状态、不能批准任何请求（包括别的智能体的）。这三条要有独立测试——它们是信任边界的全部内容。<br><b>spike 的做法值得沿用：靠「没有这个字段 / 没有这个工具」实现，而不是靠检查</b>，测试断言的是表面上不存在。再加一条不能结构化的：<code>from</code> 必须等于调用方身份，否则一个 agent 能冒充另一个。<b>拒绝理由要写成人话</b>——实测中真实 agent 会把可读的拒绝<b>报告</b>出来，而 <code>400</code> 换来的是重试循环。</span>
     <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.8</span><span class="tag sz">2 天</span></span>
   </label></li>
 
@@ -488,7 +555,7 @@ td code{white-space:nowrap}
 
   <li><input type="checkbox" id="t-2-4"><label for="t-2-4" class="tb">
     <span class="tt"><span class="tid">2.4</span><code>get_context</code>：把决策注入智能体</span>
-    <span class="td">智能体开工前拿到约束它的那些决策，从而不重新讨论已定的问题。<b>这是整个协议存在的理由</b>，别做成可选项。</span>
+    <span class="td">智能体开工前拿到约束它的那些决策，从而不重新讨论已定的问题。<b>这是整个协议存在的理由</b>，别做成可选项。<br><b>spike 实测：不要为省钱加一个小的默认 <code>limit</code>。</b>四家 × 三种日志规模全部 4/4 召回，上下文放大 100 倍只多花约 50%，而重新进入一次就多花 100%——截断省不下什么，却可能正好丢掉这轮需要的事实。必须限量时按<b>相关性</b>限，别只按时间。<br><b>另：这个实验只测了平铺聊天记录。</b>知识条目、supersede、跨任务上下文没测，而那正是「直接拼成 prompt」最可能垮的地方——2.4 做完要用同一个探针重测一遍。</span>
     <span class="tm"><span class="tag pkg">memory-core</span><span class="tag crit">关键</span><span class="tag dep">依赖 2.2</span><span class="tag sz">3 天</span></span>
   </label></li>
 
@@ -647,7 +714,7 @@ td code{white-space:nowrap}
 <table>
 <tr><th>天</th><th>做什么</th><th>产出</th></tr>
 <tr style="opacity:.5"><td><b>1</b> ✓</td><td><s>0.1 + 0.2 + 0.3 + 0.4 —— workspace 骨架、Vitest、Biome、分层检查脚本</s></td><td><s><code>pnpm verify</code> 全绿，11/11 测试通过</s></td></tr>
-<tr><td><b>2</b></td><td>1.1 —— 事件信封 + 22 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
+<tr><td><b>2</b></td><td>1.1 —— 事件信封 + 29 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
 <tr><td><b>3–4</b></td><td>1.2 —— SQLite 存储、seq 分配、幂等 token</td><td>并发 append 测试通过</td></tr>
 <tr><td><b>5</b></td><td>1.3 —— 总线 + 重放 + reducer 注册</td><td><b>重放等价性测试通过 → 内核成立</b></td></tr>
 </table>

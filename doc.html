@@ -814,11 +814,89 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 </div>
 <p>所以适配器<strong>声明</strong>集成能力，界面按声明分支——和 ADR-004 是同一条原则，只是用在第二个轴上。</p>
 
-<h3>发现三：记忆优先有了价码</h3>
-<p>Phase 3 的实验问题原本只有「靠 <code>get_context</code> 重建够不够连贯」。现在多了一问：<strong>值不值 4.7 倍延迟</strong>。答案很可能分场景——长任务内部让 agent 常驻，跨任务、跨天才重建。<code>agent-runtime.md</code> 里「智能体进程是短暂的，这是常态」这句话，现在有数字了。</p>
+<h3>发现三：记忆优先有了价码，而且和预期相反</h3>
+<p>Phase 3 的实验问题原本有两问：「靠 <code>get_context</code> 重建够不够连贯」和「值不值 4.7 倍延迟」。两问都跑完了，<strong>结论把问题本身推翻了</strong>。</p>
+
+<p>探针：种四个<b>猜不出来</b>的事实（青铜麋鹿 / 7734 / Vera / 周四 02:00），中间插一轮无关话题，再回头问。<code>resident</code> 保留厂商会话，<code>rebuild</code> 每轮丢掉会话、把 <code>get_context</code> 的输出拼在前面——是真机制，不是模拟。</p>
+
+<table class="tbl">
+<tr><th>模式</th><th>Codex</th><th>Claude</th><th>Grok</th><th>Kimi</th></tr>
+<tr><td>resident</td><td>4/4 · 14.2s</td><td>4/4 · 61.7s</td><td>4/4 · 24.5s</td><td>4/4 · 22.3s</td></tr>
+<tr><td>rebuild</td><td>4/4 · 31.1s</td><td>4/4 · 35.0s</td><td>4/4 · 28.7s</td><td>4/4 · 20.0s</td></tr>
+</table>
+<p><strong>八次全中。</strong>于是问题变成「能撑多大」——往日志里埋 N 条<b>同主题</b>的无关消息（不相关的填充太容易跳过，真实项目的日志全都看起来相关）：</p>
+<table class="tbl">
+<tr><th>埋入</th><th>每轮送出</th><th>Codex</th><th>Claude</th><th>Grok</th><th>Kimi</th></tr>
+<tr><td>0</td><td>1.1k 字</td><td>4/4 · 31.1s</td><td>4/4 · 35.0s</td><td>4/4 · 28.7s</td><td>4/4 · 20.0s</td></tr>
+<tr><td>200 条</td><td>18.7k 字</td><td>4/4 · 33.8s</td><td>4/4 · 70.2s</td><td>4/4 · 28.6s</td><td>4/4 · 26.6s</td></tr>
+<tr><td>1200 条</td><td>108.7k 字</td><td>4/4 · 34.0s</td><td>4/4 · 48.2s</td><td>4/4 · 30.6s</td><td>4/4 · 32.1s</td></tr>
+</table>
+<p><b>日志大 100 倍，一个事实都没丢，时间也几乎没变。</b>连贯性从头到尾就不是约束。</p>
+
+<h3>那代价在哪：在账单上，而这是我们原本没在看的一根轴</h3>
+<p>各家 token 口径不可比——Codex 报会话累计，Claude 报未命中缓存的部分，Kimi 什么都不报。只有 Grok 直接把一轮折成美元，所以这条结论由它承担：</p>
+<table class="tbl">
+<tr><th></th><th>5 轮成本</th><th>耗时</th></tr>
+<tr><td>resident</td><td>$0.052 – $0.062</td><td>24.4s</td></tr>
+<tr><td>rebuild，不埋</td><td>$0.092 – $0.121</td><td>28.7s</td></tr>
+<tr><td>rebuild，埋 200</td><td>$0.116</td><td>28.6s</td></tr>
+<tr><td>rebuild，埋 1200</td><td>$0.139</td><td>28.7s</td></tr>
+</table>
+<p><strong>重建贵约 2 倍；在这基础上把日志放大 100 倍，只再多约 50%。</strong>贵的是<b>重新进入</b>这件事本身，不是送进去多少上下文——常驻的一轮复用热前缀，重建的每轮都得重新买一次。</p>
+
+<div class="note"><b>这改掉了三件事。</b><br>
+① <b>不要为省钱截断 <code>get_context</code>。</b>最顺手的那个优化恰好是错的：上下文放大 100 倍只多花 50%，而重新进入一次就要多花 100%。截断省不下什么，却可能正好丢掉这一轮需要的那个事实。<br>
+② <b>该压的是轮数，不是上下文。</b>代价按「重新进入」计，所以杠杆在<b>更少、更长的轮次</b>——这是一个关于任务粒度的问题，不是关于上下文窗口的问题。<br>
+③ <b>会话常驻是厂商级优化，不是架构需求。</b>Kimi 重建比续接还<b>快</b>，Grok 基本打平——因为它们的 <code>--resume</code> 本来就要重开进程。只有握着常驻服务的 Codex 有真正的热路径。所以 <code>integration.session</code> 存在时可以用来优化，永远不能变成前提。</div>
+
+<div class="note warn"><b>这个实验没测到的地方。</b>它测的是 1200 条<b>平铺聊天记录</b>。没测知识条目、没测 supersede、没测跨任务上下文——而那恰恰是「把日志直接拼成 prompt」最可能垮掉的地方。Phase 2 做记忆时要重测。</div>
 
 <h3>一个负面结果</h3>
-<div class="note warn"><b>Codex 不会把我们的 MCP 工具暴露给它的模型。</b>在调用时注入 <code>config.mcp_servers</code> <b>进程级是生效的</b>——Codex 读配置、拉起进程、完成握手、请求 <code>tools/list</code>。但工具从没被调用：<code>tool_search_always_defer_mcp_tools</code> 生效值为 <code>true</code> 且已 <code>removed</code>（关不掉），MCP 工具被压在搜索步骤后面。四次尝试零调用，其中两次卡满四分钟。<br><br><b>后果：</b>参与通道改走<b>适配器翻译</b>——它把厂商回复翻成 <code>send_message</code> 请求。这本来就是适配器该干的事，信任边界没变：适配器在里面，厂商在外面。</div>
+<div class="note warn"><b>Codex 不会把我们的 MCP 工具暴露给它的模型。</b>在调用时注入 <code>config.mcp_servers</code> <b>进程级是生效的</b>——Codex 读配置、拉起进程、完成握手、请求 <code>tools/list</code>。但工具从没被调用：<code>tool_search_always_defer_mcp_tools</code> 生效值为 <code>true</code> 且已 <code>removed</code>（关不掉），MCP 工具被压在搜索步骤后面。四次尝试零调用，其中两次卡满四分钟。<br><br><b>后果：</b>这一家的参与通道改走<b>适配器翻译</b>——它把厂商回复翻成 <code>send_message</code> 请求。这本来就是适配器该干的事，信任边界没变：适配器在里面，厂商在外面。</div>
+
+<h3>以及一个正面结果：零适配器路径成立</h3>
+<p>同一个 MCP server，换 Claude Code 来接——<b>没有适配器，没有翻译，没有一行为 Agent OS 写的代码</b>。它只读到三个工具的描述，然后自己走完了协议：</p>
+<pre><code>$ claude -p '注册进 Agent OS，读上下文，发一条消息' --mcp-config mcp.json
+
+seq 1  agent.registered  system:runtime     Claude Code
+       capabilities = ['coding', 'review']
+seq 2  message.sent      agent:claude-code  Claude Code registered and context loaded…</code></pre>
+<p>三次工具调用，五轮，17 秒。<strong>这就是 ADR-001 的证据</strong>：一个从没听说过 Agent OS 的 agent，靠读工具描述就参与了进来。适配器是给 Codex 这类厂商的兜底，不是架构本身。</p>
+
+<p>紧接着我们让它<b>尝试越界</b>，两条授权分支都在真实 agent 上被拒——下面是它把我们服务器的原话转述回来：</p>
+<table class="tbl">
+<tr><th>它试图做的事</th><th>服务器的回答</th></tr>
+<tr><td><code>from: "codex"</code>，该 id 未注册</td><td><code>未注册的发送者 "codex"——必须先调用 register_agent</code></td></tr>
+<tr><td><code>from: "codex"</code>，已注册，但调用方是 claude-code</td><td><code>不能以 "codex" 的身份发言：调用方注册为 "claude-code"</code></td></tr>
+</table>
+<p>有意思的是它接下来做了什么：<b>它把拒绝原因报告出来，而不是换个说法重试</b>。一个会讲清楚理由的边界能换来配合；一个只返回 <code>400</code> 的边界换来的是重试循环。这条对所有面向 agent 的错误信息都成立。</p>
+
+<h3>发现四：「能参与」本身是一项能力，四家里三家有</h3>
+<p>于是集成能力多了第四个字段 <code>participates</code>，而且它和另外三个不是一类东西：streaming / reasoning / usage 为假只是<b>降级展示</b>，<code>participates</code> 为假意味着这个 agent <b>根本够不着运行时</b>，必须有人替它说话。</p>
+<table class="tbl">
+<tr><th>厂商</th><th>握手</th><th>把工具给模型</th><th>越权被拒</th><th>结论</th></tr>
+<tr><td>Claude Code</td><td>✅</td><td>✅ 三个全调</td><td>✅</td><td><b>零适配器</b></td></tr>
+<tr><td>Kimi</td><td>✅</td><td>✅ 连放开审批都不用</td><td>—</td><td><b>零适配器</b></td></tr>
+<tr><td>Grok</td><td>✅</td><td>✅ 三个全调</td><td>✅</td><td><b>零适配器</b></td></tr>
+<tr><td>Codex</td><td>✅</td><td>❌ 四次零调用</td><td>—</td><td>需要适配器翻译</td></tr>
+</table>
+<p><b>四家全都握手成功，所以握手什么也预测不了。</b>Codex 在传输层完全合规，问题出在它自己决定不把工具交给模型。「会说 MCP」推不出「能参与」，这两件事必须分开记，而且后者<b>只能测出来</b>。</p>
+
+<h3>顺带撞见的：上下文已经跨进程共享了</h3>
+<p>Grok 注册后调 <code>get_context</code>，读回来的是这个：</p>
+<pre><code>{ "project": "proj_spike",
+  "messages": [{ "from": "kimi", "content": "…" }],
+  "agents": [{ "id": "kimi" }, { "id": "grok" }] }</code></pre>
+<p>Kimi 的进程早就退出了，两个进程从没同时存在过，中间也没有任何传递——<b>日志是它们之间唯一的通道</b>。这是记忆优先在<b>跨厂商</b>维度上的第一次实证；上面那个实验只证了同一个 agent 重建自己的过去，这次是一个 agent 继承另一个的。</p>
+
+<h3>但「怎么把 server 挂上去」三家零共性</h3>
+<table class="tbl">
+<tr><th>厂商</th><th>挂载方式</th><th>坑</th></tr>
+<tr><td>Claude Code</td><td><code>--mcp-config &lt;文件&gt;</code></td><td>内联 JSON 会让 CLI 把后面的 prompt 当成第二个配置文件路径，<b>必须给文件</b></td></tr>
+<tr><td>Kimi</td><td>cwd 下的 <code>.mcp.json</code></td><td>无</td></tr>
+<tr><td>Grok</td><td><code>.grok/config.toml</code></td><td>项目级 server 在「未信任目录」里不启动；<code>grok mcp add</code> 会<b>静默丢掉 env</b>，得手工补</td></tr>
+</table>
+<p>三种机制，零重叠。<strong>所以适配器管的不只是「怎么调用」，还有「怎么接上」</strong>——这一点 <code>agent-sdk</code> 的契约目前没写，而它决定了「把 Agent OS 接到这个 agent 上」是一行配置还是一套厂商专属流程。</p>
 </section>
 
 <!-- ============ 使用指南 ============ -->
@@ -2013,6 +2091,8 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 <tr><td><b>006</b></td><td>对话折进智能体，按任务分组</td><td>新增功能：智能体对话记录该放哪儿、会话该怎么划分</td></tr>
 <tr><td><b>007</b></td><td>实现栈：TypeScript + Tauri 2 + SQLite，单机</td><td>开工前必须定的前置问题：外壳、范围、模型档位</td></tr>
 <tr><td><b>004 补</b></td><td>能力有两个轴：任务能力 + 集成能力</td><td>四家实测发现单一厂商会把自己的行为变成通用假设</td></tr>
+<tr><td><b>记忆优先</b></td><td>代价是每轮「重新进入」的约 2 倍固定溢价，与上下文体量几乎无关</td><td>四家 × 三种日志规模全部 4/4 召回；截断上下文是错的优化，压轮数才是对的</td></tr>
+<tr><td><b>001 补</b></td><td>「会说 MCP」不等于「能参与」，后者是一项要实测的能力；接入配置也归适配器管</td><td>四家全握手成功，但只有三家把工具交给模型；三家的挂载机制零共性</td></tr>
 </table>
 
 <h3>其他收敛</h3>
