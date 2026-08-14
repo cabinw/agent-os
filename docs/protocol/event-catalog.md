@@ -70,6 +70,42 @@ from `task`; see [ADR-006](../decisions/ADR-006-threads-as-a-view-in-agents.md).
 | `project.snapshot.captured` | `{ label, image, at }` | A visual checkpoint is recorded |
 | `project.revived` | `{ dormantDays, plan }` | Revival Mode generates a restart plan |
 
+## artifact.*
+
+| Event | Payload | Emitted when |
+| --- | --- | --- |
+| `artifact.produced` | `{ path, kind, task }` | An agent produces a document or asset worth keeping |
+| `artifact.derived` | `{ path, from, lens }` | An artifact is produced by digesting others from one role's perspective |
+
+**Payloads are deliberately minimal.** The content lives on disk and can be
+re-analysed at any time; the event only has to record *that it existed and where
+it came from*. Anything richer — summaries, tags, chunk indexes — is derived,
+and deriving it later is always possible. Failing to record the provenance is
+not: an artifact whose origin was never written down cannot be traced back after
+the fact.
+
+`artifact.derived` carries the chain that makes a corpus usable. A research
+corpus is read by different roles, and **each role reading it produces something
+different** — the terrain designer's notes on a particle-system document are not
+the VFX designer's. `from` lists the sources, `lens` names the perspective. That
+chain is what lets a later task reuse a digest instead of re-reading the corpus.
+
+## measurement.*
+
+| Event | Payload | Emitted when |
+| --- | --- | --- |
+| `measurement.recorded` | `{ metric, value, source, at }` | External data about shipped work arrives |
+
+The inbound half of the loop. Knowledge already carries `sourceEvents` — where a
+conclusion *came from* — but nothing recorded what happened *because* of it. A
+decision taken during research ("adopt a no-fail daily loop") is a hypothesis
+until retention data either confirms or refutes it.
+
+Recording measurements is what lets memory **grow rather than accumulate**: the
+value of a long-lived role is not that it remembers more, it is that its
+conclusions have been tested. Link a measurement to the knowledge it bears on
+with `knowledge.linked`.
+
 ## pulse.*
 
 | Event | Payload | Emitted when |

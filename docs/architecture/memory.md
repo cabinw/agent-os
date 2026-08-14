@@ -71,6 +71,39 @@ The agent-context case is the important one: an agent starting TASK-014 receives
 the decisions that constrain it, so it does not re-litigate settled questions or
 contradict an earlier choice.
 
+## Consequences
+
+`sourceEvents` traces a claim backwards. Nothing traced it forwards, so a
+conclusion could never be scored against what happened after it was adopted.
+`measurement.recorded` closes that: external results about shipped work enter the
+log and are linked to the knowledge they bear on.
+
+This is the difference between memory that **accumulates** and memory that
+**grows**. A role that runs for a year is not valuable because it remembers more
+items; it is valuable because its conclusions have been tested, and it knows
+which ones were wrong.
+
+## Corpora
+
+Knowledge extraction assumes the raw material is events. It is not always: a
+research pass can produce dozens of documents, and those are artifacts on disk,
+not chatter in a thread. `artifact.produced` and `artifact.derived` record them.
+
+The consumption pattern differs from knowledge items in a way that matters:
+
+- A **knowledge item** is a conclusion, small, and injected into context.
+- A **corpus** is evidence, large, and *read selectively by whoever needs it*.
+
+Summarising a corpus once, for everyone, loses the wrong things — **what a
+summary drops depends on who was going to read it**, and the author does not
+know that in advance. So a corpus is not compressed once; it is digested per
+role, and each digest is itself an artifact (`artifact.derived`) that the next
+task of that role can reuse.
+
+Selection therefore belongs to the reader, not the writer: give every document a
+short abstract, inject the whole index cheaply, and let the agent choose what to
+read in full.
+
 ## Retention
 
 Events may be compacted after knowledge extraction; knowledge items are never
