@@ -1,22 +1,25 @@
 # Handoff
 
-Written 2026-08-01 for an agent picking this up cold. Read this before
-`CLAUDE.md`; it tells you where the repository actually is, which is not where a
-fresh clone will suggest.
+Written 2026-08-14 for an agent picking this up cold. Read this before
+`CLAUDE.md`.
 
-## Read this first: `main` is not current
+## Read this first: the code is not where you will look for it
 
-Two pull requests are **open and unmerged**, and they stack:
+`main` is current — everything is merged, and `corepack pnpm verify` passes on it
+(65 tests, four layering rules). There is no open PR.
+
+But the directory layout is misleading:
 
 ```
-main                     ← Phase 0 only. No event log, no MCP server, no hub.
- └─ feat/event-log       ← PR #5
-     └─ feat/mcp-boundary ← PR #6   ← all real work is here
+packages/*        contracts and TYPES ONLY — no behaviour. Phase 1.1 has not started
+apps/chat-spike/  ~2 500 lines of working code. This is the whole implementation
 ```
 
-**Branch from `feat/mcp-boundary`, not from `main`.** Branching from `main`
-silently loses ~2 500 lines of working code and every measurement below. If you
-are asked to merge, merge #5 first, then #6.
+Someone reading `packages/` first will conclude the project is an empty skeleton.
+It is not: the event log, the MCP trust boundary, the hub runtime, four vendor
+adapters and one measured experiment all live under `apps/chat-spike/`. It is
+called a spike because it is expected to be partly thrown away, **not** because it
+is scratch work — several specs were decided by what it measured.
 
 ## What this project is
 
@@ -33,8 +36,9 @@ to remove conflicts.
 
 | | |
 | --- | --- |
-| `packages/*` | **Contracts and types only — no behaviour.** Phase 1.1 has not started |
-| `apps/chat-spike/` | ~2 500 lines of working code. The event log, MCP tools, hub runtime, four vendor adapters, and one experiment |
+| `apps/chat-spike/` | The implementation. Event log, MCP tools, hub runtime, four vendor adapters, one experiment |
+| `apps/chat-spike/FINDINGS.md` | The measurements. Several specs were decided here |
+| `packages/*` | Contracts and types only. Phase 1.1 starts here |
 | `docs/` | 37 specs, 7 ADRs. Canonical |
 | `doc.html` / `todo.html` | Generated walkthrough and implementation plan. Both current |
 | `tests/` | 65 tests, all passing |
@@ -126,7 +130,7 @@ Adding an event type: **catalog entry first**, then reducer, then a replay test,
 then emit. Events are permanent — a type that ships wrong stays in old logs
 forever.
 
-## Just landed (2026-08-01)
+## Just landed (2026-08-14)
 
 Two event families were added to the catalog **with no implementation**, because
 they are the only part of the memory layer that cannot be built later:

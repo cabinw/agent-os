@@ -17,8 +17,8 @@ pnpm is provided by corepack (`corepack pnpm …`); there is no global install.
 
 **There is no CI by decision.** `pnpm verify` is the only gate, and it is manual — run it. `check:layers` enforces four rules mechanically: no vendor names below `agent-sdk` (ADR-004), dependency direction, `task-engine` ⇄ `memory-core` isolation, and no event type absent from the catalog. It also runs inside `pnpm test`, so the suite cannot go green while a layering rule is broken.
 
-**Picking this up cold?** Read [HANDOFF.md](HANDOFF.md) first — `main` is behind
-two open PRs and the working code is on `feat/mcp-boundary`.
+**Picking this up cold?** Read [HANDOFF.md](HANDOFF.md) first — the working code
+is in `apps/chat-spike/`, not in `packages/`.
 
 ## Repository status
 
