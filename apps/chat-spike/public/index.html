@@ -27,6 +27,9 @@ header .sub{font-size:11px;color:var(--faint)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 #state{font-size:11.5px;color:var(--muted)}
 #usage{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+#logged{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.divider{display:flex;align-items:center;gap:9px;font-size:10.5px;color:var(--faint);margin:2px 0}
+.divider::before,.divider::after{content:"";height:1px;background:var(--border);flex:1}
 button{font-family:inherit;font-size:12px;padding:5px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
 button:hover{color:var(--text)}
 button:disabled{opacity:.4;cursor:not-allowed}
@@ -91,6 +94,7 @@ textarea:focus{outline:none;border-color:var(--accent)}
     <div class="sub">派发通道 —— 同一套核心，四种厂商接入形状</div>
   </div>
   <div class="spacer"></div>
+  <span id="logged" title="事件日志条数"></span>
   <span id="usage"></span>
   <span id="state"><span class="dot" id="dot"></span><span id="stateText">连接中…</span></span>
   <button id="reset" title="丢弃 vendor 会话，下一轮冷启动">重置会话</button>
@@ -122,6 +126,7 @@ const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
 const progress = document.getElementById("progress");
 const usage = document.getElementById("usage");
+const logged = document.getElementById("logged");
 const dot = document.getElementById("dot");
 const stateText = document.getElementById("stateText");
 const providersEl = document.getElementById("providers");
@@ -133,17 +138,24 @@ let providers = [];
 let current = null;
 let busy = false;
 
+/**
+ * The thread is the server's projection of the event log. The client keeps no
+ * message array of its own — it renders what it is given and appends events as
+ * they arrive. That is the whole point of stage 1.
+ */
+let thread = { items: [], agents: {} };
+/** Live-only, never in the log: cold-start flag for the turn in flight. */
+let lastTurn = null;
+
 function renderProviders() {
   providersEl.querySelectorAll(".pv").forEach((n) => n.remove());
   for (const p of providers) {
     const el = document.createElement("button");
     el.className = `pv${p.id === current?.id ? " on" : ""}`;
     el.disabled = busy;
-
     const name = document.createElement("span");
     name.textContent = p.label;
     el.appendChild(name);
-
     const caps = document.createElement("span");
     caps.className = "caps";
     for (const [key, label] of Object.entries(CAP_LABEL)) {
@@ -154,7 +166,6 @@ function renderProviders() {
       caps.appendChild(c);
     }
     el.appendChild(caps);
-
     el.onclick = () => {
       if (busy || p.id === current?.id) return;
       fetch("/provider", {
@@ -167,18 +178,27 @@ function renderProviders() {
   }
 }
 
-function render(m) {
-  empty?.remove();
+function renderDivider(item) {
   const el = document.createElement("div");
-  el.className = `msg ${m.role}${m.error ? " error" : ""}`;
+  el.className = "divider";
+  const b = document.createElement("b");
+  b.textContent = item.label;
+  el.appendChild(b);
+  return el;
+}
+
+function renderMessage(item) {
+  const human = item.actorKind === "human";
+  const el = document.createElement("div");
+  el.className = `msg ${human ? "human" : "agent"}`;
 
   const av = document.createElement("span");
   av.className = "av";
-  if (m.role === "agent") {
-    av.style.background = AV_COLOR[m.provider] ?? "#2563EB";
-    av.textContent = (m.providerLabel ?? "A")[0];
+  if (human) {
+    av.textContent = "你";
   } else {
-    av.textContent = m.role === "human" ? "你" : "◈";
+    av.style.background = AV_COLOR[item.from] ?? "#2563EB";
+    av.textContent = (item.agent?.name ?? item.from ?? "A")[0].toUpperCase();
   }
 
   const bd = document.createElement("div");
@@ -188,11 +208,11 @@ function render(m) {
   hd.className = "hd";
   const nm = document.createElement("span");
   nm.className = "nm";
-  nm.textContent =
-    m.role === "human" ? "你" : m.role === "system" ? "系统" : (m.providerLabel ?? "智能体");
+  nm.textContent = human ? "你" : (item.agent?.name ?? item.from);
   hd.appendChild(nm);
 
-  if (m.fresh) {
+  // Cold start is live telemetry, so it only shows on the turn that produced it.
+  if (!human && lastTurn?.id === item.id && lastTurn.fresh) {
     const t = document.createElement("span");
     t.className = "tag cold";
     t.textContent = "冷启动";
@@ -202,19 +222,28 @@ function render(m) {
   const meta = document.createElement("span");
   meta.className = "meta";
   meta.textContent = [
-    m.ms ? `${(m.ms / 1000).toFixed(1)}s` : "",
-    new Date(m.at).toLocaleTimeString("zh-CN", { hour12: false }),
+    item.ms ? `${(item.ms / 1000).toFixed(1)}s` : "",
+    new Date(item.at).toLocaleTimeString("zh-CN", { hour12: false }),
   ].filter(Boolean).join("  ·  ");
   hd.appendChild(meta);
 
   // textContent throughout: agent output is untrusted input, never innerHTML.
   const ct = document.createElement("div");
   ct.className = "ct";
-  ct.textContent = m.text;
+  ct.textContent = item.text;
 
   bd.append(hd, ct);
   el.append(av, bd);
-  log.appendChild(el);
+  return el;
+}
+
+function renderThread() {
+  log.querySelectorAll(".msg, .divider").forEach((n) => n.remove());
+  if (thread.items.length) empty?.remove();
+  for (const item of thread.items) {
+    log.appendChild(item.kind === "divider" ? renderDivider(item) : renderMessage(item));
+  }
+  logged.textContent = `${thread.items.length} 事件`;
   log.scrollTop = log.scrollHeight;
 }
 
@@ -313,17 +342,24 @@ es.onmessage = (e) => {
     case "hello":
       providers = d.providers;
       current = d.provider;
+      thread = d.thread;
       renderProviders();
-      for (const m of d.messages) render(m);
+      renderThread();
       setState("idle");
+      break;
+    case "event":
+      // Re-fold locally: the same reducer rule the server used, one event at a
+      // time. Cheap here; stage 2 can subscribe to a projection instead.
+      applyEvent(d.event);
+      renderThread();
+      break;
+    case "turn":
+      lastTurn = { id: thread.items.at(-1)?.id, fresh: d.fresh };
+      renderThread();
       break;
     case "provider":
       current = d;
       renderProviders();
-      break;
-    case "message":
-      if (d.message.role === "agent") clearStream();
-      render(d.message);
       break;
     case "delta":
       pushDelta(d.text);
@@ -339,12 +375,41 @@ es.onmessage = (e) => {
     case "progress":
       progress.textContent = `⋯ ${d.kind}`;
       break;
+    case "notice":
+      progress.textContent = d.text;
+      break;
+    case "error":
+      progress.textContent = `✗ ${d.message}`;
+      break;
     case "status":
       if (d.state === "idle") clearStream();
       setState(d.state);
       break;
   }
 };
+
+/** Mirrors src/thread.mjs. Kept minimal on purpose — see README. */
+function applyEvent(evt) {
+  if (evt.type === "agent.registered") {
+    const a = evt.payload;
+    thread.agents[a.id] = a;
+    thread.items.push({ kind: "divider", id: evt.id, at: evt.at, label: `${a.name} 加入会话` });
+    return;
+  }
+  if (evt.type !== "message.sent") return;
+  const cause = thread.items.find((i) => i.id === evt.causedBy);
+  thread.items.push({
+    kind: "message",
+    id: evt.id,
+    at: evt.at,
+    actorKind: evt.actor.kind,
+    from: evt.payload.from,
+    to: evt.payload.to,
+    text: evt.payload.content,
+    agent: thread.agents[evt.payload.from] ?? null,
+    ...(cause ? { ms: Date.parse(evt.at) - Date.parse(cause.at) } : {}),
+  });
+}
 
 async function send() {
   const text = input.value.trim();
