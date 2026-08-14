@@ -156,20 +156,44 @@ with a discriminated union.
 *Reuse:* the spike's ULID generator and `seq`-assigned-at-write boundary are
 already proven; `tests/event-log.test.ts` has the replay-equivalence test.
 
-**B · Bind the hub to localhost and add a shared token** *(half a day)*
+**B · Stop the hub listening on every interface; require a token** *(half a day)*
 `apps/chat-spike/src/server.mjs` calls `server.listen(PORT)` with no host, so Node
 binds `::` — every interface, no auth, while the process spawns agent CLIs with
 file access. This is a live exposure, not a hypothetical.
-*Done when:* default binding is `127.0.0.1` and a bearer token is required.
+*Done when:* the bind address is explicit (default `127.0.0.1`, widened only by
+config) and a bearer token is required on every route.
+*Note:* since the hub is going to run on a server (below), the token is the
+load-bearing half — a server that binds only loopback is useless, so the
+protection has to be authentication, not address.
 
 **C · Hub v2 — projects, sessions, remote runners** *(see `todo.html`)*
-Design is settled; the permission/isolation half was **cut by the owner** (trusted
-collaborators only, subscription billing). Remaining: project objects with real
-directories, sessions as second-class objects that survive restart, a three-column
-UI, and runners on other machines.
-*Note:* the adapter contract (`send(prompt) → {text, sessionId, ms, fresh}` plus an
-`onEvent` stream) already **is** the runner wire protocol. It does not need
-redesigning to cross a network.
+Design is settled. The permission/isolation half was **cut by the owner** (trusted
+collaborators only, subscription billing) — do not reintroduce separate Unix
+users, containers, or a credential broker.
+
+**The hub runs on a server. Every machine is a runner, including the owner's Mac.**
+That decision is made, and it shapes the rest:
+
+- The hub **dispatches only** — it never spawns a vendor CLI, so the server needs
+  no vendor logins. Each runner has its own.
+- The event log and project metadata live on the server, which also makes backup
+  and multi-device access fall out for free.
+- **Project files live on runners, not on the hub.** A project on the hub is
+  metadata plus which runners hold a working copy; the shared state between
+  machines is the **git remote**, not a filesystem. Do not reach for a network
+  mount.
+- Capability belongs to `(agent, host)`, not to the agent: "reverse engineering"
+  is Claude *on the box with the tooling*. A runner reports its OS, hardware and
+  installed MCP servers, and those become capabilities. Routing still reads
+  capabilities only, so ADR-004 is unaffected.
+- The adapter contract (`send(prompt) → {text, sessionId, ms, fresh}` plus an
+  `onEvent` stream) already **is** the runner wire protocol. It was extracted from
+  four vendors and survives being moved across a network unchanged.
+- Runners connect **out** to the hub, so no workstation needs an inbound port.
+
+Sessions become second-class objects keyed by `(user, project, agent)` and must
+survive a restart — today the vendor session id is an in-memory field that dies
+with the process.
 
 Order the owner leaned toward: **B → C → A.** C first because the owner uses it
 daily, and every valuable finding in this project so far came from running
@@ -188,8 +212,6 @@ something rather than reasoning about it.
 
 ## Open questions the owner has not settled
 
-- Where the hub runs long-term: on the owner's Mac, or on a server with the Mac as
-  just another runner. This blocks the shape of projects and sessions in C.
 - Cross-project knowledge (one project's approach reused in another). Confirmed as
   a real need, deliberately deferred — it is derivable from multiple logs and needs
   no envelope change.
