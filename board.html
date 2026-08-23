@@ -50,7 +50,7 @@ button,input{font:inherit;color:inherit}a{color:inherit}
 h1{font-size:34px;line-height:1.16;letter-spacing:-.035em;margin:0;font-weight:720}.lede{font-size:14px;line-height:1.75;color:var(--muted);max-width:760px;margin:13px 0 0}
 .hero-status{border:1px solid color-mix(in srgb,var(--accent) 26%,var(--border));background:linear-gradient(145deg,var(--surface),color-mix(in srgb,var(--accent-soft) 62%,var(--surface)));border-radius:14px;padding:17px;box-shadow:var(--panel-shadow)}
 .status-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.status-head b{font-size:13px}.status-chip,.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface-soft);color:var(--muted);font-size:10px;white-space:nowrap}
-.status-chip.waiting{color:var(--accent);background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 20%,var(--border))}.hero-status p{color:var(--muted);font-size:11.5px;margin:10px 0 12px}
+.status-chip.waiting{color:var(--accent);background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 20%,var(--border))}.status-chip.running{color:var(--info);background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 24%,var(--border))}.hero-status p{color:var(--muted);font-size:11.5px;margin:10px 0 12px}
 .next-chain{display:flex;gap:5px;align-items:center;flex-wrap:wrap;font:600 10px var(--mono);color:var(--muted)}.next-chain span{padding:4px 7px;border-radius:6px;background:var(--surface);border:1px solid var(--border)}.next-chain i{font-style:normal;color:var(--accent)}
 .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:10px 0 32px}.kpi{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 15px;box-shadow:var(--shadow);min-width:0}
 .kpi-label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:10.5px}.kpi-dot{width:7px;height:7px;border-radius:50%;background:var(--metric,var(--info));flex:none}.kpi-value{font-size:27px;line-height:1.15;font-weight:680;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-top:10px}.kpi-sub{font-size:10.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -75,7 +75,7 @@ h2{font-size:21px;line-height:1.3;letter-spacing:-.025em;margin:3px 0 0;font-wei
 .phase-name b{display:block;font-size:12.5px}.phase-name small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}.phase-progress{display:flex;align-items:center;gap:9px}.phase-progress .bar{margin:0;flex:1}.phase-count{font:10.5px var(--mono);color:var(--muted);text-align:right}.chev{color:var(--faint);transition:transform .16s ease}.phase-row[open] .chev{transform:rotate(90deg)}
 .roadmap-list{border-top:1px solid var(--border);padding:5px 16px 11px;background:var(--surface-soft)}.roadmap-task{display:grid;grid-template-columns:72px minmax(0,1fr) 90px;gap:10px;align-items:start;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer}.roadmap-task:last-child{border-bottom:0}.roadmap-task:hover .roadmap-title{color:var(--accent)}.roadmap-id{font:600 9.5px var(--mono);color:var(--faint)}.roadmap-title{font-size:11.5px;font-weight:580}.roadmap-accept{display:block;color:var(--muted);font-size:10px;margin-top:2px}.roadmap-state{text-align:right;font-size:9.5px}
 .problem-controls{display:flex;gap:6px;margin-bottom:11px}.problems{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.problem{border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:14px;position:relative;overflow:hidden}.problem::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--severity,var(--warn))}.problem-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.problem-id{font:650 9.5px var(--mono);color:var(--faint)}.problem h3{font-size:12.5px;margin:5px 0 6px}.problem p{color:var(--muted);font-size:10.8px;margin:0}.problem-next{border-top:1px dashed var(--border);padding-top:9px;margin-top:10px;color:var(--muted);font-size:10.5px}.problem-next b{color:var(--text)}
-.problem-links{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:9px}.problem-links a{font-size:9.5px;color:var(--accent);text-decoration:none}.problem.resolved{opacity:.72}.problem.resolved::before{background:var(--ok)}
+.problem-links{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:9px}.problem-links a,.problem-links .source-label{font-size:9.5px;color:var(--accent);text-decoration:none}.problem-links .source-label{color:var(--faint)}.problem.resolved{opacity:.72}.problem.resolved::before{background:var(--ok)}
 .activity-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:11px}.timeline,.maintenance{border:1px solid var(--border);background:var(--surface);border-radius:13px;padding:8px 16px;box-shadow:var(--shadow)}.activity-item{display:grid;grid-template-columns:82px 10px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid var(--border);animation:arrive .2s ease-out}.activity-item:last-child{border-bottom:0}.activity-time{font:9.5px var(--mono);color:var(--faint)}.activity-mark{width:8px;height:8px;border-radius:50%;background:var(--event-color,var(--info));margin-top:4px}.activity-copy b{font-size:11.5px}.activity-copy p{font-size:10.5px;color:var(--muted);margin:2px 0 0}
 .maintenance{padding:16px}.maintenance h3{font-size:13px;margin:0 0 9px}.maint-rule{display:grid;grid-template-columns:24px minmax(0,1fr);gap:9px;padding:8px 0;border-bottom:1px solid var(--border)}.maint-rule:last-child{border-bottom:0}.maint-num{width:23px;height:23px;border-radius:7px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font:650 9px var(--mono)}.maint-rule b{display:block;font-size:11px}.maint-rule small{display:block;color:var(--muted);font-size:10px;margin-top:1px}
 .sources{display:flex;gap:7px;flex-wrap:wrap}.source-chip{padding:6px 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);text-decoration:none;color:var(--muted);font-size:10.5px}.source-chip:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,var(--border))}.foot{display:flex;justify-content:space-between;gap:16px;color:var(--faint);font-size:10px;padding:24px 0 0;margin-top:14px;border-top:1px solid var(--border)}
@@ -129,15 +129,15 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
       </div>
 
       <section class="overall-progress" id="overview" aria-labelledby="overall-title">
-        <div class="overall-ring" id="overall-ring" aria-label="总体进度">
-          <div class="overall-number"><strong id="overall-percent">0%</strong><small>总体完成度</small></div>
+        <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:35.9%">
+          <div class="overall-number"><strong id="overall-percent">35.9%</strong><small>总体完成度</small></div>
         </div>
         <div class="overall-copy">
           <div class="eyebrow">Overall progress</div>
           <h1 id="overall-title">项目总体进度</h1>
-          <p>按 canonical Roadmap 中状态为 <code>completed</code> 的 Task 计算。验证实验、门禁和工具覆盖保留为独立指标，不会被混进这个百分比。</p>
+          <p>按看板中全部去重 Task 的 <code>progress</code> 加权计算；同一个 Roadmap Task 即使也在当前路线中只计一次。实验、门禁和工具覆盖保留为独立指标。</p>
           <div class="overall-bar" aria-hidden="true"><span id="overall-bar"></span></div>
-          <div class="overall-bar-meta"><span id="overall-fraction"></span><span>完成后自动重算</span></div>
+          <div class="overall-bar-meta"><span id="overall-fraction"></span><span>按 Task 实际进度实时加权</span></div>
         </div>
         <div class="overall-breakdown" id="overall-breakdown" aria-label="总体进度拆分"></div>
       </section>
@@ -149,9 +149,9 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
           <p class="lede">这里不把“跑通的实验原型”误写成“正式产品已完成”。进度按验证原型、当前执行路线和 canonical Roadmap 分轨计算；所有任务状态来自 ADR-002，问题保留开放与已解决历史。</p>
         </div>
         <aside class="hero-status" aria-label="当前安排">
-          <div class="status-head"><b>当前安排</b><span class="status-chip waiting">等待你安排</span></div>
-          <p>项目任务尚未进入执行。推荐的第一项是恢复完整验证门禁，然后封住 Hub 的访问和身份边界。</p>
-          <div class="next-chain"><span>GATE</span><i>→</i><span>SECURITY</span><i>→</i><span>LOCAL</span><i>→</i><span>CONTRACT</span><i>→</i><span>REMOTE</span></div>
+          <div class="status-head"><b>当前安排</b><span class="status-chip running">执行中 · SVR-02</span></div>
+          <p>RM-1.1a Event Core 严格事件契约已完成并通过 323/323 全仓验证；当前继续独立验收服务器工程师的 Hub runtime、受信部署工具、事务安装和候选隔离。</p>
+          <div class="next-chain"><span>RM-1.1a ✓</span><i>·</i><span>SVR-02</span><i>→</i><span>SVR-03</span><i>→</i><span>SVR-04</span><i>→</i><span>SVR-05/06</span></div>
         </aside>
       </header>
 
@@ -163,7 +163,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
       </section>
 
       <section id="current" aria-labelledby="current-title">
-        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">当前没有已授权的实现任务。右侧是建议顺序，不代表已经开工。</p></div>
+        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">SVR-02 正在执行；右侧按已完成前置、当前任务和后续依赖展示整条路线。</p></div>
         <div class="current-layout">
           <article class="current-card" id="current-task"></article>
           <div class="todo-panel" id="route-list" aria-label="推荐任务顺序"></div>
@@ -230,13 +230,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 17,
-  "updatedAt": "2026-08-23 21:26 CST",
+  "revision": 40,
+  "updatedAt": "2026-08-23 23:08 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "RM-1.1",
-  "verification": {"testsPassed":159,"testsTotal":159,"filesPassed":13,"filesTotal":13,"gatePassed":4,"gateTotal":4,"lintErrors":0,"checkedAt":"2026-08-23 21:26 CST"},
-  "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":0,"eventSchemaTotal":29,"adapters":4},
-  "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1"],
+  "currentTaskId": "SVR-02",
+  "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-23 23:08 CST"},
+  "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":29,"eventSchemaTotal":29,"adapters":4},
+  "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
   "roadmapPhases": [
     {"id":"Phase 0","title":"工程地基","goal":"Workspace、测试、Biome 与分层守卫","order":0},
     {"id":"Hub","title":"Agent Hub 验证","goal":"两条通道、能力路由、任务与人工验收的 Spike","order":1},
@@ -247,7 +247,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"Phase 5","title":"多智能体深度","goal":"协商、规划、自主路由与性能分析","order":6}
   ],
   "tasks": [
-    {"id":"FND-0.1","scope":"roadmap","phase":"Phase 0","title":"pnpm workspace + 五个空包骨架","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":[],"acceptance":"五个包可构建并产出声明；event-core 机械保持零依赖。","source":"todo.html#p0","summary":"正式实现的类型和包边界地基。"},
+    {"id":"FND-0.1","scope":"roadmap","phase":"Phase 0","title":"pnpm workspace + 五个空包骨架","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":[],"acceptance":"五个包可构建并产出声明；event-core 机械保持零内部 workspace 依赖。","source":"todo.html#p0","summary":"正式实现的类型和包边界地基。"},
     {"id":"FND-0.2","scope":"roadmap","phase":"Phase 0","title":"Vitest + Biome 基线","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["FND-0.1"],"acceptance":"测试与格式检查基线可运行。","source":"todo.html#p0","summary":"建立项目最初的自动验证工具。"},
     {"id":"FND-0.3","scope":"roadmap","phase":"Phase 0","title":"分层检查脚本","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["FND-0.1"],"acceptance":"四条分层规则能主动检出违规并以非零退出。","source":"todo.html#p0","summary":"守住厂商泄漏、依赖方向、兄弟互引和事件目录。"},
     {"id":"FND-0.4","scope":"roadmap","phase":"Phase 0","title":"更新开发命令与手工门禁说明","status":"completed","progress":100,"priority":"P1","owner":"—","dependsOn":["FND-0.1"],"acceptance":"仓库写明 pnpm verify 是唯一且手工的关口。","source":"todo.html#p0","summary":"让接手者不会误读构建状态。"},
@@ -258,22 +258,29 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"HUB-B.4","scope":"roadmap","phase":"Hub","title":"Hub 花名册、定向消息与任务线程","status":"completed","progress":100,"priority":"P1","owner":"—","dependsOn":["HUB-B.1"],"acceptance":"三方协作可读；跳数显示与 runtime 预算同源。","source":"todo.html#hub","summary":"Spike 的最小人类观察面。"},
     {"id":"HUB-C","scope":"roadmap","phase":"Hub","title":"任务对象与人工验收原型","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["HUB-B.1"],"acceptance":"created → assigned → running → review → human completed 真机闭环。","source":"todo.html#hub","summary":"Agent 不能自行完成验收；README 状态文案仍需同步。"},
 
-    {"id":"RM-1.1","scope":"roadmap","phase":"Phase 1","title":"事件信封 + 29 个 strict schema + ULID","status":"running","progress":10,"priority":"P0","owner":"Codex team","dependsOn":[],"blockedBy":["PROB-EVENT-SPEC"],"acceptance":"未知 type 或任何多余字段在 parse 时被拒绝。","source":"todo.html#p1","summary":"已进入 canonical 规范冲突审计；先统一信封、draft/stored 边界与 29 类 payload，再实现 strict parser。"},
-    {"id":"RM-1.2","scope":"roadmap","phase":"Phase 1","title":"SQLite 事件存储：append-only + 幂等","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1"],"acceptance":"并发 append 无重复 seq；同一 token 重试只落一条。","source":"todo.html#p1","summary":"用事务存储替换 throwaway JSONL。"},
-    {"id":"RM-1.3","scope":"roadmap","phase":"Phase 1","title":"事件总线、重放与 reducer 注册","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.2"],"acceptance":"从 seq 0 重放与增量归约状态完全一致。","source":"todo.html#p1","summary":"把 ADR-005 变成机器守住的性质。"},
-    {"id":"RM-1.4","scope":"roadmap","phase":"Phase 1","title":"快照与恢复","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.3"],"acceptance":"删除全部快照后重启，状态不变。","source":"todo.html#p1","summary":"快照只是缓存，不能成为真相来源。"},
-    {"id":"RM-1.5","scope":"roadmap","phase":"Phase 1","title":"任务状态转移矩阵与穷举测试","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.3"],"acceptance":"8 状态 × 10 事件全覆盖；progress 不触发状态转移。","source":"todo.html#p1","summary":"实现 ADR-002 的完整生命周期。"},
-    {"id":"RM-1.6","scope":"roadmap","phase":"Phase 1","title":"依赖图、环检测与就绪重算","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.5"],"acceptance":"未满足依赖不能离开 created；创建时拒绝环。","source":"todo.html#p1","summary":"让任务图的可执行性可证明。"},
-    {"id":"RM-1.7","scope":"roadmap","phase":"Phase 1","title":"能力路由与 Agent 注册表","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.5"],"acceptance":"核心代码无 provider 分支；无人具备能力时显式浮出。","source":"todo.html#p1","summary":"按能力、负载和结果路由。"},
-    {"id":"RM-1.8","scope":"roadmap","phase":"Phase 1","title":"MCP Server：12 个工具 + strict 校验","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.7"],"acceptance":"canonical 12 个工具全部 strict 校验并通过边界测试。","source":"todo.html#p1","summary":"Spike 当前只实现 7/12。"},
-    {"id":"RM-1.9","scope":"roadmap","phase":"Phase 1","title":"授权边界：Agent 不能写事件、设状态或审批","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.8"],"acceptance":"Agent 不能写事件、设置任务状态、审批或冒充身份。","source":"todo.html#p1","summary":"以不存在的字段和工具守住边界。"},
-    {"id":"RM-1.10","scope":"roadmap","phase":"Phase 1","title":"审批闸门接口（CLI 占位）","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.9"],"acceptance":"审批可阻塞调用；超时只 expired，绝不自动放行。","source":"todo.html#p1","summary":"为 Phase 3 UI 预留真正可阻塞的接口。"},
-    {"id":"RM-1.11","scope":"roadmap","phase":"Phase 1","title":"Agent SDK + 第一个适配器","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.8"],"acceptance":"两个不同厂商执行同类任务，核心代码零改动。","source":"todo.html#p1","summary":"正式化已测得的 adapter 边界。"},
-    {"id":"RM-1.12","scope":"roadmap","phase":"Phase 1","title":"Supervisor：目标拆解成任务图","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.7"],"acceptance":"Supervisor 输出合法任务图，选方案时记录决策。","source":"todo.html#p1","summary":"以 structured output 生成 requires 和 dependsOn。"},
-    {"id":"RM-1.13","scope":"roadmap","phase":"Phase 1","title":"会话 reducer：按任务分组并织入生命周期","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.3","RM-1.5"],"acceptance":"会话重放结果与增量投影一致。","source":"todo.html#p1","summary":"把线程变成可重放的任务投影。"},
-    {"id":"RM-1.14","scope":"roadmap","phase":"Phase 1","title":"端到端 Demo 脚本","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1","RM-1.12"],"acceptance":"完整循环以事件日志断言，不以截图验收。","source":"todo.html#p1","summary":"Phase 1 的正式验收。"},
+    {"id":"SVR-01","scope":"route","phase":"Server","title":"Ubuntu / Windows 基线与部署契约","status":"completed","progress":100,"priority":"P0","owner":"服务器工程师","dependsOn":["C-REMOTE-01"],"blockedBy":[],"acceptance":"脱敏记录两端版本、端口、TLS、服务、目录和 ACL；不做远端变更，不以公网 HTTP 代替 HTTPS。","source":{"label":"server branch · deploy/README.md @ 3454ca0","href":"https://github.com/cabinw/agent-os/commit/3454ca0"},"summary":"提交 3454ca0 已推送：两端只读盘点、staging 拓扑、身份/目录、生命周期、耐久性边界和全部上线阻塞已由主任务审查通过。"},
+    {"id":"SVR-02","scope":"route","phase":"Server","title":"Ubuntu Hub 可部署单元","status":"running","progress":64,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":["PROB-HUB-DEPLOY-TRUST","PROB-HUB-DEPLOY-CONTRACT","PROB-HUB-ACTIVATION","PROB-HUB-RUNTIME-LIMITS","PROB-HUB-COMPENSATION"],"acceptance":"非 root Hub 只监听 loopback，经 HTTPS 代理暴露；systemd、受限 env、health、升级与回滚在 staging 验证。","source":"apps/chat-spike/README.md","summary":"Hub runtime 边界与部署信任重构继续推进；最新审计发现补偿 helper 的内部 exit 仍可能跳过最终 stop / disable / hard-maintenance，须以故障注入证明 fail closed 后才能签收。"},
+    {"id":"SVR-03","scope":"route","phase":"Server","title":"持久状态、备份恢复与运维安全","status":"created","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-02"],"blockedBy":[],"acceptance":"placement/request/session 状态完成备份→破坏副本→恢复演练；日志轮转和容量检查不泄漏凭据。","source":"apps/chat-spike/README.md","summary":"为 Remote placement 与 request replay 增加安全的备份、恢复、升级前快照和日志运维路径。"},
+    {"id":"SVR-04","scope":"route","phase":"Server","title":"Windows Remote Worker 正式启动路径","status":"created","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":[],"acceptance":"PowerShell 安装/启动/停止/健康/卸载可恢复；Grok、路径、ACL、进程终止、workspace containment 和凭据隔离通过。","source":"docs/architecture/agent-runtime.md","summary":"在 Windows 测试机把 outbound Worker 与 Grok 做成可长期运行、可重启恢复的执行面，并补跨平台自动测试。"},
+    {"id":"SVR-05","scope":"route","phase":"Server","title":"Ubuntu Hub ↔ Windows Grok 真实联调","status":"created","progress":0,"priority":"P0","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-03","SVR-04"],"blockedBy":[],"acceptance":"真实 Grok 完成注册→指派→事件→review；断线、Hub 重启、重复请求、取消、超时、离线与旧 lease 均按契约处理。","source":"docs/decisions/ADR-008-server-hub-local-first-runners.md","summary":"Windows 只主动连出，Hub 不持有 working copy 或 vendor credential；我负责接口对照、故障注入和最终签收。"},
+    {"id":"SVR-06","scope":"route","phase":"Server","title":"服务器自动验收入口与交付矩阵","status":"created","progress":0,"priority":"P1","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-05"],"blockedBy":[],"acceptance":"静态部署门禁、双机 smoke 命令、全量 verify、脱敏证据矩阵和逐任务 commit 全部可复核。","source":"CLAUDE.md","summary":"交付本地安全门禁与明确的双机 smoke 入口；服务器工程师推送分支，我 review 后再决定集成。"},
 
-    {"id":"RM-2.1","scope":"roadmap","phase":"Phase 2","title":"知识项模型与抽取触发规则","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.14"],"acceptance":"六类知识和噪声筛选规则可测试。","source":"todo.html#p2","summary":"从事件中提取有价值的持久知识。"},
+    {"id":"RM-1.1a","scope":"roadmap","phase":"Phase 1","title":"事件信封 + 29 个 strict schema + ULID","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"未知 version/type 或任何多余字段在 parse 时被拒绝。","source":"todo.html#p1","summary":"version-first parser、type↔subject、深冻结、精确 RFC3339、自引用防线与安全类型收窄已落实；323/323 全仓验证通过。"},
+    {"id":"RM-1.1b","scope":"roadmap","phase":"Phase 1","title":"SQLite 事件存储：append-only + 幂等","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1a"],"acceptance":"并发 append 无重复 seq；同一 token 重试只落一条。","source":"todo.html#p1","summary":"用事务存储替换 throwaway JSONL。"},
+    {"id":"RM-1.1c","scope":"roadmap","phase":"Phase 1","title":"事件总线、重放与 reducer 注册","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1b"],"acceptance":"从首条事件重放与增量归约状态完全一致。","source":"todo.html#p1","summary":"把 ADR-005 变成机器守住的性质。"},
+    {"id":"RM-1.1d","scope":"roadmap","phase":"Phase 1","title":"快照与恢复","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.1c"],"acceptance":"删除全部快照后重启，状态不变。","source":"todo.html#p1","summary":"快照只是缓存，不能成为真相来源。"},
+    {"id":"RM-1.2a","scope":"roadmap","phase":"Phase 1","title":"任务状态转移矩阵与穷举测试","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1c"],"acceptance":"8 状态 × 10 事件全覆盖；progress 不触发状态转移。","source":"todo.html#p1","summary":"实现 ADR-002 的完整生命周期。"},
+    {"id":"RM-1.2b","scope":"roadmap","phase":"Phase 1","title":"依赖图、环检测与就绪重算","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.2a"],"acceptance":"未满足依赖不能离开 created；创建时拒绝环。","source":"todo.html#p1","summary":"让任务图的可执行性可证明。"},
+    {"id":"RM-1.2c","scope":"roadmap","phase":"Phase 1","title":"能力路由与 Agent 注册表","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.2a"],"acceptance":"核心代码无 provider 分支；无人具备能力时显式浮出。","source":"todo.html#p1","summary":"按能力、负载和结果路由。"},
+    {"id":"RM-1.3a","scope":"roadmap","phase":"Phase 1","title":"MCP Server：12 个工具 + strict 校验","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.2c"],"acceptance":"canonical 12 个工具全部 strict 校验并通过边界测试。","source":"todo.html#p1","summary":"Spike 当前只实现 7/12。"},
+    {"id":"RM-1.3b","scope":"roadmap","phase":"Phase 1","title":"授权边界：Agent 不能写事件、设状态或审批","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.3a"],"acceptance":"Agent 不能写事件、设置任务状态、审批或冒充身份。","source":"todo.html#p1","summary":"以不存在的字段和工具守住边界。"},
+    {"id":"RM-1.3c","scope":"roadmap","phase":"Phase 1","title":"审批闸门接口（CLI 占位）","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.3b"],"acceptance":"审批可阻塞调用；超时只 expired，绝不自动放行。","source":"todo.html#p1","summary":"为 Phase 3 UI 预留真正可阻塞的接口。"},
+    {"id":"RM-1.4a","scope":"roadmap","phase":"Phase 1","title":"Agent SDK + 第一个适配器","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.3a"],"acceptance":"两个不同厂商执行同类任务，核心代码零改动。","source":"todo.html#p1","summary":"正式化已测得的 adapter 边界。"},
+    {"id":"RM-1.5a","scope":"roadmap","phase":"Phase 1","title":"Supervisor：目标拆解成任务图","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.2c"],"acceptance":"Supervisor 输出合法任务图，选方案时记录决策。","source":"todo.html#p1","summary":"以 structured output 生成 requires 和 dependsOn。"},
+    {"id":"RM-1.5b","scope":"roadmap","phase":"Phase 1","title":"会话 reducer：按任务分组并织入生命周期","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.1c","RM-1.2a"],"acceptance":"会话重放结果与增量投影一致。","source":"todo.html#p1","summary":"把线程变成可重放的任务投影。"},
+    {"id":"RM-1.5c","scope":"roadmap","phase":"Phase 1","title":"端到端 Demo 脚本","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.5a","RM-1.4a"],"acceptance":"完整循环以事件日志断言，不以截图验收。","source":"todo.html#p1","summary":"Phase 1 的正式验收。"},
+
+    {"id":"RM-2.1","scope":"roadmap","phase":"Phase 2","title":"知识项模型与抽取触发规则","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.5c"],"acceptance":"六类知识和噪声筛选规则可测试。","source":"todo.html#p2","summary":"从事件中提取有价值的持久知识。"},
     {"id":"RM-2.2","scope":"roadmap","phase":"Phase 2","title":"摘要管线：窗口化 + 因果上下文","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.1"],"acceptance":"每句结论都能回溯到 sourceEvents。","source":"todo.html#p2","summary":"按相关事件窗口产出结论，不逐行摘要。"},
     {"id":"RM-2.3","scope":"roadmap","phase":"Phase 2","title":"知识覆盖机制 supersedes","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.1"],"acceptance":"新知识覆盖旧知识但旧知识仍可读。","source":"todo.html#p2","summary":"保留决策演进和原因。"},
     {"id":"RM-2.4","scope":"roadmap","phase":"Phase 2","title":"get_context：注入相关决策","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-2.2"],"acceptance":"相关知识不被小默认 limit 截断，并重跑 recall 探针。","source":"todo.html#p2","summary":"Memory-first 的核心产品能力。"},
@@ -282,10 +289,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"RM-3.1","scope":"roadmap","phase":"Phase 3","title":"Tauri 壳、七项导航与 design token","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-2.5"],"acceptance":"CSS token 与 canonical 设计语言一致，导航按 ADR-003。","source":"todo.html#p3","summary":"正式 macOS 人类界面的地基。"},
     {"id":"RM-3.2","scope":"roadmap","phase":"Phase 3","title":"i18n 骨架（zh-CN / en）","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"界面文案从第一天外部化。","source":"todo.html#p3","summary":"避免后补国际化。"},
     {"id":"RM-3.3","scope":"roadmap","phase":"Phase 3","title":"项目脉冲 Project Pulse","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"KPI 可追到事件，头条按后果严重性排序。","source":"todo.html#p3","summary":"面向人类的每日工作摘要。"},
-    {"id":"RM-3.4","scope":"roadmap","phase":"Phase 3","title":"审批闸门 UI 与菜单栏挂件","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.1","RM-1.10"],"acceptance":"不可逆动作只能在应用内审批；拒绝必须有理由。","source":"todo.html#p3","summary":"Human-in-the-loop 的正式界面。"},
+    {"id":"RM-3.4","scope":"roadmap","phase":"Phase 3","title":"审批闸门 UI 与菜单栏挂件","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.1","RM-1.3c"],"acceptance":"不可逆动作只能在应用内审批；拒绝必须有理由。","source":"todo.html#p3","summary":"Human-in-the-loop 的正式界面。"},
     {"id":"RM-3.5","scope":"roadmap","phase":"Phase 3","title":"项目库与项目详情","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"项目状态、五列清单和详情抽屉可用。","source":"todo.html#p3","summary":"跨项目管理入口。"},
     {"id":"RM-3.6","scope":"roadmap","phase":"Phase 3","title":"任务视图与智能体视图","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"能表达 100% 仍 review 与无人具备能力两种状态。","source":"todo.html#p3","summary":"正式 Tasks / Agents 人类表面。"},
-    {"id":"RM-3.7","scope":"roadmap","phase":"Phase 3","title":"会话读取界面","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.6","RM-1.13"],"acceptance":"问题 → 阻塞 → 回答 → 解除在一屏内可读。","source":"todo.html#p3","summary":"把消息和生命周期事件织成可读线程。"},
+    {"id":"RM-3.7","scope":"roadmap","phase":"Phase 3","title":"会话读取界面","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.6","RM-1.5b"],"acceptance":"问题 → 阻塞 → 回答 → 解除在一屏内可读。","source":"todo.html#p3","summary":"把消息和生命周期事件织成可读线程。"},
     {"id":"RM-3.8","scope":"roadmap","phase":"Phase 3","title":"任务详情内嵌会话与跨会话搜索","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.7"],"acceptance":"复用同一组件，支持参与者筛选和全局搜索。","source":"todo.html#p3","summary":"避免会话表面分叉成两套实现。"},
     {"id":"RM-3.9","scope":"roadmap","phase":"Phase 3","title":"人工发言（按项目可关闭）","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.7","RM-3.4"],"acceptance":"存在待审批时，会话操作都不能满足审批。","source":"todo.html#p3","summary":"人的消息是指导，不是批准。"},
 
@@ -300,7 +307,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"RM-5.3","scope":"roadmap","phase":"Phase 5","title":"自主任务路由","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-5.2"],"acceptance":"Runtime 可基于事件与能力调整分配。","source":"todo.html#p5","summary":"减少 Supervisor 对每次分配的介入。"},
     {"id":"RM-5.4","scope":"roadmap","phase":"Phase 5","title":"Agent 性能分析","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-5.3"],"acceptance":"按能力维度的历史结果可反哺路由。","source":"todo.html#p5","summary":"只有基础数据可信后才有意义。"},
 
-    {"id":"REPO-01","scope":"route","phase":"Repository","title":"恢复原 GitHub 仓库与提交基线","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"origin 指向原 GitHub 仓库；修改按任务进入 codex 分支和单一职责 commit；分支已推送且可独立审查、回退。","source":"git remote -v","summary":"原 GitHub origin 已恢复；codex/project-control 的原子提交已推送并建立 tracking，main 未被改写。"},
+    {"id":"REPO-01","scope":"route","phase":"Repository","title":"恢复原 GitHub 仓库与提交基线","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"origin 指向原 GitHub 仓库；修改按任务进入 codex 分支和单一职责 commit；分支已推送且可独立审查、回退。","source":{"label":"本地命令 · git remote -v"},"summary":"原 GitHub origin 已恢复；codex/project-control 的原子提交已推送并建立 tracking，main 未被改写。"},
     {"id":"GATE-01","scope":"route","phase":"Gate","title":"恢复完整 pnpm verify","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["REPO-01"],"blockedBy":[],"acceptance":"corepack pnpm verify 一次完整通过；记录真实测试数。","source":"scripts/check-layers.mjs","summary":"Biome 归零；分层守卫改用 TypeScript AST 并覆盖三类绕过；全量 verify 为 7 files、82/82 tests、4/4 gates。"},
     {"id":"HUB-SEC-01","scope":"route","phase":"Security","title":"封住 Hub 访问和身份边界","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["GATE-01"],"blockedBy":[],"acceptance":"显式 bind；每条 HTTP/SSE 路由需要 bearer token；caller 与 human accept 均由服务器身份决定。","source":"tests/hub-security.test.ts","summary":"默认 loopback、全路由 bearer、human/agent principal、精确 CORS、HTML 转义和受限本机工具链已实现，安全集成测试 9/9。"},
     {"id":"HUB-BOOT-01","scope":"route","phase":"Security","title":"恢复认证后的浏览器启动流程","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["HUB-SEC-01"],"blockedBy":[],"acceptance":"匿名只能取得无数据、无能力的 inert shell；token 仅从 fragment 或本地输入进内存并立即清除；所有 data/control/SSE/MCP 仍要求 Bearer。","source":"tests/hub-security.test.ts","summary":"公开 inert shell + password/fragment bootstrap 已完成；token 只驻留页面内存，所有 capability routes 继续强制 Bearer，安全测试 10/10。"},
@@ -313,35 +320,79 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
   ],
   "problems": [
     {"id":"PROB-BOOTSTRAP","status":"resolved","severity":"high","title":"认证后的浏览器启动流程已恢复","detail":"GET / 仅返回无数据 inert shell；human token 从 password input 或 URL fragment 进入内存，fragment 在首个 fetch 前清除。query、cookie、localStorage 均未使用。","next":"Tauri 阶段由原生 credential storage 注入，不改变 API/SSE 的 Bearer principal。","affects":["HUB-BOOT-01","C-LOCAL-01"],"source":"tests/hub-security.test.ts"},
-    {"id":"PROB-REPO-PUSH","status":"resolved","severity":"medium","title":"新 SSH 仓库方案已取消","detail":"用户决定继续使用原 GitHub 仓库；新 SSH origin 已移除，原 GitHub 远端恢复为 origin，因此不再需要向新仓库上传历史。","next":"后续仅向原 GitHub 仓库推送按任务隔离的 codex 分支。","affects":["REPO-01"],"source":"git remote -v"},
+    {"id":"PROB-REPO-PUSH","status":"resolved","severity":"medium","title":"新 SSH 仓库方案已取消","detail":"用户决定继续使用原 GitHub 仓库；新 SSH origin 已移除，原 GitHub 远端恢复为 origin，因此不再需要向新仓库上传历史。","next":"后续仅向原 GitHub 仓库推送按任务隔离的 codex 分支。","affects":["REPO-01"],"source":{"label":"本地命令 · git remote -v"}},
     {"id":"PROB-VERIFY","status":"resolved","severity":"high","title":"完整验证门禁已恢复为绿","detail":"tests/hub.test.ts 的 19 个 Biome 错误已清零；TypeScript、Biome、分层检查和 Vitest 一次通过，当前为 7 files、82/82 tests。","next":"每个任务提交前跑目标测试，路线节点完成时复跑全量 verify。","affects":["GATE-01"],"source":"package.json"},
     {"id":"PROB-AUTH","status":"resolved","severity":"critical","title":"Hub 已启用全路由认证与显式绑定","detail":"默认绑定 127.0.0.1；所有 HTTP、SSE、静态资源和 404 均先验证 bearer，宽绑定只能显式配置。","next":"Remote Runner 阶段复用 principal 模型，并增加传输重放保护。","affects":["HUB-SEC-01"],"source":"tests/hub-security.test.ts"},
-    {"id":"PROB-IDENTITY","status":"resolved","severity":"critical","title":"caller 与 human actor 已由服务端身份决定","detail":"Bearer token 唯一映射 human 或具体 Agent；/mcp/call 忽略 body.caller，/accept 仅 human principal 可达。","next":"正式 MCP Server 沿用 transport-derived identity，不暴露 caller 字段。","affects":["HUB-SEC-01","RM-1.9"],"source":"tests/hub-security.test.ts"},
+    {"id":"PROB-IDENTITY","status":"resolved","severity":"critical","title":"caller 与 human actor 已由服务端身份决定","detail":"Bearer token 唯一映射 human 或具体 Agent；/mcp/call 忽略 body.caller，/accept 仅 human principal 可达。","next":"正式 MCP Server 沿用 transport-derived identity，不暴露 caller 字段。","affects":["HUB-SEC-01","RM-1.3b"],"source":"tests/hub-security.test.ts"},
     {"id":"PROB-EXEC","status":"resolved","severity":"critical","title":"Grok 本机执行链已收敛到最小权限","detail":"移除 --always-approve；改用 dontAsk + Agent OS MCP allow rule、workspace sandbox，禁用子 Agent 和 Web，并以 0600 保存 transport token。参数组合经本机 Grok 1.0.5 解析。","next":"Local Runner contract 继续验证 workspace containment 和环境白名单。","affects":["HUB-SEC-01","C-LOCAL-01"],"source":"tests/hub-security.test.ts"},
     {"id":"PROB-ARCH","status":"resolved","severity":"high","title":"Accepted ADR 与最新 Hub / Runner 方向冲突已消除","detail":"ADR-008 已取代 ADR-007 的 single-machine 范围，明确 Server Hub 控制面与 Local / Remote Runner 执行面；ADR-007 其余技术栈决策继续有效。","next":"实现必须通过同一 Runner contract suite，Remote 只增加 transport 失败模式。","affects":["ADR-008","C-REMOTE-01"],"source":"docs/decisions/ADR-008-server-hub-local-first-runners.md"},
     {"id":"PROB-CONTEXT","status":"resolved","severity":"medium","title":"真实 Hub 不再默认截断上下文","detail":"Hub runtime 在省略 limit 时返回完整任务范围；显式正整数 limit 才截断。context-rebuild 实验也已移除第二套 harness，改走真实 Hub runtime。","next":"Phase 2 继续以相关性检索扩展，但不得恢复小默认上限。","affects":["EVIDENCE-01","RM-2.4"],"source":"tests/runtime-regressions.test.ts"},
     {"id":"PROB-REGRESSION","status":"resolved","severity":"high","title":"已复现的运行时回归均有测试与修复","detail":"runtime cause 覆盖伪造 replyTo；快速双重 assign 只发一个 task.started；损坏尾后 append 可重启重放；Hub 重启注册仍幂等。HTTP caller 身份由 HUB-SEC-01 单独覆盖。","next":"保留 tests/runtime-regressions.test.ts 作为本地 Runner contract 的回归层。","affects":["EVIDENCE-01","C-LOCAL-01"],"source":"tests/runtime-regressions.test.ts"},
-    {"id":"PROB-LAYERS","status":"resolved","severity":"medium","title":"分层守卫绕过已封住","detail":"守卫改用 TypeScript AST 识别 static/dynamic/require/import-type；空 catalog hard fail，同一行 import 文本不再隐藏未知事件。新增 3 项回归。","next":"正式 Event Core 增加 schema 时继续由 catalog-first 守卫保护。","affects":["GATE-01","RM-1.1"],"source":"tests/layering.test.ts"},
+    {"id":"PROB-LAYERS","status":"resolved","severity":"medium","title":"分层守卫绕过已封住","detail":"守卫改用 TypeScript AST 识别 static/dynamic/require/import-type；空 catalog hard fail，同一行 import 文本不再隐藏未知事件。新增 3 项回归。","next":"正式 Event Core 增加 schema 时继续由 catalog-first 守卫保护。","affects":["GATE-01","RM-1.1a"],"source":"tests/layering.test.ts"},
     {"id":"PROB-SESSION","status":"resolved","severity":"medium","title":"本地 vendor session 已可持久恢复","detail":"Opaque session id 由 Runner 按 (user, project, agent) 原子落盘；仅同 host、adapter、canonical workspace 可恢复，不匹配即冷启动。","next":"Remote Runner 复用同一逻辑 session placement 与恢复规则。","affects":["SESSION-01"],"source":"tests/local-runner.test.ts"},
-    {"id":"PROB-STORE","status":"open","severity":"high","title":"Spike JSONL 仍不支持事务、多写者和幂等重试","detail":"崩溃尾恢复已修复，但 seq 分配仍是单进程内存计数；同一 dispatch 重试可能重复落事件，无法承担正式 Hub 存储。","next":"RM-1.2 以 SQLite/WAL、事务 seq 和 idempotency token 完整替换。","affects":["RM-1.2"],"source":"apps/chat-spike/src/log.mjs"},
+    {"id":"PROB-STORE","status":"open","severity":"high","title":"Spike JSONL 仍不支持事务、多写者和幂等重试","detail":"崩溃尾恢复已修复，但 seq 分配仍是单进程内存计数；同一 dispatch 重试可能重复落事件，无法承担正式 Hub 存储。","next":"RM-1.1b 以 SQLite/WAL、事务 seq 和 idempotency token 完整替换。","affects":["RM-1.1b"],"source":"apps/chat-spike/src/log.mjs"},
     {"id":"PROB-DOC","status":"resolved","severity":"medium","title":"文档状态、计数与 Runner 拓扑已同步","detail":"README、HANDOFF、CLAUDE、canonical docs、doc/next/todo 页面已统一到 12 个 MCP 工具、无 hosted CI、Server Hub 与 Local-first Runner 路线；固定旧测试数已移除。","next":"功能改动继续在同一提交更新关联文档和看板，不再复制第二份规范。","affects":["ADR-008","GATE-01"],"source":"docs/development/roadmap.md"},
     {"id":"PROB-SUPPLY","status":"open","severity":"medium","title":"依赖审计仍有 1 critical / 3 high 等告警","detail":"Vitest、Vite、nanoid 与生产链 fast-uri 均有已知 advisory；当前配置未发现可利用数据流，但版本需要升级或 override。","next":"固定 packageManager / Node，并在独立任务中升级后复跑 verify 与 audit。","affects":["GATE-01"],"source":"pnpm-lock.yaml"},
-    {"id":"PROB-RUNNER-IDEMP","status":"resolved","severity":"high","title":"Runner requestId 已具备跨重启 at-most-once 语义","detail":"0600 原子 request ledger 持久化 SHA-256 fingerprint、规范事件与终态，不保存 prompt；completed / failed 可重放，崩溃遗留 queued / running 明确恢复为 UNAVAILABLE。","next":"正式 Event Store 的写入幂等由 RM-1.2 独立实现，不与 Runner request ledger 混用。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"apps/chat-spike/src/runners/request-store.mjs"},
+    {"id":"PROB-RUNNER-IDEMP","status":"resolved","severity":"high","title":"Runner requestId 已具备跨重启 at-most-once 语义","detail":"0600 原子 request ledger 持久化 SHA-256 fingerprint、规范事件与终态，不保存 prompt；completed / failed 可重放，崩溃遗留 queued / running 明确恢复为 UNAVAILABLE。","next":"正式 Event Store 的写入幂等由 RM-1.1b 独立实现，不与 Runner request ledger 混用。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"apps/chat-spike/src/runners/request-store.mjs"},
     {"id":"PROB-RUNNER-LIFE","status":"resolved","severity":"high","title":"共享 Runner 生命周期与错误语义已冻结","detail":"Local / Remote 共用 dispatch、cancel、health、hasSession、resetSession、close；CANCELLED、TIMEOUT、UNAVAILABLE 与 ADAPTER_FAILURE 的 retry 分类和竞态由同一 contract suite 验证。","next":"新增 transport 只能实现这份契约，不得引入 provider-specific 分支。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"tests/helpers/runner-contract-suite.ts"},
     {"id":"PROB-HUB-FALLBACK","status":"resolved","severity":"critical","title":"Hub 已无绕过 Runner 的执行路径","detail":"Hub 构造现在强制完整 Runner，direct-adapter、working-copy、MCP mount 与 vendor CLI fallback 已移除；无完整 Runner 时 fail closed。","next":"server 组合根只负责选择并注入 Local 或 Remote Runner。","affects":["RUNNER-CONTRACT-01"],"source":"apps/chat-spike/src/hub.mjs"},
     {"id":"PROB-REMOTE-INTEGRATION","status":"resolved","severity":"high","title":"Remote transport 已接入生产组合根","detail":"首轮只有隔离 contract 测试，无法证明 server 与独立 Worker 能真正执行；现已增加显式 local/remote 模式、生产 Worker 入口和真实子进程纵向测试。","next":"后续 transport 修改必须同时通过共享契约与生产组合测试。","affects":["C-REMOTE-01"],"source":"tests/remote-server-integration.test.ts"},
     {"id":"PROB-REMOTE-FENCE","status":"resolved","severity":"critical","title":"租约、重连与 Hub 重启竞态已封住","detail":"仅靠 deliveryId 无法阻止旧 Worker 在重新租约后提交结果；现以随机 leaseId、心跳续租、活跃租约校验、孤儿分类、持久 request ledger 和 control deadline 实现 fencing。","next":"正式事件存储继续把 Runner 交付幂等与领域事件幂等分开。","affects":["C-REMOTE-01"],"source":"tests/remote-runner.test.ts"},
     {"id":"PROB-RUNNER-SECRET","status":"resolved","severity":"critical","title":"Vendor 子进程不再继承控制面凭据","detail":"安全审计发现 Runner、Human 与完整 Agent token map 会随环境传入厂商 CLI；统一 childProcessEnv 现先剥离全部 AGENT_OS_*，只显式回填当前 scoped URL/token，真实子进程测试验证无泄漏。","next":"新 adapter 必须复用同一环境净化边界。","affects":["C-REMOTE-01","HUB-SEC-01"],"source":"tests/remote-server-integration.test.ts"},
     {"id":"PROB-REMOTE-OFFLINE","status":"resolved","severity":"high","title":"离线 Remote host 现在 fail closed","detail":"Hub 曾能向没有活跃 Worker 的 placement 发起任务并等待超时；assign_task、send_message、/say 与 /task 现先验证执行就绪，离线时立即返回 MCP 错误或 HTTP 503。","next":"未来多 host 调度只能从健康 placement 中选择。","affects":["C-REMOTE-01"],"source":"apps/chat-spike/src/hub.mjs"},
-    {"id":"PROB-EVENT-SPEC","status":"open","severity":"high","title":"Event Core canonical 文档存在信封与 payload 冲突","detail":"strict domain schema 与 opaque Event Core、subject 必填与 Spike 可选、draft seq=null 与 stored seq 整数，以及 agent/task/approval 等 payload 字段在多份 canonical 文档中不一致。","next":"RM-1.1 先扩展既有权威文档并用 ADR 固化 draft/stored 与 strict parsing 边界，再实现 29 类 schema；不创建第二份重复规范。","affects":["RM-1.1"],"source":"docs/protocol/event-catalog.md"},
+    {"id":"PROB-EVENT-SPEC","status":"resolved","severity":"high","title":"Event Core canonical 文档的信封与 payload 冲突已收敛","detail":"ADR-009 固化 schemaVersion、EventInput/Draft/Stored、subject 必填、unknown fail-closed 与永久 replay；event catalog 已定义 29 类 strict v1 payload。","next":"V1 冻结；任何形状变化新增 schemaVersion 或 catalog event，不放宽 parser 兼容 Spike。","affects":["RM-1.1a"],"source":"docs/decisions/ADR-009-versioned-strict-event-contract.md"},
+    {"id":"PROB-EVENT-AUDIT","status":"resolved","severity":"high","title":"Event v1 对抗验收缺口已全部收口","detail":"parser 已绑定 type↔subject，移除可伪造返回类型的泛型，按 version-first 分派，精确比较任意 RFC3339 小数秒，并拒绝自因果、自回复、自依赖与自来源；全部解析结果递归冻结。workspace 门禁现在只禁止内部 @agent-os 依赖。","next":"V1 形状保持冻结；RM-1.1b 复用同一 StoredEvent parser 做 SQLite append/replay，不复制或放宽 schema。","affects":["RM-1.1a","RM-1.1b"],"source":"packages/event-core/src/envelope.ts"},
+    {"id":"PROB-RUNNER-CACHE-FLAKE","status":"open","severity":"medium","title":"Remote Worker 热缓存上限存在可观察时序竞态","detail":"完整并行门禁两次复现 worker.executions 在 Hub Promise 已全部完成时仍短暂为 3，契约断言上限 2；同一用例单独重复 5 次全过，说明不是容量逻辑的稳定失败，而是完成响应与 trim 的时序未被契约化。","next":"SVR-06 明确硬上限或最终收敛语义；修实现或用 waitFor 验证收敛并另测在途上界，禁止以 retry 隐藏。","affects":["SVR-06","C-REMOTE-01"],"source":"tests/remote-runner.test.ts"},
+    {"id":"PROB-WINDOWS-RUNNER","status":"open","severity":"critical","title":"Windows Worker 的凭据文件、进程树与环境继承尚不安全","detail":"MCP mount 会把 Agent bearer 写入可变 workspace 且可能跟随 symlink/junction/hardlink；0600 不等于 Windows ACL。取消只杀父进程，SIGTERM 不可用；vendor 还继承除 AGENT_OS_* 外的全部环境并用 PATH 裸命令。","next":"SVR-04 以真实 Windows ACL、reparse-point 防护、最小 env、可信 CLI 路径和完整进程树终止实现并验证；Grok 重启后不得有孤儿或秘密泄漏。","affects":["SVR-04","SVR-05"],"source":"apps/chat-spike/src/mcp-mount.mjs"},
+    {"id":"PROB-HUB-RUNTIME-TEST","status":"resolved","severity":"medium","title":"新增 Hub runtime 边界测试的确定性挂起已修复","detail":"根因是把已经完整读取的 IncomingMessage.destroyed 误当成不能回包，非法 JSON 路径因此悬挂；改用 aborted 判定并按语义拆分后，当前 runtime 文件 11/11 通过。","next":"保留客户端 deadline 与分拆用例；进一步用 Runner 半包测试覆盖 transport 旁路。","affects":["SVR-02"],"source":{"label":"server branch（待集成）· tests/hub-runtime.test.ts"}},
+    {"id":"PROB-HUB-DEPLOY-GATE","status":"resolved","severity":"medium","title":"Hub deploy gate 的只读 release 清理已收口","detail":"清理现在只接受已验证的 owned 临时父目录和名称，先恢复 owner write 再删除，并在清理成功后才输出 PASS；主任务复跑 exit 0，未留下 agent-os-hub-test 目录。","next":"保留严格目标校验，禁止将 cleanup 扩展到 workspace、release 根或未验证变量。","affects":["SVR-02"],"source":{"label":"server branch（待集成）· deploy/hub/verify.sh"}},
+    {"id":"PROB-HUB-DEPLOY-CONTRACT","status":"open","severity":"high","title":"受信 admin kit 与应用 artifact 的新契约尚未接通","detail":"当前重构中 artifact 已排除 deploy/，但 install、health 与 gate 仍有 release 内 deploy 路径；admin kit 尚未安装，静态 gate 仍断言旧 ExecStartPre。旧契约下的 PASS 不能证明新契约可部署。","next":"完全分离受信 root 工具与非 root 应用包，重写安装引用和门禁；只有新契约的 install/upgrade/rollback 全部通过后才能恢复 PASS。","affects":["SVR-02"],"source":{"label":"server branch（待集成）· deploy/hub/bin/package-release.sh"}},
+    {"id":"PROB-RUNNER-SLOW-BODY","status":"resolved","severity":"high","title":"Runner transport 的慢 body 与 early-reject 旁路已封住","detail":"Remote body reader 现在有 1 MiB、3 秒绝对 deadline、abort/error 清理与 CL fast reject；匿名 401 和错误方法 405 固定回包后关闭连接。timer 通过注入 API 局部验证，不再污染全局。","next":"保留 body 专项与完整 Remote 回归；真实 Nginx 还需验证 client/upstream timeout 与连接配额。","affects":["SVR-02","SVR-05"],"source":"tests/remote-runner.test.ts"},
+    {"id":"PROB-HUB-DEPLOY-TRUST","status":"open","severity":"critical","title":"应用 release 内脚本可经部署链获得 root 执行","detail":"systemd 用 + 执行 current release 的 validate-config，root install/upgrade 也调用 release 自带 health-check；当前 verifier 只查文件存在，SHA 只证明完整性，不证明发布者，恶意结构合法 artifact 可越过 agent-os 身份边界。首次安装失败还会留下 env/current/unit 半状态并阻止安全重试。","next":"把 root helper 固定到 release 外的 root-owned 可信路径并验证签名 manifest；应用包只以 agent-os 运行。安装改为离线全验证后原子提交，逐 checksum/tar/start/ready 故障证明幂等恢复。","affects":["SVR-02","SVR-06"],"source":{"label":"server branch（待集成）· deploy/hub/systemd/agent-os-hub.service"}},
+    {"id":"PROB-HUB-ACTIVATION","status":"open","severity":"high","title":"候选版本在健康门禁前已接流量并可改共享状态","detail":"upgrade 先切 current 并在固定 4173 启动 candidate，Nginx 会立刻代理；失败后只回滚代码却声明 state unchanged。health-check 只看任意 HTTP 200，错误进程占端口也可能假绿；unit/proxy 还缺主机级连接、内存、任务、FD、core 与 capability 边界。","next":"增加 maintenance 或独立 candidate 端口与流量门控，校验精确响应、systemd active/MainPID；失败候选不得改状态或成为 previous，并在真实 systemd 249/Nginx 上验证资源边界。","affects":["SVR-02","SVR-03","SVR-06"],"source":{"label":"server branch（待集成）· deploy/hub/bin/upgrade.sh"}},
+    {"id":"PROB-HUB-PRODUCTION","status":"open","severity":"high","title":"Remote Hub 当前只能作为 staging，不能声明公网生产就绪","detail":"权威事件仍在无事务/fsync 的 throwaway JSONL，正式耐久性依赖 RM-1.1b SQLite；当前 Server 路线只签收受控 staging 与跨机证据，不把 Spike 冒充正式真相源。","next":"SVR-02/03 完成运行与部署边界并明确 staging 限制；RM-1.1b 完成前不做 production-ready 签收，不用停机复制 JSONL 冒充正式一致备份。","affects":["SVR-02","SVR-03","SVR-05","RM-1.1b"],"source":"apps/chat-spike/src/server.mjs"},
+    {"id":"PROB-HUB-RUNTIME-LIMITS","status":"open","severity":"high","title":"Hub 生产流量的内存、背压、退避与日志边界尚未封住","detail":"最新独立 runtime 审查发现 Remote event 可累计占用内存、SSE 慢客户端缺背压、通用路由半包未在可安全拒绝时提前终止、Worker 固定 100ms 重试可形成风暴，local token 还可能进入 journald。","next":"为五项分别加入确定预算、慢客户端断开或限流、半包安全拒绝、带抖动指数退避和凭据脱敏；以可复现测试覆盖后重跑 97 项服务器相关回归。","affects":["SVR-02","SVR-05","SVR-06"],"source":"apps/chat-spike/src/server.mjs"},
+    {"id":"PROB-HUB-COMPENSATION","status":"open","severity":"high","title":"部署补偿可能被内部 exit 提前截断","detail":"移除 EXIT trap 后，恢复函数仍调用会直接 exit 的 helper；enable 校验等失败可终止 shell，从而跳过最终 stop、disable 与 hard-maintenance，失败安装不一定保持封闭。","next":"补偿路径只返回状态并汇总失败；注入 is-enabled=false、sentinel 异常等故障，证明所有退出路径最终仍 stop + disable + hard-maintenance。","affects":["SVR-02","SVR-06"],"source":{"label":"server branch（待集成）· Hub install/upgrade compensation"}},
+    {"id":"PROB-HUB-RESTART","status":"open","severity":"high","title":"真实 Hub/Worker 重启不会自动收敛遗留 running task","detail":"现有重启测试由测试代码手工用同一 requestId 再 dispatch，只证明 transport 重放；真实 server 重启没有恢复 in-flight dispatch 或状态推进，Worker 将 running ledger 变为 UNAVAILABLE 后，Hub task 仍可能永久 running。","next":"SVR-05 给出真实最小复现与期望责任边界；若策略属于正式 Task Engine，保留 blocker 到 RM-1.2a，不在 Spike 部署层擅自发明转移。","affects":["SVR-05","RM-1.2a"],"source":"tests/remote-runner.test.ts"},
 
     {"id":"FIX-CAUSE","status":"resolved","severity":"high","title":"省略 replyTo 可脱离因果链","detail":"首次真机运行发现 Agent 可省略 replyTo 使深度归零。runtime 现会在调用方未提供时补 causedBy。","next":"保留回归测试并继续验证显式伪造 replyTo。","affects":["HUB-B.2"],"source":"apps/chat-spike/FINDINGS.md"},
     {"id":"FIX-REGISTER","status":"resolved","severity":"medium","title":"重复注册污染永久事件日志","detail":"Agent 中途重复 register 曾追加第二条 agent.registered。实现已改为重复注册幂等。","next":"重启后重新注册仍需回归覆盖。","affects":["HUB-A.1"],"source":"apps/chat-spike/FINDINGS.md"},
     {"id":"FIX-ECHO","status":"resolved","severity":"medium","title":"任务唤醒造成交付内容回显两遍","detail":"按因果链判断“这一轮是否说过话”无法覆盖任务 wake；现改为比较 runtime 拥有的 seq 位置。","next":"保留一次且仅一次交付测试。","affects":["HUB-C"],"source":"apps/chat-spike/FINDINGS.md"},
-    {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层零依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
+    {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
-    {"at":"2026-08-23 21:26","kind":"decision","entity":"RM-1.1","title":"路线切换到 Event Core 规范审计","detail":"Remote Runner 已完成；当前先消除 canonical 信封、payload、draft/stored 与 strict parsing 冲突，再实现 29 类 schema 和 ULID。"},
+    {"at":"2026-08-23 23:06","kind":"problem","entity":"PROB-HUB-COMPENSATION","title":"部署补偿的 Bash 退出路径仍未封闭","detail":"服务器工程师推进到 SVR-02 64% 后发现恢复 helper 可直接 exit，跳过 stop / disable / hard-maintenance；已要求改为返回状态并用多故障注入证明最终 fail closed。"},
+    {"at":"2026-08-23 22:53","kind":"problem","entity":"PROB-HUB-RUNTIME-LIMITS","title":"Server runtime 新增 5 项生产边界门禁","detail":"69/69 只证明现有契约回归稳定；进一步对抗审查发现 event 累计内存、SSE 背压、半包拒绝、100ms 重试风暴与 journald token 风险。SVR-02 保持 58%，待实现和 97 项回归。"},
+    {"at":"2026-08-23 22:50","kind":"verified","entity":"SVR-02","title":"服务器 runtime 组合回归 69/69 通过","detail":"主任务在隔离服务器分支独立运行 Hub runtime 12、Hub security 10、Remote production 4、Remote Runner 43 项，全部通过且零 unhandled；SVR-02 从 50% 调至 58%，部署事务与信任门禁仍阻止签收。"},
+    {"at":"2026-08-23 23:08","kind":"verified","entity":"RM-1.1a","title":"最终包入口与完整门禁复验通过","detail":"ULID entropy failure 改为事务式状态提交并增加 3 条回归；从构建后的 package 入口复验 fail closed。build、类型契约、Biome、分层和 15 个测试文件一次通过，共 323/323。"},
+    {"at":"2026-08-23 22:49","kind":"completed","entity":"RM-1.1a","title":"Event Core 严格事件契约完成","detail":"对抗审查缺口全部修复；新增深冻结工具、version-first 分派、subject 绑定、精确时间与安全 parser 类型，契约专项扩到 164/164；最终全仓门禁为 15/15 文件、323/323 测试。"},
+    {"at":"2026-08-23 22:40","kind":"problem","entity":"PROB-HUB-DEPLOY-CONTRACT","title":"旧 deploy PASS 已按新信任契约作废","detail":"独立复核发现 artifact、extract allowlist、install、health、admin kit 与静态断言仍处在互不兼容的重构中间态；服务器工程师已确认不会提交，SVR-02 保持 50%。"},
+    {"at":"2026-08-23 22:40","kind":"completed","entity":"BOARD-03","title":"首屏执行状态与总体进度已同步","detail":"静态首屏不再残留“等待安排”和 0% 占位；当前明确显示 SVR-02 执行中，加载前后总体进度均为 35.2%，刷新即可看到 r32。"},
+    {"at":"2026-08-23 22:35","kind":"verified","entity":"PROB-RUNNER-SLOW-BODY","title":"Remote body 专项 5/5、完整文件 43/43 通过","detail":"有效凭据半包在 3 秒 408，CL/chunked 超限 413，abort 可恢复，匿名 401 与 405 立即 fail-and-close；timer 注入替代全局 spy，复验零 unhandled。"},
+    {"at":"2026-08-23 22:34","kind":"completed","entity":"BOARD-03","title":"顶部总体进度覆盖全部去重 Task","detail":"此前虽按 progress 加权，但数据源仍只有 canonical Roadmap，Server 路线不会改变顶部数字；现在全部 Task 去重计权并显示 1 位小数，同时单列 canonical 与当前路线百分比。"},
+    {"at":"2026-08-23 22:32","kind":"problem","entity":"PROB-RUNNER-SLOW-BODY","title":"Remote body 回归因全局 timer 污染大面积失败","detail":"主任务联跑：Hub runtime 11/11 通过；Remote 43 项中 24 失败、9 个 unhandled。fake timer 对 clearTimeout 的 spy 泄漏到后续测试，已要求局部隔离后全文件零异常复验。"},
+    {"at":"2026-08-23 22:31","kind":"problem","entity":"PROB-HUB-DEPLOY-TRUST","title":"部署信任边界与半安装状态阻止 SVR-02 提交","detail":"独立审查确认 release 自带脚本可被 root 执行，artifact verifier 无发布者认证；checksum、start 或 ready 失败后 install 也不可幂等重试。已要求 root helper 外置、签名清单和逐故障恢复。"},
+    {"at":"2026-08-23 22:31","kind":"problem","entity":"PROB-HUB-ACTIVATION","title":"健康门禁前 candidate 已暴露给公网","detail":"固定 4173 使候选启动即接收 Nginx 流量，失败回滚不能保证状态不变；仅看 200 还可被错误进程假冒。流量门控、精确进程健康和 systemd/Nginx 资源限制进入签收门槛。"},
+    {"at":"2026-08-23 22:23","kind":"problem","entity":"PROB-RUNNER-SLOW-BODY","title":"Runner 路由存在 body timeout 旁路","detail":"对抗审查以有效 Runner 身份发送 Content-Length 100 但只传一个字节，3.6 秒仍无响应；当前 11/11 runtime 测试未覆盖，已要求与普通 API 使用相同 deadline 和清理契约。"},
+    {"at":"2026-08-23 22:23","kind":"verified","entity":"SVR-02","title":"部署门禁清理修复后真正 exit 0","detail":"install、upgrade、rollback、失败候选回滚全部执行，PASS 只在严格限定的临时根成功清除后输出；主任务复跑无 agent-os-hub-test 残留，SVR-02 进度调至 50%。"},
+    {"at":"2026-08-23 22:20","kind":"problem","entity":"PROB-HUB-DEPLOY-GATE","title":"部署门禁先报 PASS、最终仍 exit 1","detail":"install→upgrade→rollback→失败回滚断言均执行，但测试 release 被冻结为只读后无法由普通用户清理；门禁遗留 temp tree，已要求限定范围恢复写位并让 PASS 只在成功清理后出现。"},
+    {"at":"2026-08-23 22:15","kind":"problem","entity":"PROB-HUB-RUNTIME-TEST","title":"新增 runtime 测试 1/2 因整体超时失败","detail":"主任务独立执行 tests/hub-runtime.test.ts：Runner close 失败传播通过，health/body/abort/shutdown 组合用例 40 秒未收敛；已要求拆分定位并修复，不能以扩大 timeout 掩盖。"},
+    {"at":"2026-08-23 22:13","kind":"verified","entity":"SVR-02","title":"现有 Hub / Remote 组合回归 14/14 通过","detail":"在允许本机 loopback 的验收环境中，hub-security 10/10、remote-server-integration 4/4 通过；新增 body、health、abort 与 shutdown 边界测试尚未交付，因此任务仍保持 30%。"},
+    {"at":"2026-08-23 22:11","kind":"verified","entity":"SVR-02","title":"Hub hardening 完成首轮增量审查","detail":"已看到 body 1 MiB 上限、5 秒读取超时、draining、10 秒 shutdown deadline、live/ready 和 Runner close 错误上抛；进度调至 30%。同时要求代理显式保护 health 路径并补边界、abort 与退出失败测试。"},
+    {"at":"2026-08-23 22:09","kind":"verified","entity":"SVR-01","title":"服务器部署契约通过主任务验收","detail":"3454ca0 已推送；提交仅含 3 份文档，链接全部有效，差异无主机地址、密钥标记、Bearer 或长 token-like 内容。"},
+    {"at":"2026-08-23 22:09","kind":"completed","entity":"SVR-01","title":"两端基线与 staging 契约完成","detail":"Ubuntu/Windows 环境、HTTPS 依赖、身份目录、状态恢复、健康生命周期与生产阻塞已收敛到 deploy/README.md 单一运维来源。"},
+    {"at":"2026-08-23 22:09","kind":"decision","entity":"SVR-02","title":"切换到 Ubuntu Hub 可部署单元","detail":"服务器工程师分别推进运行时 hardening 与 systemd/proxy/install/rollback 资产；主任务按 P0 安全清单逐提交审查。"},
+    {"at":"2026-08-23 22:02","kind":"completed","entity":"BOARD-02","title":"总体完成度改为实际进度加权","detail":"此前只统计 completed Task，70% 的进行中任务不会改变总百分比；现在 canonical Roadmap 按每项 progress 实时加权，并单列当前路线加权进度。"},
+    {"at":"2026-08-23 22:01","kind":"verified","entity":"SVR-01","title":"Ubuntu / Windows 两端只读盘点完成","detail":"Ubuntu、Nginx/TLS、systemd 与 Windows、Node、Grok、Task Scheduler、SSH 现状已脱敏记录；部署 runbook 进入审查收尾。"},
+    {"at":"2026-08-23 21:59","kind":"problem","entity":"PROB-WINDOWS-RUNNER","title":"Windows 对抗审查确认四类 P0 边界","detail":"凭据文件可跟随重解析点、POSIX mode 不能证明 ACL、取消不杀进程树、denylist 环境会泄露无关 secret；已全部反馈给服务器工程师。"},
+    {"at":"2026-08-23 21:59","kind":"problem","entity":"PROB-HUB-PRODUCTION","title":"公网 Hub 验收范围校准为 staging","detail":"现有 52 项代码测试不覆盖 systemd/TLS/健康/备份；JSONL 仍是正式上线阻塞。服务器路线先交付安全 staging 和真实双机证据。"},
+    {"at":"2026-08-23 21:59","kind":"problem","entity":"PROB-HUB-RESTART","title":"重启测试未证明任务状态恢复","detail":"transport 可重放不等于任务可恢复；真实 Hub/Worker 中断后的 running task 终态与重派责任加入 SVR-05。"},
+    {"at":"2026-08-23 21:56","kind":"problem","entity":"PROB-RUNNER-CACHE-FLAKE","title":"完整门禁稳定复现 Remote cache 时序失败","detail":"pnpm verify：build、Biome 70 files、layers 4/4 通过；Vitest 271/273。Remote 热缓存竞态与 workspace 旧断言各失败 1 项，门禁保持 3/4。"},
+    {"at":"2026-08-23 21:55","kind":"verified","entity":"SVR-06","title":"Remote 生产组合基线可运行","detail":"获得本机 loopback 权限后，生产组合 4/4、共享 Runner 18/18 通过；Remote transport 38 项中仅缓存收敛时序 1 项失败。"},
+    {"at":"2026-08-23 21:50","kind":"decision","entity":"SVR-01","title":"服务器工作流已拆分并派发","detail":"服务器工程师在隔离 codex/server-runtime 分支负责 Ubuntu 部署、Windows Worker、真实 Grok 双机验证和运维交付；主任务负责接口冻结、review 与联调验收。"},
+    {"at":"2026-08-23 21:50","kind":"problem","entity":"PROB-EVENT-AUDIT","title":"Event Core 暂停前完成对抗审查","detail":"114 项目标测试通过但尚不足以签收：type↔subject、parser 泛型、亚毫秒时间、自引用和嵌套测试缺口已登记，当前改动未提交。"},
+    {"at":"2026-08-23 21:50","kind":"decision","entity":"RM-1.1a","title":"Event Core 在安全点暂停","detail":"保留 70% 实现与全部未提交修改，不继续扩展；等待服务器工作流并行启动后由主任务恢复修复和验收。"},
+    {"at":"2026-08-23 21:26","kind":"decision","entity":"RM-1.1a","title":"路线切换到 Event Core 规范审计","detail":"Remote Runner 已完成；当前先消除 canonical 信封、payload、draft/stored 与 strict parsing 冲突，再实现 29 类 schema 和 ULID。"},
     {"at":"2026-08-23 21:26","kind":"verified","entity":"C-REMOTE-01","title":"Remote Runner 完整门禁通过","detail":"TypeScript、Biome 64 files、4 条分层规则及 13 个测试文件 159/159 全绿；其中 Remote 38 项、生产组合 4 项。"},
     {"at":"2026-08-23 21:26","kind":"completed","entity":"C-REMOTE-01","title":"生产 Remote Runner 路径完成","detail":"Hub 主动接收出站 Worker、持久幂等与 placement、租约 fencing、离线拒绝、独立凭据和生产启动入口全部完成。"},
     {"at":"2026-08-23 21:26","kind":"problem","entity":"PROB-RUNNER-SECRET","title":"对抗审查发现并封住子进程凭据继承","detail":"厂商 CLI 曾可继承控制面 token；统一环境净化后，真实子进程只看到当前 scoped credential。"},
@@ -394,7 +445,17 @@ const statusColors={created:"var(--faint)",assigned:"var(--info)",running:"var(-
 const priorityColors={P0:"var(--risk)",P1:"var(--warn)",P2:"var(--info)"};
 const view={scope:"all",query:"",problem:"all"};
 const esc=(value)=>String(value??"").replace(/[&<>\"']/g,(char)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[char]);
+const sourceMeta=(source)=>typeof source==="string"?{label:source,href:source}:source;
+const sourceRef=(source,labelPrefix="")=>{
+  const meta=sourceMeta(source);
+  const label=labelPrefix+meta.label;
+  return meta.href
+    ? `<a href="${esc(meta.href)}">${esc(label)}</a>`
+    : `<span class="source-label">${esc(label)}</span>`;
+};
 const roadmapTasks=DATA.tasks.filter((task)=>task.scope==="roadmap");
+const prototypeTasks=roadmapTasks.filter((task)=>["Phase 0","Hub"].includes(task.phase));
+const completedPrototype=prototypeTasks.filter((task)=>task.status==="completed");
 const routeTasks=DATA.currentRoute.map((id)=>byId.get(id)).filter(Boolean);
 const completedRoadmap=roadmapTasks.filter((task)=>task.status==="completed");
 const openProblems=DATA.problems.filter((problem)=>problem.status==="open");
@@ -406,29 +467,36 @@ function setMeta(){
 }
 
 function renderOverall(){
-  const total=roadmapTasks.length;
-  const done=completedRoadmap.length;
-  const remaining=total-done;
-  const pct=total?Math.round(done/total*100):0;
-  const routeDone=routeTasks.filter((task)=>task.status==="completed").length;
+  const overallTasks=DATA.tasks;
+  const total=overallTasks.length;
+  const done=overallTasks.filter((task)=>task.status==="completed").length;
+  const earned=overallTasks.reduce((sum,task)=>sum+Math.max(0,Math.min(100,Number(task.progress)||0)),0);
+  const possible=total*100;
+  const pct=possible?Math.round(earned/possible*1000)/10:0;
+  const roadmapEarned=roadmapTasks.reduce((sum,task)=>sum+Math.max(0,Math.min(100,Number(task.progress)||0)),0);
+  const roadmapPct=roadmapTasks.length?Math.round(roadmapEarned/(roadmapTasks.length*100)*1000)/10:0;
+  const routeEarned=routeTasks.reduce((sum,task)=>sum+Math.max(0,Math.min(100,Number(task.progress)||0)),0);
+  const routePct=routeTasks.length?Math.round(routeEarned/(routeTasks.length*100)*1000)/10:0;
   const ring=document.querySelector("#overall-ring");
   ring.style.setProperty("--overall-pct",`${pct}%`);
-  ring.setAttribute("aria-label",`项目总体进度 ${pct}%，${done} / ${total} 项完成`);
+  ring.setAttribute("aria-label",`项目总体进度 ${pct}%，${done} / ${total} 项完成，按任务实际进度加权`);
   document.querySelector("#overall-percent").textContent=`${pct}%`;
   document.querySelector("#overall-bar").style.setProperty("--pct",`${pct}%`);
-  document.querySelector("#overall-fraction").textContent=`${done} / ${total} Roadmap Tasks completed`;
+  document.querySelector("#overall-fraction").textContent=`${done}/${total} 已完成 · ${earned}/${possible} progress points`;
   document.querySelector("#overall-breakdown").innerHTML=[
     `<div class="overall-stat ok"><small>已完成</small><b>${done}</b></div>`,
-    `<div class="overall-stat"><small>未完成</small><b>${remaining}</b></div>`,
-    `<div class="overall-stat"><small>当前路线</small><b>${routeDone}/${routeTasks.length}</b></div>`,
+    `<div class="overall-stat"><small>Canonical</small><b>${roadmapPct}%</b></div>`,
+    `<div class="overall-stat"><small>当前路线</small><b>${routePct}%</b></div>`,
     `<div class="overall-stat risk"><small>开放问题</small><b>${openProblems.length}</b></div>`
   ].join("");
 }
 
 function renderKpis(){
+  const phaseOne=roadmapTasks.filter((task)=>task.phase==="Phase 1");
+  const phaseOneDone=phaseOne.filter((task)=>task.status==="completed").length;
   const metrics=[
     {label:"验证实验",value:`${DATA.capabilities.experimentsPassed}/${DATA.capabilities.experimentsTotal}`,sub:"5 个 Spike 阶段已证实",color:"var(--ok)"},
-    {label:"正式 Phase 1",value:"0/5",sub:"正式里程碑尚未交付",color:"var(--info)"},
+    {label:"正式 Phase 1 子项",value:`${phaseOneDone}/${phaseOne.length}`,sub:"RM-1.1a 已交付",color:"var(--info)"},
     {label:"完整门禁",value:`${DATA.verification.gatePassed}/${DATA.verification.gateTotal}`,sub:`Biome ${DATA.verification.lintErrors} errors`,color:"var(--risk)"},
     {label:"行为测试",value:`${DATA.verification.testsPassed}/${DATA.verification.testsTotal}`,sub:`${DATA.verification.filesPassed}/${DATA.verification.filesTotal} files pass`,color:"var(--ok)"},
     {label:"MCP 工具",value:`${DATA.capabilities.mcpImplemented}/${DATA.capabilities.mcpTotal}`,sub:"Spike / canonical",color:"var(--warn)"},
@@ -444,12 +512,14 @@ function progressCard(title,description,done,total,color,left,right){
 
 function renderProgress(){
   const routeDone=routeTasks.filter((task)=>task.status==="completed").length;
+  const routeProgress=routeTasks.reduce((sum,task)=>sum+(Number(task.progress)||0),0);
   const p1=roadmapTasks.filter((task)=>task.phase==="Phase 1");
   const p1Done=p1.filter((task)=>task.status==="completed").length;
+  const p1Progress=p1.reduce((sum,task)=>sum+(Number(task.progress)||0),0);
   document.querySelector("#progress-grid").innerHTML=[
-    progressCard("原型／验证","Phase 0 与 Agent Hub 已跑出真实证据",completedRoadmap.length,10,"var(--ok)","Spike 完成","100%"),
-    progressCard("当前本地优先路线","Gate → Security → Local → Contract → Remote → Core",routeDone,routeTasks.length,"var(--accent)","等待安排",`${routeTasks.length-routeDone} 项未完成`),
-    progressCard("正式 Phase 1","正式 packages 仍只有类型和契约",p1Done,p1.length,"var(--info)","0 个行为里程碑",`${p1.length} 项 backlog`)
+    progressCard("原型／验证","Phase 0 与 Agent Hub 已跑出真实证据",completedPrototype.length,prototypeTasks.length,"var(--ok)","Spike 完成"),
+    progressCard("当前执行路线","已完成基础路线，正在并行推进 Server 与 Event Core",routeProgress,routeTasks.length*100,"var(--accent)",`${routeDone}/${routeTasks.length} 项完成`,`${Math.round(routeProgress/(routeTasks.length*100)*100)}%`),
+    progressCard("正式 Phase 1","正式 packages 已进入 Event Core 契约实现",p1Progress,p1.length*100,"var(--info)",`${p1Done}/${p1.length} 项完成`,`${Math.round(p1Progress/(p1.length*100)*100)}%`)
   ].join("");
 }
 
@@ -506,7 +576,8 @@ function renderRoadmap(){
   document.querySelector("#roadmap-list").innerHTML=DATA.roadmapPhases.map((phase)=>{
     const tasks=roadmapTasks.filter((task)=>task.phase===phase.id);
     const done=tasks.filter((task)=>task.status==="completed").length;
-    const pct=Math.round(done/tasks.length*100);
+    const progress=tasks.reduce((sum,task)=>sum+(Number(task.progress)||0),0);
+    const pct=tasks.length?Math.round(progress/(tasks.length*100)*100):0;
     return `<details class="phase-row" ${phase.id==="Phase 1"?"open":""}><summary><span class="phase-name"><b>${esc(phase.id)} · ${esc(phase.title)}</b><small>${esc(phase.goal)}</small></span><span class="phase-progress"><span class="bar" style="--bar-color:${done===tasks.length?"var(--ok)":"var(--info)"}"><span style="--pct:${pct}%"></span></span></span><span class="phase-count">${done}/${tasks.length}</span><span class="chev">›</span></summary><div class="roadmap-list">${tasks.map((task)=>`<div class="roadmap-task" data-open-task="${esc(task.id)}"><span class="roadmap-id">${esc(task.id)}</span><span><span class="roadmap-title">${esc(task.title)}</span><span class="roadmap-accept">${esc(task.acceptance)}</span></span><span class="roadmap-state">${roadmapStateChip(task)}</span></div>`).join("")}</div></details>`;
   }).join("");
 }
@@ -520,13 +591,13 @@ function renderProblems(){
   if(view.problem!=="all")problems=problems.filter((problem)=>problem.status===view.problem);
   document.querySelector("#problem-list").innerHTML=problems.map((problem)=>{
     const [label,color,kind]=severityMeta(problem.severity);
-    return `<article class="problem ${problem.status}" style="--severity:${color}"><div class="problem-top"><div><div class="problem-id">${esc(problem.id)}</div><h3>${esc(problem.title)}</h3></div><span class="chip ${problem.status==="resolved"?"ok":kind}">${problem.status==="resolved"?"已解决":label}</span></div><p>${esc(problem.detail)}</p><div class="problem-next"><b>下一步：</b>${esc(problem.next)}</div><div class="problem-links"><span class="chip">影响 ${problem.affects.length} Task</span><a href="${esc(problem.source)}">证据来源 →</a></div></article>`;
+    return `<article class="problem ${problem.status}" style="--severity:${color}"><div class="problem-top"><div><div class="problem-id">${esc(problem.id)}</div><h3>${esc(problem.title)}</h3></div><span class="chip ${problem.status==="resolved"?"ok":kind}">${problem.status==="resolved"?"已解决":label}</span></div><p>${esc(problem.detail)}</p><div class="problem-next"><b>下一步：</b>${esc(problem.next)}</div><div class="problem-links"><span class="chip">影响 ${problem.affects.length} Task</span>${sourceRef(problem.source,"证据来源 · ")}</div></article>`;
   }).join("");
 }
 
 function renderActivity(){
   const colors={completed:"var(--ok)",verified:"var(--info)",decision:"var(--accent)",problem:"var(--risk)"};
-  document.querySelector("#activity-list").innerHTML=DATA.activity.map((item)=>`<div class="activity-item"><span class="activity-time">${esc(item.at)}</span><i class="activity-mark" style="--event-color:${colors[item.kind]??"var(--info)"}"></i><span class="activity-copy"><b>${esc(item.title)}</b><p><code>${esc(item.entity)}</code> · ${esc(item.detail)}</p></span></div>`).join("");
+  document.querySelector("#activity-list").innerHTML=[...DATA.activity].sort((a,b)=>b.at.localeCompare(a.at)).map((item)=>`<div class="activity-item"><span class="activity-time">${esc(item.at)}</span><i class="activity-mark" style="--event-color:${colors[item.kind]??"var(--info)"}"></i><span class="activity-copy"><b>${esc(item.title)}</b><p><code>${esc(item.entity)}</code> · ${esc(item.detail)}</p></span></div>`).join("");
 }
 
 function renderSources(){document.querySelector("#sources").innerHTML=DATA.sources.map((source)=>`<a class="source-chip" href="${esc(source.href)}">${esc(source.label)}</a>`).join("");}
@@ -536,7 +607,7 @@ function showTask(id){
   document.querySelector("#dialog-id").textContent=task.id;
   document.querySelector("#dialog-title").textContent=task.title;
   const blocked=(task.blockedBy??[]).map((problemId)=>DATA.problems.find((problem)=>problem.id===problemId)).filter(Boolean);
-  document.querySelector("#dialog-body").innerHTML=`<div class="detail-grid"><div class="detail"><small>状态</small><b>${statusLabels[task.status]}</b></div><div class="detail"><small>进度</small><b>${task.progress}%</b></div><div class="detail"><small>优先级</small><b>${esc(task.priority)}</b></div><div class="detail"><small>阶段</small><b>${esc(task.phase)}</b></div><div class="detail"><small>Owner</small><b>${esc(task.owner)}</b></div><div class="detail"><small>范围</small><b>${task.scope==="route"?"当前执行路线":"Canonical Roadmap"}</b></div></div><div class="detail-block"><h4>任务说明</h4><p>${esc(task.summary)}</p></div><div class="detail-block"><h4>完成判据</h4><p>${esc(task.acceptance)}</p></div><div class="detail-block"><h4>依赖</h4><p>${task.dependsOn?.length?task.dependsOn.map(esc).join(" → "):"无"}</p></div>${blocked.length?`<div class="detail-block"><h4>关联 Problems</h4><p>${blocked.map((problem)=>`${esc(problem.id)} · ${esc(problem.title)}`).join("<br>")}</p></div>`:""}<div class="detail-block"><h4>来源</h4><p><a href="${esc(task.source)}">${esc(task.source)}</a></p></div>`;
+  document.querySelector("#dialog-body").innerHTML=`<div class="detail-grid"><div class="detail"><small>状态</small><b>${statusLabels[task.status]}</b></div><div class="detail"><small>进度</small><b>${task.progress}%</b></div><div class="detail"><small>优先级</small><b>${esc(task.priority)}</b></div><div class="detail"><small>阶段</small><b>${esc(task.phase)}</b></div><div class="detail"><small>Owner</small><b>${esc(task.owner)}</b></div><div class="detail"><small>范围</small><b>${task.scope==="route"?"当前执行路线":"Canonical Roadmap"}</b></div></div><div class="detail-block"><h4>任务说明</h4><p>${esc(task.summary)}</p></div><div class="detail-block"><h4>完成判据</h4><p>${esc(task.acceptance)}</p></div><div class="detail-block"><h4>依赖</h4><p>${task.dependsOn?.length?task.dependsOn.map(esc).join(" → "):"无"}</p></div>${blocked.length?`<div class="detail-block"><h4>关联 Problems</h4><p>${blocked.map((problem)=>`${esc(problem.id)} · ${esc(problem.title)}`).join("<br>")}</p></div>`:""}<div class="detail-block"><h4>来源</h4><p>${sourceRef(task.source)}</p></div>`;
   document.querySelector("#task-dialog").showModal();
 }
 

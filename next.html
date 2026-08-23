@@ -206,34 +206,34 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
       <header class="hero" id="overview">
         <div>
           <div class="eyebrow">Next move · decision brief</div>
-          <h1>调用链已经跑通，现在进入正式 Event Core</h1>
-          <p class="lede">Local Runner、共享契约和生产 Remote Runner 均已验证。当前关键路径是先统一 canonical 事件规范，再依次实现 strict 信封、SQLite 事件存储、重放与任务生命周期；Spike 继续作为证据，不直接演变成正式内核。</p>
+          <h1>Event Contract 已完成，现在验收 Server Hub</h1>
+          <p class="lede">Local Runner、共享契约、production-mode Remote Runner 和 RM-1.1a Event Contract 均已验证。当前关键路径是先完成 Server Hub 的受信部署、备份恢复与 Windows Worker 联调，再回到 RM-1.1b SQLite 事件存储；Spike 继续作为证据，不直接演变成正式内核。</p>
           <div class="hero-actions">
             <a class="btn primary" href="#start">从推荐起点开始</a>
             <a class="btn" href="#options">查看全部选择</a>
           </div>
         </div>
         <aside class="route-card" aria-label="默认推荐路线">
-          <div class="route-head"><strong>默认推荐路线</strong><span class="recommended">1.1 → 1.2 → 1.3 → 1.5 → 1.8</span></div>
+          <div class="route-head"><strong>默认推荐路线</strong><span class="recommended">Local ✓ → Remote ✓ → Event ✓ → Server → SQLite</span></div>
           <div class="mini-route">
-            <div class="mini-step"><span class="mini-n">01</span><span><b>统一事件规范</b><small>信封 · draft/stored · 29 类 payload</small></span><span class="mini-time">当前</span></div>
-            <div class="mini-step"><span class="mini-n">02</span><span><b>实现 strict Event Core</b><small>ULID · parser · 类型导出</small></span><span class="mini-time">1–2d</span></div>
-            <div class="mini-step"><span class="mini-n">03</span><span><b>SQLite append-only store</b><small>事务 seq · WAL · 幂等 token</small></span><span class="mini-time">2–3d</span></div>
-            <div class="mini-step"><span class="mini-n">04</span><span><b>重放与 reducer</b><small>总线 · 注册 · replay 等价</small></span><span class="mini-time">1–2d</span></div>
-            <div class="mini-step"><span class="mini-n">05</span><span><b>任务循环与 MCP</b><small>生命周期 · 路由 · strict tools</small></span><span class="mini-time">后续</span></div>
+            <div class="mini-step"><span class="mini-n">01</span><span><b>Local / Remote Runner</b><small>共享契约 · transport · 重启恢复</small></span><span class="mini-time">✓</span></div>
+            <div class="mini-step"><span class="mini-n">02</span><span><b>RM-1.1a Event Contract</b><small>ULID · version-first · 29 类 schema</small></span><span class="mini-time">✓</span></div>
+            <div class="mini-step"><span class="mini-n">03</span><span><b>SVR-02 Hub 部署单元</b><small>受信工具 · 事务安装 · candidate 隔离</small></span><span class="mini-time">当前</span></div>
+            <div class="mini-step"><span class="mini-n">04</span><span><b>SVR-03～06 联调验收</b><small>备份恢复 · Windows Worker · 故障演练</small></span><span class="mini-time">后续</span></div>
+            <div class="mini-step"><span class="mini-n">05</span><span><b>RM-1.1b SQLite store</b><small>事务 seq · WAL · 幂等 token</small></span><span class="mini-time">Server 后</span></div>
           </div>
         </aside>
       </header>
 
       <div class="alert">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3.5v.5M10.3 4.3 2.8 17.2A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.8L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <div><strong>Local / Remote 调用路线已完成，当前进入正式 Event Core</strong><p><a href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008</a> 已落实：Server Hub 只 dispatch，Local / Remote Runner 共用契约；生产远程模式、出站 Worker、随机 lease fencing、持久 placement 与重启 replay 已通过。下一步把已证明的信封和边界移入正式 packages。</p></div>
+        <div><strong>Runner 与 Event Contract 已完成，当前验收 Server Hub 部署</strong><p><a href="docs/decisions/ADR-009-versioned-strict-event-contract.md">ADR-009</a> 的 RM-1.1a 已通过 323 / 323 全仓测试；SVR-02 正在收口受信 admin kit、可重试安装和 candidate 流量门控，完成服务器路线后接 RM-1.1b SQLite store。</p></div>
       </div>
 
       <div class="kpis" aria-label="当前状态">
-        <article class="kpi"><div class="kpi-top"><span>正式实现阶段</span><span class="kpi-icon tone-info">P1</span></div><div class="kpi-value">Phase 1</div><div class="kpi-meta">RM-1.1 Event Core 执行中</div></article>
+        <article class="kpi"><div class="kpi-top"><span>当前执行阶段</span><span class="kpi-icon tone-info">S2</span></div><div class="kpi-value">SVR-02</div><div class="kpi-meta">Event Contract 已完成</div></article>
         <article class="kpi"><div class="kpi-top"><span>行为测试</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">全绿</div><div class="kpi-meta">以 pnpm verify 输出为准</div></article>
-        <article class="kpi"><div class="kpi-top"><span>完整验证门禁</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">PASS</div><div class="kpi-meta">build · Biome · layers · tests</div></article>
+        <article class="kpi"><div class="kpi-top"><span>完整验证门禁</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">PASS</div><div class="kpi-meta">build · types · Biome · layers · tests</div></article>
         <article class="kpi"><div class="kpi-top"><span>可运行实现</span><span class="kpi-icon tone-warn">S</span></div><div class="kpi-value">Spike</div><div class="kpi-meta">实验依据，不是最终产品</div></article>
       </div>
 
@@ -265,8 +265,8 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
         <div class="decision-panel" aria-live="polite">
           <div class="decision-copy">
             <span class="badge" id="mode-badge">推荐</span>
-            <h3 id="mode-title">从事件信封进入正式内核</h3>
-            <p id="mode-desc">先消除 canonical 规范冲突，再按依赖顺序落地 Event Store、replay、Task Engine 与 MCP。</p>
+            <h3 id="mode-title">先签收 Server Hub 部署边界</h3>
+            <p id="mode-desc">保持 Event Contract 全绿，先完成受信部署、备份恢复和 Windows 联调，再按依赖顺序落地 SQLite Event Store。</p>
           </div>
           <div class="decision-list" id="route-list"></div>
         </div>
@@ -314,17 +314,24 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           </article>
 
           <article class="work-card" data-tone="info">
-            <div class="work-top"><div><div class="work-id">C-REMOTE-01</div><h3>生产 Remote Runner 路径</h3></div><a class="source-link" href="apps/chat-spike/src/adapters/base.mjs">共享契约 →</a></div>
+            <div class="work-top"><div><div class="work-id">C-REMOTE-01</div><h3>Production-mode Remote Runner 路径</h3></div><a class="source-link" href="apps/chat-spike/src/adapters/base.mjs">共享契约 →</a></div>
             <p>保留本地阶段已经跑通的请求、流式事件、结果和 session 语义，把 Local Runner 调用换成经过认证的出站连接。Hub 只 dispatch，不启动 vendor CLI。</p>
             <div class="tags"><span class="tag ok">已完成</span><span class="tag">38 + 4 项测试</span><span class="tag">生产组合根</span></div>
             <div class="done-when"><b>已验证：</b>同一个真实任务走 Local 与 Remote；核心事件一致，断线、旧 lease、Hub 重启、离线与凭据隔离均有回归。</div>
           </article>
 
+          <article class="work-card" data-tone="risk">
+            <div class="work-top"><div><div class="work-id">SVR-02 → 06</div><h3>部署并联调 Server Hub / Windows Worker</h3></div><a class="source-link" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">部署决策 →</a></div>
+            <p>先把 Hub runtime 收进受信的 Ubuntu 部署事务，再交付一致备份、Windows Worker 安全边界、真实跨机链路和故障演练；主任务负责独立验收。</p>
+            <div class="tags"><span class="tag ok">SVR-01 已完成</span><span class="tag">SVR-02 当前 64%</span><span class="tag">不可提前签收</span></div>
+            <div class="done-when"><b>完成判据：</b>受信 admin kit 与应用 artifact 分域，安装可重试、candidate 不接生产流量，Ubuntu / Windows 真机测试和恢复演练全部留证。</div>
+          </article>
+
           <article class="work-card" data-tone="ok">
-            <div class="work-top"><div><div class="work-id">A / PHASE 1.1</div><h3>实现正式 Event Core 信封</h3></div><a class="source-link" href="docs/architecture/event-core.md">规范 →</a></div>
+            <div class="work-top"><div><div class="work-id">RM-1.1a</div><h3>实现正式 Event Core 信封</h3></div><a class="source-link" href="docs/architecture/event-core.md">规范 →</a></div>
             <p>在 <code>packages/event-core</code> 落地 ULID、严格事件 schema 和 29 个 payload discriminated union，复用 spike 已证明的边界。</p>
-            <div class="tags"><span class="tag ok">关键路径</span><span class="tag">2 天</span><span class="tag">正式内核</span></div>
-            <div class="done-when"><b>完成判据：</b>未知 type 或额外字段在 parse 时被拒绝，重放等价测试通过。</div>
+            <div class="tags"><span class="tag ok">已完成</span><span class="tag ok">323 / 323</span><span class="tag">正式内核</span></div>
+            <div class="done-when"><b>已验证：</b>未知 version/type、任意层额外字段、非法 subject、自引用和解析后修改全部 fail closed。</div>
           </article>
         </div>
       </section>
@@ -332,14 +339,14 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
       <section id="week">
         <div class="section-head">
           <div><div class="section-kicker">Suggested week</div><h2>建议的一周切片</h2></div>
-          <p class="section-desc">Local / Remote 调用切片已经完成。下一切片严格按 Event Core 的依赖顺序推进，每天都以完整门禁和可重放性质验收。</p>
+          <p class="section-desc">Local / Remote 与 Event Contract 切片已经完成。服务器路线先完成部署和跨机验收，随后从 Day 3 的 SQLite 事件存储继续。</p>
         </div>
         <div class="week">
           <article class="day"><div class="day-no">Day 1</div><h3>消除规范冲突</h3><p>统一事件信封、draft/stored、subject 与 29 类 payload；把约束写回权威文档和 ADR。</p><div class="day-out"><b>产出：</b>唯一可实现的事件契约</div></article>
-          <article class="day"><div class="day-no">Day 2</div><h3>实现 strict schema</h3><p>完成 ULID、信封 parser、discriminated union 与额外字段拒绝测试。</p><div class="day-out"><b>产出：</b>RM-1.1 完成</div></article>
-          <article class="day"><div class="day-no">Day 3</div><h3>建立 SQLite 事件存储</h3><p>实现 append-only、事务 seq、WAL 与 idempotency token。</p><div class="day-out"><b>产出：</b>RM-1.2 核心性质</div></article>
+          <article class="day"><div class="day-no">Day 2</div><h3>实现 strict schema</h3><p>完成 ULID、信封 parser、discriminated union 与额外字段拒绝测试。</p><div class="day-out"><b>产出：</b>RM-1.1a 完成</div></article>
+          <article class="day"><div class="day-no">Day 3</div><h3>建立 SQLite 事件存储</h3><p>实现 append-only、事务 seq、WAL 与 idempotency token。</p><div class="day-out"><b>产出：</b>RM-1.1b 核心性质</div></article>
           <article class="day"><div class="day-no">Day 4</div><h3>验证并发与恢复</h3><p>覆盖多写者、重复提交、损坏恢复与进程重启。</p><div class="day-out"><b>产出：</b>可靠事件真相源</div></article>
-          <article class="day"><div class="day-no">Day 5</div><h3>接入重放与 reducer</h3><p>实现事件总线、注册机制，并证明增量投影与从零重放一致。</p><div class="day-out"><b>产出：</b>RM-1.3 纵向切片</div></article>
+          <article class="day"><div class="day-no">Day 5</div><h3>接入重放与 reducer</h3><p>实现事件总线、注册机制，并证明增量投影与从首条事件重放一致。</p><div class="day-out"><b>产出：</b>RM-1.1c 纵向切片</div></article>
         </div>
       </section>
 
@@ -349,7 +356,7 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           <p class="section-desc">勾选状态只保存在这个浏览器的 localStorage，不会写回项目，也不代表 canonical 计划已经改变。</p>
         </div>
         <div class="check-panel" id="checks">
-          <label class="check-row"><input class="check" type="checkbox" data-key="verify"><span><span class="check-title">完整 verify 恢复绿色</span><span class="check-sub">build · Biome · layers · 完整 Vitest 套件</span></span><span class="check-kind">门禁</span></label>
+          <label class="check-row"><input class="check" type="checkbox" data-key="verify"><span><span class="check-title">完整 verify 恢复绿色</span><span class="check-sub">build · type contract · Biome · layers · 完整 Vitest 套件</span></span><span class="check-kind">门禁</span></label>
           <label class="check-row"><input class="check" type="checkbox" data-key="auth"><span><span class="check-title">每条 Hub 路由都有认证</span><span class="check-sub">包括 SSE、MCP、任务、验收与 reset</span></span><span class="check-kind">安全</span></label>
           <label class="check-row"><input class="check" type="checkbox" data-key="identity"><span><span class="check-title">caller 不再来自调用 payload</span><span class="check-sub">身份由连接／token/session 推导</span></span><span class="check-kind">信任边界</span></label>
           <label class="check-row"><input class="check" type="checkbox" data-key="evidence"><span><span class="check-title">context 实验走真实 Hub 路径</span><span class="check-sub">1200 条 haystack 的结论可迁移到日常 Hub</span></span><span class="check-kind">证据</span></label>
@@ -370,7 +377,7 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           <article class="plain-card do-not">
             <h3>暂时不要做</h3>
             <ul>
-              <li>不要修 spike 的 JSONL 持久化；Phase 1.2 会用 SQLite + WAL 替换。</li>
+              <li>不要修 spike 的 JSONL 持久化；Phase 1.1b 会用 SQLite + WAL 替换。</li>
               <li>不要提前做完整 memory/retrieval；先保留不可事后恢复的 provenance 事件。</li>
               <li>不要重新引入容器、独立 Unix 用户或 credential broker；可信协作者模型已由 owner 选定。</li>
               <li>不要扩完整桌面 UI；本地与远程调用切片都只需要最小可观察面。</li>
@@ -378,14 +385,14 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
             </ul>
           </article>
           <article class="plain-card decisions">
-            <h3>Event Core 开始前要拍板</h3>
+            <h3>已拍板的 Event Core 边界</h3>
             <ul>
-              <li>Event Core 校验完整领域 payload，还是只保存 opaque payload？</li>
-              <li><code>EventDraft.seq = null</code> 与持久事件正整数 seq 的边界如何表达？</li>
-              <li><code>subject</code> 是否始终必填；Spike 的可选字段如何迁移？</li>
-              <li>29 类 payload 的必填字段以 event catalog 为唯一权威。</li>
-              <li>未知事件由 parser 拒绝；reducer 对未来版本事件的兼容策略单独定义。</li>
-              <li>正式 Event Store 继续采用 SQLite + WAL，不从服务器部署自动推导为 Postgres。</li>
+              <li>Event Core 校验版本化记录形状；领域状态转移和授权仍归上层。</li>
+              <li><code>EventDraft.seq = null</code>；持久事件从正整数 1 开始。</li>
+              <li><code>schemaVersion: 1</code> 和 <code>subject</code> 必填；Spike 日志只可显式迁移。</li>
+              <li>29 类 payload 的必填字段以 event catalog 为唯一权威并完全 strict。</li>
+              <li>未知 version/type fail closed；reducer 只可忽略已知但无关的事件。</li>
+              <li>正式 Event Store 采用 SQLite + WAL；事件不可有损 compact。</li>
             </ul>
           </article>
         </div>
@@ -402,6 +409,7 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           <a class="source-chip" href="docs/development/roadmap.md">roadmap · 正式阶段顺序</a>
           <a class="source-chip" href="apps/chat-spike/FINDINGS.md">FINDINGS · 实验依据</a>
           <a class="source-chip" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008 · 当前 Runner 拓扑</a>
+          <a class="source-chip" href="docs/decisions/ADR-009-versioned-strict-event-contract.md">ADR-009 · 版本化事件契约</a>
           <a class="source-chip" href="docs/design/design-language.md">design-language · 视觉规范</a>
         </div>
       </section>
@@ -416,24 +424,24 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
 
 <script>
 const routes={
-  balanced:{badge:"推荐",title:"从事件信封进入正式内核",desc:"先消除 canonical 规范冲突，再按依赖顺序落地 Event Store、replay、Task Engine 与 MCP。",steps:[
-    ["统一 event catalog 与信封","把 draft/stored、subject 和 payload 冲突写成唯一契约","当前"],
-    ["Event envelope + 29 schemas","实现 ULID、strict parser 与 discriminated union","1–2d"],
-    ["SQLite store","实现事务 seq、WAL 与幂等 token","2–3d"],
-    ["Replay + reducers","证明从零重放与增量投影一致","1–2d"],
-    ["Task Engine + MCP","在可信事件内核上实现正式核心循环","后续"]]},
-  daily:{badge:"最快见效",title:"优先把 Spike 证据变成可靠存储",desc:"先完成最小 strict envelope 和 SQLite store，让现有调用链尽快拥有正式、可重放的真相源。",steps:[
-    ["冻结最小事件契约","只解决会阻断存储的 canonical 冲突","当前"],
-    ["Strict envelope","先提供正式输入边界与 ULID","1d"],
-    ["SQLite append-only store","替换 JSONL 的单进程限制","2–3d"],
-    ["Replay probe","用现有 Hub 事件证明恢复等价","1d"],
-    ["补齐全部 payload schema","关闭 29 类事件的剩余差异","1d"]]},
-  core:{badge:"正式内核",title:"严格按 Phase 1 依赖顺序推进",desc:"把 schema、store、bus、task lifecycle 和 MCP 逐层做成机器守住的性质。",steps:[
-    ["RM-1.1 schema + ULID","未知类型和额外字段全部拒绝","1–2d"],
-    ["RM-1.2 SQLite store","并发 append 与幂等重试","2–3d"],
-    ["RM-1.3 bus + replay","增量与全量归约一致","1–2d"],
-    ["RM-1.5 task matrix","覆盖完整状态转移和依赖图","2d"],
-    ["RM-1.8 strict MCP","把已验证的 Hub 工具正式化","2–3d"]]}
+  balanced:{badge:"推荐",title:"先签收 Server Hub 部署边界",desc:"保持 Event Contract 全绿，先完成受信部署、备份恢复和 Windows 联调，再按依赖顺序落地 SQLite Event Store。",steps:[
+    ["RM-1.1a · 事件契约","version-first、ULID、29 类 strict union","✓"],
+    ["SVR-02 · Ubuntu Hub","受信 admin kit、事务安装、candidate 隔离","当前"],
+    ["SVR-03～06 · 跨机验收","备份恢复、Windows Worker、故障演练","后续"],
+    ["RM-1.1b · SQLite store","实现事务 seq、WAL 与幂等 token","Server 后"],
+    ["RM-1.1c · Replay + reducers","证明从首条事件重放与增量投影一致","随后"]]},
+  daily:{badge:"最快见效",title:"优先完成可部署的远程协作环境",desc:"把已经通过的 Hub / Runner runtime 放进受控 Ubuntu 部署和真实 Windows Worker，再继续正式存储。",steps:[
+    ["RM-1.1a · Strict envelope","正式输入边界、ULID 与 29 类 schema","✓"],
+    ["SVR-02 · Ubuntu Hub","非 root runtime 与 HTTPS 部署事务","当前"],
+    ["SVR-04 · Windows Worker","ACL、进程树、最小环境和真实 CLI","后续"],
+    ["SVR-05/06 · 联调与故障演练","重启恢复、过期 lease、资源边界","后续"],
+    ["RM-1.1b · SQLite store","替换 throwaway JSONL","Server 后"]]},
+  core:{badge:"正式内核",title:"从已完成 schema 继续 Phase 1",desc:"服务器路线完成后，把 store、bus、task lifecycle 和 MCP 逐层做成机器守住的性质。",steps:[
+    ["RM-1.1a schema + ULID","未知版本、类型和额外字段全部拒绝","✓"],
+    ["RM-1.1b SQLite store","并发 append 与幂等重试","下一正式项"],
+    ["RM-1.1c bus + replay","增量与全量归约一致","1–2d"],
+    ["RM-1.2a task matrix","覆盖完整状态转移和依赖图","2d"],
+    ["RM-1.3a strict MCP","把已验证的 Hub 工具正式化","2–3d"]]}
 };
 const routeList=document.querySelector("#route-list");
 function setMode(mode){
