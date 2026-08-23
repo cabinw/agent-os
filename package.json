@@ -9,13 +9,14 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "check:types": "tsc --noEmit --project tests/types/tsconfig.json",
     "clean": "tsc --build --clean",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "check:layers": "node scripts/check-layers.mjs",
-    "verify": "tsc --build && biome check . && node scripts/check-layers.mjs && vitest run"
+    "verify": "tsc --build && pnpm run check:types && biome check . && node scripts/check-layers.mjs && vitest run"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",

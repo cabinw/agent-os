@@ -37,7 +37,7 @@ agent-os/
          agent-sdk  task-engine  memory-core          │
               └──────┴──────────────┴─────────────────┘
                               ▼
-                         event-core      ← kernel, zero dependencies
+                         event-core      ← kernel, zero workspace dependencies
 ```
 
 Only `apps/hub` composes the event store. `apps/runner` uses shared event types
@@ -45,15 +45,19 @@ through `agent-sdk` and sends requests to the Hub; it never opens the store.
 `apps/macos` is an authenticated Hub client, not part of this server import
 graph.
 
-`event-core` is the **bottom** of the stack, not the middle. It exports
-`registerReducer`; the domain packages register into it. A kernel that imported
-its own consumers could not be tested in a bare runtime, and could not be the
-thing every projection is derived from.
+`event-core` is the **bottom** of the stack, not the middle. It currently exports
+the versioned event schemas; RM-1.1c adds `registerReducer`, through which domain
+packages register into it.
+Knowing permanent record shapes does not give the kernel task transitions or
+authorization rules. A kernel that imported its own consumers could not be
+tested in a bare runtime, and could not be the thing every projection is derived
+from.
 
 Three consequences worth stating explicitly:
 
-- `event-core` depends on nothing in this repo. No vendor SDK, no UI import, no
-  sibling package. It should be testable with the other four absent.
+- `event-core` has zero workspace dependencies. No vendor SDK, UI import or
+  sibling package. Pure runtime libraries for schema validation and storage do
+  not reverse the internal dependency graph.
 - `task-engine` and `memory-core` are siblings and must not import each other.
   They communicate only by emitting and reducing events.
 - `agent-sdk` sits beside the domain packages. It defines the shared Runner and
@@ -66,7 +70,7 @@ Mechanically checked by `pnpm check:layers`.
 
 | Package | Exports | Owns |
 | --- | --- | --- |
-| `event-core` | `append`, `subscribe`, `replay`, `registerReducer` | The log, ordering, snapshots |
+| `event-core` | v1 event schemas and types; then `append`, `subscribe`, `replay`, `registerReducer` in RM-1.1b/c | Permanent record contract, log, ordering, snapshots |
 | `task-engine` | `createTask`, `assignTask`, `transition`, `taskState` | Legal transitions, dependencies |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
 | `agent-sdk` | strict `dispatch`, normalized result / event / error shapes, `cancel`, adapter `send` | Shared Local / Remote Runner and adapter contract |

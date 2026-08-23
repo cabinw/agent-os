@@ -22,7 +22,7 @@ Canonical. See [ADR-002](../decisions/ADR-002-task-lifecycle.md).
                     └──────┬───────┘      blocker resolved   └───────────┘
                            │ report_result
                     ┌──────▼───────┐
-                    │    review    │  human or reviewing agent
+                    │    review    │  human acceptance only
                     └──────┬───────┘
               accepted     │      rejected → back to running
                     ┌──────▼───────┐

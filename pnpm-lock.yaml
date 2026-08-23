@@ -30,7 +30,11 @@ importers:
         specifier: workspace:*
         version: link:../event-core
 
-  packages/event-core: {}
+  packages/event-core:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/mcp-server:
     dependencies:

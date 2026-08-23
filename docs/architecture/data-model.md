@@ -30,11 +30,11 @@ are operational runtime records; see [agent-runtime](agent-runtime.md).
 | **Goal** | `id, project, statement, status` | Decomposed by the Supervisor into tasks |
 | **Task** | see [task-schema](../protocol/task-schema.md) | The unit routing and progress attach to |
 | **Agent** | see [agent-schema](../protocol/agent-schema.md) | Logical identity is per project; capability is per `(agent, host)` placement |
-| **Message** | `id, from, to, type, task?, content, replyTo?, attachments?` | Types: instruction, question, answer, progress, report, review, warning |
+| **Message** | event `id`; `from, to, type, task?, content, replyTo?, attachments?` | `replyTo` is message semantics; runtime-owned `causedBy` is execution causality |
 | **Thread** | `project, task?` | **Derived, not stored.** One per task plus one project thread. See [ADR-006](../decisions/ADR-006-threads-as-a-view-in-agents.md) |
-| **Event** | see [event-catalog](../protocol/event-catalog.md) | The only writable object |
+| **Event** | see [event-core](event-core.md) and [event-catalog](../protocol/event-catalog.md) | Versioned strict record; the only writable object |
 | **Knowledge** | see [memory](memory.md) | Typed, sourced, supersedable |
-| **Approval** | `id, action, requestedBy, risk, status` | status ∈ pending / granted / rejected / expired |
+| **Approval** | request event `id`; `action, detail, requestedBy, risk, status` | status ∈ pending / granted / rejected / expired |
 
 ## Ownership
 

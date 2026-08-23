@@ -84,9 +84,12 @@ describe("workspace 骨架", () => {
     }
   });
 
-  it("event-core 没有任何 workspace 依赖", () => {
+  it("event-core 没有任何内部 workspace 依赖", () => {
     const pkg = readJson("packages/event-core/package.json");
-    expect(pkg.dependencies).toBeUndefined();
+    const dependencies = pkg.dependencies as Record<string, string> | undefined;
+    expect(
+      Object.keys(dependencies ?? {}).filter((name) => name.startsWith("@agent-os/")),
+    ).toEqual([]);
 
     const tsconfig = readJson("packages/event-core/tsconfig.json");
     expect(tsconfig.references).toEqual([]);

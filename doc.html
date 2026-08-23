@@ -420,10 +420,10 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
   <h1>Agent OS</h1>
   <p class="lede" style="margin-top:14px;max-width:660px">面向 AI 原生团队的操作系统。人只负责说出目标，AI 团队负责拆解、执行、协作，并把过程沉淀成不会随对话窗口消失的项目记忆。</p>
   <div class="hero-badges">
-    <span class="badge">可执行 Hub spike · Local Runner 纵向切片</span>
+    <span class="badge">Hub / Runner ✓ · Event Contract ✓ · Server 执行中</span>
     <span class="badge">MCP 协议 v0.3</span>
-    <span class="badge">7 个界面 · docs 下 36 份文档</span>
-    <span class="badge">8 条 ADR</span>
+    <span class="badge">7 个界面 · docs 下 37 份文档</span>
+    <span class="badge">9 条 ADR</span>
   </div>
 </div>
 
@@ -571,7 +571,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 <tr><td><b>Agent Runtime</b></td><td><code>(agent, host)</code> 生命周期、能力匹配</td><td>在适配器之外出现厂商名</td></tr>
 <tr><td><b>Runner</b></td><td>适配器、厂商会话、项目 working copy</td><td>直接写 Hub 事件存储</td></tr>
 <tr><td><b>MCP Server</b></td><td>认证并接纳智能体调用、发出事件</td><td>信任 body 里的 caller</td></tr>
-<tr><td><b>Event Core</b></td><td>追加、排序、持久化、重放、归约</td><td>解释业务含义</td></tr>
+<tr><td><b>Event Core</b></td><td>验证版本化事件、追加、排序、持久化、重放、归约</td><td>解释业务含义</td></tr>
 <tr><td><b>Task Engine</b></td><td>强制合法状态转移</td><td>直接和智能体通话</td></tr>
 <tr><td><b>Memory Core</b></td><td>把事件历史变成可追溯的知识</td><td>把原始对话当知识存</td></tr>
 <tr><td><b>审批闸门</b></td><td>挂起高风险动作等人</td><td>超时自动放行</td></tr>
@@ -610,14 +610,14 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 <path d="M350 170 L350 186" stroke="#9CA3AF" stroke-width="1.3" marker-end="url(#ar)"/>
 <rect x="180" y="188" width="340" height="42" rx="10" fill="#EEF0FE" stroke="#C7CBF5"/>
 <text x="350" y="206" class="l" text-anchor="middle">event-core</text>
-<text x="350" y="222" class="s" text-anchor="middle">日志 · 排序 · 快照 · 重放 · reducer</text>
+<text x="350" y="222" class="s" text-anchor="middle">v1 schema · 日志 · 排序 · 重放 · reducer</text>
 <text x="540" y="213" class="tag">内核</text>
 </svg>
 </div>
 <figcaption><b>包依赖。</b><code>task-engine</code> 与 <code>memory-core</code> 是兄弟，只能通过发事件和归约事件通信，绝不互相 import。</figcaption>
 </figure>
 
-<div class="note"><b>正式 package 的构建顺序即依赖顺序：</b><code>event-core → task-engine → mcp-server → agent-sdk → memory-core → UI</code>。当前 executable-spike 路线先完成 <code>Local Runner → shared contract → Remote Runner</code>；这是验证顺序，不会反转 package 依赖。</div>
+<div class="note"><b>正式 package 的构建顺序即依赖顺序：</b><code>event-core → task-engine → mcp-server → agent-sdk → memory-core → UI</code>。Executable-spike 已完成 <code>Local Runner → shared contract → Remote Runner</code> 验证，RM-1.1a Event Contract 也已进入正式包；当前验收 Server，随后继续 RM-1.1b SQLite。这是执行顺序，不会反转 package 依赖。</div>
 </section>
 
 <section id="events">
@@ -626,6 +626,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
 
 <h3>事件信封</h3>
 <pre><code>{
+  "schemaVersion": 1,
   "id": "evt_01H...",
   "type": "task.progress.updated",
   "seq": 4821,                        // 项目内单调递增，重放顺序以此为准
@@ -637,20 +638,22 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
   "payload": { "progress": 65, "note": "Implementing MCP tools" }
 }</code></pre>
 
+<p>事件有三个明确阶段：<code>EventInput</code> 是已接纳的领域事实，<code>EventDraft</code> 加上运行时生成的 id 与时间且 <code>seq: null</code>，<code>StoredEvent</code> 才拥有持久化事务分配的正整数序号。v1 的 29 种事件组成严格的判别联合；解析先按版本、再按事件类型分派，事件域必须匹配 subject kind。事件 id 是 <code>evt_</code> 加大写 canonical ULID；task subject 使用 <code>TASK-nnn</code>，project subject 必须等于 envelope project，agent 注册／断连中重复的 agent id 也必须与 subject 一致；task message 和 project message 分别精确指向 payload task 与 envelope project。成功解析的信封、payload、数组与嵌套对象全部递归冻结；未知版本、未知类型、未知字段都会使追加或重放失败。完整规则见 <a href="docs/decisions/ADR-009-versioned-strict-event-contract.md">ADR-009</a>。</p>
+
 <h3>保证</h3>
 <table>
 <tr><th>性质</th><th>保证</th></tr>
-<tr><td>不可变</td><td>事件永不编辑或删除。写错了用一条补偿事件纠正。</td></tr>
+<tr><td>不可变</td><td>事件永不编辑、删除或逻辑压缩。写错了用目录中具有明确归约语义的领域事件纠正。</td></tr>
 <tr><td>有序</td><td>项目内通过 <code>seq</code> 全序。跨项目不保证。</td></tr>
 <tr><td>持久</td><td>持久化之后才向生产者确认。</td></tr>
-<tr><td>可重放</td><td>从 <code>seq 0</code> 归约完整日志，精确复现当前状态。</td></tr>
+<tr><td>可重放</td><td>从第一条事件（持久事件的 <code>seq</code> 从 1 开始）归约完整日志，精确复现当前状态。</td></tr>
 <tr><td>幂等</td><td>生产者带 client token，重试返回原事件。</td></tr>
 </table>
 
 <h3>命名</h3>
-<p><code>&lt;域&gt;.&lt;主体&gt;.&lt;过去式动词&gt;</code>，小写、点分隔、<strong>永远过去时</strong>。事件记录已经发生的事，不记录应该发生的事。全量清单见 <code>docs/protocol/event-catalog.md</code>。</p>
+<p><code>&lt;域&gt;.&lt;可选限定词&gt;.&lt;过去式动词&gt;</code>，小写、点分隔、至少两段，末段描述已经发生的事实。中间段只在需要限定事实时出现；最终以事件目录的允许列表为准。全量清单见 <code>docs/protocol/event-catalog.md</code>。</p>
 <p>
-<span class="evt">agent.registered</span><span class="evt">agent.status.changed</span><span class="evt">task.created</span><span class="evt">task.assigned</span><span class="evt">task.started</span><span class="evt">task.progress.updated</span><span class="evt">task.blocked</span><span class="evt">task.unblocked</span><span class="evt">task.review.requested</span><span class="evt">task.completed</span><span class="evt">task.failed</span><span class="evt">task.cancelled</span><span class="evt">message.sent</span><span class="evt">approval.requested</span><span class="evt">approval.granted</span><span class="evt">approval.rejected</span><span class="evt">approval.expired</span><span class="evt">knowledge.created</span><span class="evt">knowledge.superseded</span><span class="evt">project.snapshot.captured</span><span class="evt">project.revived</span><span class="evt">pulse.story.generated</span>
+<span class="evt">agent.registered</span><span class="evt">agent.status.changed</span><span class="evt">agent.disconnected</span><span class="evt">task.created</span><span class="evt">task.assigned</span><span class="evt">task.started</span><span class="evt">task.progress.updated</span><span class="evt">task.blocked</span><span class="evt">task.unblocked</span><span class="evt">task.review.requested</span><span class="evt">task.completed</span><span class="evt">task.failed</span><span class="evt">task.cancelled</span><span class="evt">message.sent</span><span class="evt">approval.requested</span><span class="evt">approval.granted</span><span class="evt">approval.rejected</span><span class="evt">approval.expired</span><span class="evt">knowledge.created</span><span class="evt">knowledge.linked</span><span class="evt">knowledge.superseded</span><span class="evt">project.created</span><span class="evt">project.state.changed</span><span class="evt">project.snapshot.captured</span><span class="evt">project.revived</span><span class="evt">artifact.produced</span><span class="evt">artifact.derived</span><span class="evt">measurement.recorded</span><span class="evt">pulse.story.generated</span>
 </p>
 </section>
 
@@ -754,7 +757,7 @@ figure:has(.mock),figure:has(.mbwrap){overflow-x:auto;padding-bottom:4px}
   <div class="tile"><h4>来源可追溯</h4><p>每个知识项都带 <code>sourceEvents</code>，任何一句结论都能回溯到产生它的那批事件。记忆永远不是任何东西的唯一副本。</p></div>
   <div class="tile"><h4>不修改，只覆盖</h4><p>后来的决策通过 <code>supersedes</code> 指向旧的，旧的仍然可读。"我们曾经这么做，第 N 个月改了，原因是……"是一等查询。</p></div>
   <div class="tile"><h4>注入智能体上下文</h4><p>接手 TASK-014 的智能体会收到约束它的那些决策，因此不会重新讨论已经定了的问题，也不会和早先的选择自相矛盾。</p></div>
-  <div class="tile"><h4>只压缩事件，不压缩知识</h4><p>知识抽取完成后事件可以压缩；知识项永不压缩。存储随有意义的产出增长，而不是随闲聊增长。</p></div>
+  <div class="tile"><h4>证据与知识都永久可追溯</h4><p>知识抽取不会授权删除来源事件；事件可迁移到冷存储，但必须保持无损重放。快照和非事件遥测可以丢弃，知识项通过 supersedes 演进而不覆写。</p></div>
 </div>
 </section>
 
@@ -2050,7 +2053,10 @@ seq 2  message.sent      agent:claude-code  Claude Code registered and context l
 <tr><td>质量门禁与 Hub 认证</td><td>已完成</td><td>所有能力路由按 principal 授权，完整 verify 全绿</td></tr>
 <tr><td>Local Runner 纵向切片</td><td>已完成</td><td>Hub 注入 Runner，真实子进程回写事件并可从 failure 恢复</td></tr>
 <tr><td>共享 Runner contract</td><td>已完成</td><td>持久幂等、cancel / retry / health / close；Hub 强制 Runner 且无 direct fallback</td></tr>
-<tr><td>Remote Runner</td><td>已完成</td><td>生产 Hub / outbound Worker、随机 lease fencing、持久 placement 与重启 replay 全部通过</td></tr>
+<tr><td>Remote Runner</td><td>已完成</td><td>Production-mode Hub / outbound Worker、随机 lease fencing、持久 placement 与重启 replay 全部通过</td></tr>
+<tr><td>RM-1.1a Event Contract</td><td>已完成</td><td>版本化 strict v1、29 类 payload、ULID、subject 和类型契约通过完整门禁</td></tr>
+<tr><td>SVR-02～06 Server 路线</td><td>执行中</td><td>受信部署、恢复、Windows Worker 与真实跨机故障演练全部留证</td></tr>
+<tr><td>RM-1.1b SQLite Event Store</td><td>下一步</td><td>事务 seq 与幂等 append 替换 throwaway JSONL 真相源</td></tr>
 </table>
 
 <h3>Phase 1 — 核心循环（无 UI）</h3>
@@ -2107,7 +2113,7 @@ seq 2  message.sent      agent:claude-code  Claude Code registered and context l
 </ul>
 
 <p style="margin-top:26px;padding-top:20px;border-top:1px solid var(--doc-border);color:var(--doc-muted);font-size:13px">
-本文档由 <code>docs/</code> 下的 36 份文档生成。规格发生实质变更时应重新生成。<br>
+本文档由 <code>docs/</code> 下的 37 份文档生成。规格发生实质变更时应重新生成。<br>
 设计图为基于规格制作的高保真示意，非最终视觉交付物；<code>ui/</code> 下的渲染图在间距与视觉细节上仍具权威性。
 </p>
 </section>

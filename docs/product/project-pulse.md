@@ -59,3 +59,7 @@ saving computed from measured task durations rather than asserted.
 Pulse never introduces state. It is a reducer output — if a number appears here
 it must be derivable from the log, and clicking it must reach the underlying
 events.
+
+The one durable output is `pulse.story.generated`: headline prose is
+non-deterministic and therefore recorded with non-empty `sourceEvents`. KPI
+values and headline ranking remain projections.

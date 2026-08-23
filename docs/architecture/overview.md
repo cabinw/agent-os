@@ -49,9 +49,10 @@ events the Task Engine used to advance state. There is no second source of truth
 ```
 
 Rule: a layer may depend downward only, so `event-core` sits at the **bottom**
-and depends on nothing. It must compile with no knowledge that a UI, an AI
-vendor, or even the other four packages exist. The domain packages register
-reducers into it, never the reverse. See
+and has zero internal workspace dependencies. Pure schema and storage runtime
+libraries do not reverse that graph. It must compile with no knowledge that a
+UI, an AI vendor, or even the other four packages exist. The domain packages
+register reducers into it, never the reverse. See
 [ADR-005](../decisions/ADR-005-derived-state-only.md) and
 [packages.md](packages.md).
 
@@ -64,7 +65,7 @@ reducers into it, never the reverse. See
 | **Agent Runtime** | Track `(agent, host)` lifecycle and match capability to task | Know vendor-specific APIs outside an adapter |
 | **Runner** | Own adapters, vendor sessions and project working copies | Write the Hub event store directly |
 | **MCP Server** | Validate and admit authenticated agent calls, emit events | Trust caller identity from a body field |
-| **Event Core** | Append, order, persist, replay, reduce | Interpret domain meaning |
+| **Event Core** | Validate versioned record shapes; append, order, persist, replay, reduce | Interpret domain meaning or authorize transitions |
 | **Task Engine** | Enforce legal state transitions | Talk to agents directly |
 | **Memory Core** | Turn event history into durable knowledge | Store raw transcripts as knowledge |
 | **Approval Gate** | Suspend risky actions pending a human | Auto-approve on timeout |

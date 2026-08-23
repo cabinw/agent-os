@@ -50,6 +50,10 @@ pending approval is visible as project state, not just a notification.
 5. **Everything is logged.** Who approved what, when, and with what stated
    justification — it becomes part of Memory.
 
+`approval.requested` always includes `detail`; omission is not a lower-risk
+request, it is invalid. `approval.expired.after` is the planned RFC3339 deadline,
+while envelope `at` is when the expiration was recorded.
+
 ## Presentation
 
 The menu-bar extra carries an Approvals section with inline ✓/✗ so a decision

@@ -66,7 +66,9 @@ Required before any other call. Registration is per project.
 }
 ```
 
-Emits `agent.registered`. Re-registering an existing id reconnects it rather
+Emits `agent.registered` with runtime-owned `host`, adapter-owned `integration`
+and the admitted `concurrency`. Re-registering the same `(agent, host)`
+reconnects it rather
 than duplicating — **and "does not duplicate" means no second event**, not a
 second event the reader is expected to ignore. Agents re-register unprompted
 mid-task; events are permanent, so a duplicate puts a spurious "X joined" into
@@ -98,6 +100,7 @@ host placement for dispatch.
   "params": {
     "title": "Implement payment webhook handler",
     "goal": "GOAL-003",
+    "description": "Handle Stripe webhooks with idempotency keys.",
     "requires": ["coding"],
     "priority": "high",
     "dependsOn": ["TASK-012"],
@@ -155,7 +158,7 @@ Types: `instruction`, `question`, `answer`, `progress`, `report`, `review`,
 | --- | --- |
 | `to` | An agent id, or `"*"` to address every agent on the task. Not a list — a fan-out is one message with `"*"`, not N messages. |
 | `task` | Determines which thread the message joins. Omitting it lands the message in the project thread; agents should scope to a task whenever one applies. |
-| `replyTo` | Event id of the message being answered. Drives reply quoting and lets `answer` be matched to its `question`. **Optional to send, not optional to record** — see below. |
+| `replyTo` | Event id of the message being answered. Required for `answer`; optional for other types. It drives quoting, not runtime causal budgets. |
 | `attachments` | Output paths or `KN-*` knowledge ids. Display-only references — attaching does not transfer or copy anything. |
 
 Messages are the readable record of a task's collaboration. See
@@ -167,8 +170,10 @@ separate mechanism; it is this one. An unknown recipient must be rejected at the
 boundary rather than accepted — a `to` nobody will ever read looks delivered and
 is not.
 
-**The runtime owns `causedBy`, never the caller.** When an agent omits `replyTo`,
-the runtime links the message to the one that woke that agent. Runaway
+**The runtime owns `causedBy`, never the caller.** `replyTo` is a semantic
+message reference and may differ from the event that woke the turn. The runtime
+validates it but never derives causal depth from it. When an agent has no causal
+field to supply, the runtime still links emitted events to the wake event. Runaway
 protection is keyed on causal depth, so a chain the sender can detach itself
 from is a budget the sender can opt out of — measured in
 [chat-spike](../../apps/chat-spike/FINDINGS.md#two-holes-the-first-live-run-found),
@@ -209,8 +214,10 @@ treats as a stall.
 }
 ```
 
-Moves the task to `review`, not to `completed` — acceptance is a separate act.
-Emits `task.review.requested`.
+`status: "completed"` moves the task to `review`, not to `completed` — human
+acceptance is a separate act — and emits `task.review.requested`.
+`status: "failed"` emits `task.failed` with the runtime attempt count. It never
+creates a review request for a result the executor declared unrecoverable.
 
 ### request_approval
 
@@ -232,7 +239,9 @@ external publishing, and architecture changes.
 
 Blocks the caller. Emits `approval.requested`, then `approval.granted` or
 `approval.rejected`. **Approvals never auto-grant on timeout** — an unanswered
-request expires as `approval.expired` and the task stays blocked.
+request expires as `approval.expired` and the task stays blocked. The expiration
+payload records the planned RFC3339 deadline as `after`; envelope `at` records
+when the expiration fact was admitted.
 
 ### get_context
 
@@ -273,12 +282,16 @@ alone.
 { "method": "query_memory", "params": { "q": "why postgres", "type": "decision" } }
 ```
 
-Emits `knowledge.created`.
+Emits `knowledge.created`. `rationale` and `alternatives` are preserved in that
+event; the runtime adds auditable `sourceEvents` from the admitted causal
+context rather than writing a second knowledge table.
 
 ## Rules for implementers
 
 - An agent may never write an event directly. Tools request; the runtime decides
   and emits.
+- Tools never accept `schemaVersion`, `id`, `seq`, `at`, `actor` or `causedBy`.
+  Those are runtime/store-owned event fields.
 - An agent may never set task status directly. It reports; the Task Engine
   transitions.
 - An agent may never approve its own request.

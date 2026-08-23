@@ -31,7 +31,7 @@ const QUIET = process.argv.includes("--quiet");
 
 /**
  * What each package is allowed to import from this repo.
- * `event-core` is the bottom of the stack: it imports nothing.
+ * `event-core` is the bottom of the stack: it imports no workspace package.
  */
 const ALLOWED_DEPS = {
   "event-core": [],
@@ -295,7 +295,9 @@ if (violations.length === 0) {
   if (!QUIET) {
     console.log("✓ check:layers — 4 条规则全部通过");
     console.log(`  · ${Object.keys(ALLOWED_DEPS).length} 个包，依赖方向严格向下`);
-    console.log(`  · event-core 依赖数：${ALLOWED_DEPS["event-core"].length}`);
+    console.log(
+      `  · event-core 内部 workspace 依赖数：${ALLOWED_DEPS["event-core"].length}`,
+    );
     console.log(`  · 事件目录已知类型：${catalogTypes.size}`);
   }
   process.exit(0);

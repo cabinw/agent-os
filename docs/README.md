@@ -4,6 +4,8 @@
 
 New to the project: [vision](vision.md) → [architecture/overview](architecture/overview.md) →
 [ADR-008](decisions/ADR-008-server-hub-local-first-runners.md) →
+[ADR-009](decisions/ADR-009-versioned-strict-event-contract.md) →
+[protocol/event-catalog](protocol/event-catalog.md) →
 [protocol/mcp-protocol](protocol/mcp-protocol.md) → [development/roadmap](development/roadmap.md).
 
 ## Index
@@ -13,7 +15,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | Doc | Covers |
 | --- | --- |
 | [overview](architecture/overview.md) | The runtime loop, layers, and how components fit |
-| [event-core](architecture/event-core.md) | The kernel: bus, store, replay, reduction |
+| [event-core](architecture/event-core.md) | Versioned event contract; bus, store, replay, reduction |
 | [task-engine](architecture/task-engine.md) | Task lifecycle, assignment, dependencies |
 | [agent-runtime](architecture/agent-runtime.md) | Local / Remote Runners, sessions, host capability, adapters |
 | [supervisor-agent](architecture/supervisor-agent.md) | The AI project manager |
@@ -71,6 +73,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-006](decisions/ADR-006-threads-as-a-view-in-agents.md) | Threads live in Agents and are scoped to tasks |
 | [ADR-007](decisions/ADR-007-implementation-stack.md) | TypeScript + Tauri 2 + SQLite; deployment scope superseded |
 | [ADR-008](decisions/ADR-008-server-hub-local-first-runners.md) | Server Hub; Local Runner first, Remote Runner next |
+| [ADR-009](decisions/ADR-009-versioned-strict-event-contract.md) | Versioned strict events; draft/stored boundary; lossless replay |
 
 ## Assets
 

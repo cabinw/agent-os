@@ -119,7 +119,7 @@ this is a preference.
 
 ## Retention
 
-Messages follow event retention. When events are compacted after knowledge
-extraction, a thread may become sparse — the extracted knowledge item remains and
-the thread links to it. A thread is never silently emptied: a compaction marker
-renders in place of removed spans.
+Messages are events and remain losslessly replayable. Cold storage may make old
+spans slower to load, but it cannot make a thread sparse or replace evidence with
+a summary. Knowledge links complement the transcript; they never substitute for
+it.

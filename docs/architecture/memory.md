@@ -106,5 +106,7 @@ read in full.
 
 ## Retention
 
-Events may be compacted after knowledge extraction; knowledge items are never
-compacted. Storage grows with meaningful output, not with chatter.
+Knowledge extraction never permits deleting its evidence. Formal events remain
+losslessly replayable per ADR-009; they may move to cold storage, while
+discardable snapshots and non-event Runner telemetry may be compacted.
+Knowledge items are also permanent and superseded rather than edited.

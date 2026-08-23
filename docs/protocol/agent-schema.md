@@ -24,6 +24,11 @@
 | `parentAgent` | Delegation tree; failures escalate to the parent |
 | `concurrency` | Logical upper bound across the agent's placements |
 
+`agent.registered` records these logical fields together with runtime-owned
+`host`, controlled `capabilities` and the strict five-boolean `integration`
+declaration. Formal v1 registrations always have a reachable host; same-host
+re-registration is idempotent.
+
 ## Host placement
 
 An agent id is logical and stable within a project. Each reachable execution

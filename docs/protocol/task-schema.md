@@ -40,13 +40,18 @@ Terminal: `completed`, `failed`, `cancelled`. `blocked` always returns to
 | Field | Notes |
 | --- | --- |
 | `requires` | Capability list used for routing. Set at creation; agents are matched to it. |
-| `owner` | Accountable for the outcome. Usually the agent that created the task. |
+| `owner` | Accountable for the outcome. Derived from the authenticated actor on `task.created`. |
 | `executor` | Doing the work. Empty until assigned. |
 | `progress` | 0–100, agent-reported, advisory only. Never triggers a transition. |
 | `dependsOn` | Task cannot leave `created` until all are `completed`. Cycles rejected. |
 | `outputs` | File paths, URLs or artifact ids produced. Populated at `report_result`. |
 | `knowledge` | Knowledge items this task consumed or produced. |
 | `requiresApproval` | Forces the Approval Gate before `completed`. |
+
+The `task.created` event stores `title, goal, description?, requires, priority,
+dependsOn, requiresApproval`. Task id comes from the event subject; project,
+owner and creation time derive from the envelope. No task payload repeats those
+fields.
 
 ## Priority
 

@@ -19,11 +19,14 @@ Event is the only writable object. Every other entity — task, agent, project,
 knowledge, approval — is a reducer output.
 
 - Producers call `append`. Nothing else writes.
-- Reducers are pure `(state, event) → state` and may be rebuilt from `seq 0`.
+- Reducers are pure `(state, event) → state` and may be rebuilt from before the
+  first stored event (`seq` starts at 1).
 - Snapshots are a cache, discardable without data loss.
 - A reducer bug is fixed by correcting code and replaying, never by patching
   stored state.
 - Corrections are compensating events, never edits or deletes.
+- Events cannot be logically compacted after extraction. Bytes may move to cold
+  storage only if lossless replay remains available; see ADR-009.
 
 ## Alternatives
 

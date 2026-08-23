@@ -48,6 +48,8 @@ estimates, front-loading the work that unblocks everything else:
 ```
 
 Each step has a ▶ control that turns it into real tasks and assigns them.
+The durable `project.revived` plan is an ordered, non-empty array of strict
+`{ title, estimateMinutes, detail }` steps; array order is execution order.
 
 ## Staleness
 
