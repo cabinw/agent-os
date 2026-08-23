@@ -21,6 +21,7 @@ export class EventLog {
   #events = [];
   #seq = 0;
   #subscribers = new Set();
+  #needsSeparator = false;
 
   constructor(path) {
     this.#path = path;
@@ -36,6 +37,7 @@ export class EventLog {
   #replayFromDisk() {
     if (!existsSync(this.#path)) return;
     const raw = readFileSync(this.#path, "utf8");
+    this.#needsSeparator = raw.length > 0 && !raw.endsWith("\n");
     let skipped = 0;
 
     for (const line of raw.split("\n")) {
@@ -64,7 +66,9 @@ export class EventLog {
    */
   append(event) {
     const stored = { ...event, seq: ++this.#seq };
-    appendFileSync(this.#path, `${JSON.stringify(stored)}\n`);
+    const separator = this.#needsSeparator ? "\n" : "";
+    appendFileSync(this.#path, `${separator}${JSON.stringify(stored)}\n`);
+    this.#needsSeparator = false;
     this.#events.push(stored);
     for (const fn of this.#subscribers) fn(stored);
     return stored;

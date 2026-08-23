@@ -42,8 +42,18 @@ export class Hub {
    * @param {string} opts.workspace                 per-agent directories live here
    * @param {string} opts.url                       where the MCP bridge calls back
    * @param {number} [opts.budget]
+   * @param {(id: string) => string|null} [opts.tokenForAgent]
    */
-  constructor({ log, projectId, broadcast, getAdapter, workspace, url, budget }) {
+  constructor({
+    log,
+    projectId,
+    broadcast,
+    getAdapter,
+    workspace,
+    url,
+    budget,
+    tokenForAgent,
+  }) {
     this.log = log;
     this.projectId = projectId;
     this.broadcast = broadcast;
@@ -51,12 +61,20 @@ export class Hub {
     this.workspace = workspace;
     this.url = url;
     this.budget = budget ?? DEFAULT_BUDGET;
+    this.tokenForAgent = tokenForAgent ?? (() => null);
 
     /** @type {Map<string, {id, label, adapter, queue, busy, integration}>} */
     this.agents = new Map();
     /** Causal index for depth. Rebuilt on boot so a restart keeps its budgets. */
     this.byId = new Map();
-    for (const e of log.replay()) this.byId.set(e.id, e);
+    /** Registration idempotency also survives a Hub restart. */
+    this.announcedIds = new Set();
+    for (const e of log.replay()) {
+      this.byId.set(e.id, e);
+      if (e.type === "agent.registered" && e.payload?.id) {
+        this.announcedIds.add(e.payload.id);
+      }
+    }
 
     this.tools = createToolRouter(this.runtime());
   }
@@ -85,6 +103,26 @@ export class Hub {
     return depth;
   }
 
+  /**
+   * Resolve a reply link without letting an agent choose the budget it sees.
+   * During a wake the runtime-owned cause always wins, even when the caller
+   * supplies a different `replyTo`. Outside a wake, a reply may only target a
+   * stored message that was actually addressed to that agent.
+   */
+  causeFor(agentId, requestedId) {
+    const active = this.agents.get(agentId)?.cause;
+    if (active?.id) return active.id;
+    if (!requestedId) return undefined;
+
+    const requested = this.byId.get(requestedId);
+    if (requested?.type !== "message.sent" || requested.payload?.to !== agentId) {
+      throw new ValidationError(
+        `replyTo ${requestedId} 不是发给 "${agentId}" 的消息，不能作为回复目标`,
+      );
+    }
+    return requested.id;
+  }
+
   // ------------------------------------------------------------------ agents
 
   /** Registration is idempotent: re-registering reconnects, per mcp-protocol.md. */
@@ -107,7 +145,7 @@ export class Hub {
       /** The task this agent is currently working, so its messages are scoped. */
       task: null,
       /** Whether `agent.registered` has been written for it. */
-      announced: false,
+      announced: this.announcedIds.has(id),
       integration: { ...Cls.capabilities, participates: participates(id) },
     };
     this.agents.set(id, entry);
@@ -128,7 +166,11 @@ export class Hub {
     // Every agent gets its own directory because two of the three mount
     // mechanisms are files in the working directory — a shared cwd would make
     // every agent present the same identity to the bridge.
-    const mcp = mountMcp(entry.id, { dir, url: this.url, caller: entry.id });
+    const mcp = mountMcp(entry.id, {
+      dir,
+      url: this.url,
+      token: this.tokenForAgent(entry.id),
+    });
     entry.adapter = new entry.Cls({
       cwd: dir,
       mcp,
@@ -394,6 +436,7 @@ export class Hub {
         }
 
         entry.announced = true;
+        hub.announcedIds.add(p.id);
         const evt = hub.emit(
           makeEvent({
             type: "agent.registered",
@@ -469,7 +512,7 @@ export class Hub {
         const entry = hub.agents.get(executor);
         if (!entry) throw new ValidationError(`未知执行者 "${executor}"`);
 
-        hub.taskEvent(
+        const assigned = hub.taskEvent(
           "task.assigned",
           p.task,
           { executor },
@@ -479,7 +522,7 @@ export class Hub {
 
         // The seam again: assignment wakes, exactly as a message does.
         hub.wakeForTask(entry, p.task, {
-          id: null,
+          id: assigned.id,
           payload: {
             from: caller ?? HUMAN_ID,
             to: executor,
@@ -508,10 +551,9 @@ export class Hub {
       },
 
       sendMessage(p) {
-        // `replyTo` is a courtesy; the link is not optional. Falling back to the
-        // message this agent was woken with keeps the chain — and the budget —
-        // intact whatever the model chooses to send.
-        const causedBy = p.replyTo ?? hub.agents.get(p.from)?.cause?.id;
+        // The runtime-owned wake cause wins over caller input. Otherwise an
+        // agent could point at an older event and reset its own hop budget.
+        const causedBy = hub.causeFor(p.from, p.replyTo);
         const evt = hub.emit(
           makeEvent({
             type: "message.sent",
@@ -540,9 +582,15 @@ export class Hub {
 
       getContext(p) {
         const thread = project(hub.log.replay());
-        const limit = p?.limit ?? 200;
         // Scoping to a task is a filter on the same fold, never a second store.
         const scope = p?.task ? (i) => i.task === p.task || i.task == null : () => true;
+        const messages = thread.items.filter((i) => i.kind === "message").filter(scope);
+        if (p?.limit !== undefined && (!Number.isInteger(p.limit) || p.limit < 1)) {
+          throw new ValidationError("get_context.limit 必须是正整数");
+        }
+        // Canonical protocol: no small default limit. A caller may explicitly
+        // ask for a bounded response, but omission means the complete scope.
+        const selected = p?.limit === undefined ? messages : messages.slice(-p.limit);
         return {
           project: hub.projectId,
           tasks: Object.values(thread.tasks).map((t) => ({
@@ -551,16 +599,12 @@ export class Hub {
             status: t.status,
             executor: t.executor,
           })),
-          messages: thread.items
-            .filter((i) => i.kind === "message")
-            .filter(scope)
-            .slice(-limit)
-            .map((i) => ({
-              from: i.from,
-              to: i.to,
-              type: i.messageType,
-              content: i.text,
-            })),
+          messages: selected.map((i) => ({
+            from: i.from,
+            to: i.to,
+            type: i.messageType,
+            content: i.text,
+          })),
           agents: hub.roster().map((a) => ({ id: a.id, name: a.label })),
         };
       },
@@ -574,6 +618,11 @@ export class Hub {
   wakeForTask(entry, taskId, cause) {
     entry.queue = entry.queue
       .then(async () => {
+        // Assignment is repeatable for re-routing, but only the current
+        // assignment may start. A second queued wake observes running/review
+        // and becomes a no-op instead of emitting another task.started.
+        const current = this.tasks()[taskId];
+        if (current?.status !== "assigned" || current.executor !== entry.id) return;
         // `task.started` is the real event that woke this turn, so it is the
         // cause. A synthetic one with no id would detach the whole turn from the
         // causal chain — the same hole `replyTo` had.

@@ -28,9 +28,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAdapter } from "../src/adapters/index.mjs";
 import { makeEvent } from "../src/events.mjs";
+import { Hub } from "../src/hub.mjs";
 import { EventLog } from "../src/log.mjs";
-import { createToolRouter } from "../src/mcp-tools.mjs";
-import { project } from "../src/thread.mjs";
 
 /**
  * Facts are arbitrary on purpose — a model cannot infer "7734" or "青铜麋鹿"
@@ -74,53 +73,20 @@ const CHATTER = [
   ["agent", "错误全采，正常路径 1%，慢请求单独打标全采。"],
 ];
 
-function harness() {
+function harness(providerId, Cls) {
   const dir = mkdtempSync(join(tmpdir(), "agentos-exp-"));
   const log = new EventLog(join(dir, "events.jsonl"));
-  const registered = new Set();
-
-  const emit = (e) => log.append(e);
-
-  const tools = createToolRouter({
-    registeredIds: () => registered,
-    registerAgent(p) {
-      registered.add(p.id);
-      emit(
-        makeEvent({
-          type: "agent.registered",
-          project: PROJECT,
-          actor: { kind: "system", id: "runtime" },
-          subject: { kind: "agent", id: p.id },
-          payload: { id: p.id, name: p.name, provider: p.id, capabilities: [] },
-        }),
-      );
-      return { registered: p.id };
-    },
-    sendMessage(p) {
-      const evt = emit(
-        makeEvent({
-          type: "message.sent",
-          project: PROJECT,
-          actor: { kind: "agent", id: p.from },
-          subject: { kind: "project", id: PROJECT },
-          causedBy: p.replyTo,
-          payload: { from: p.from, to: p.to, type: p.type, content: p.content },
-        }),
-      );
-      return { id: evt.id, seq: evt.seq };
-    },
-    getContext() {
-      const thread = project(log.replay());
-      return {
-        project: PROJECT,
-        messages: thread.items
-          .filter((i) => i.kind === "message")
-          .map((i) => ({ from: i.from, content: i.text })),
-      };
-    },
+  const hub = new Hub({
+    log,
+    projectId: PROJECT,
+    broadcast: () => {},
+    getAdapter: (id) => (id === providerId ? Cls : null),
+    workspace: join(dir, "workspace"),
+    url: "http://127.0.0.1:0",
   });
+  hub.register(providerId);
 
-  return { log, tools, emit };
+  return { log, hub, emit: (event) => hub.emit(event) };
 }
 
 /**
@@ -168,18 +134,19 @@ async function run(providerId, mode, padding = 0) {
   const Cls = getAdapter(providerId);
   if (!Cls) throw new Error(`未知 provider：${providerId}`);
 
-  const { log, tools, emit } = harness();
-  tools.call("register_agent", { id: providerId, name: Cls.label });
+  const { log, hub, emit } = harness(providerId, Cls);
+  const tools = hub.tools;
 
   // Usage is the axis the first two experiments missed: recall held and latency
   // stayed flat, so what a rebuild actually costs is what it is billed.
   let usage = null;
-  const adapter = new Cls({
-    cwd: process.env.AGENT_CWD ?? process.cwd(),
-    onEvent: (e) => {
-      if (e.kind === "usage") usage = e;
-    },
-  });
+  const entry = hub.agents.get(providerId);
+  const adapter = hub.adapterFor(entry);
+  const priorOnEvent = adapter.onEvent;
+  adapter.onEvent = (e) => {
+    priorOnEvent(e);
+    if (e.kind === "usage") usage = e;
+  };
   const turns = [];
   let hits = 0;
   let tokens = 0;
@@ -208,6 +175,8 @@ async function run(providerId, mode, padding = 0) {
     if (mode === "rebuild") {
       // The whole point: the vendor keeps nothing, the log supplies everything.
       adapter.resetSession();
+      // This is the actual Hub runtime path used by a woken local agent, not a
+      // second experiment-only implementation of get_context.
       const ctx = await tools.call("get_context", {});
       prompt = preamble(ctx, providerId) + step.say;
     }
@@ -243,7 +212,7 @@ async function run(providerId, mode, padding = 0) {
     });
   }
 
-  await adapter.close().catch(() => {});
+  await hub.close();
   return { turns, hits, tokens, costUsd, events: log.size };
 }
 
