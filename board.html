@@ -150,7 +150,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
           <p class="lede">这里不把“跑通的实验原型”误写成“正式产品已完成”。进度按验证原型、当前执行路线和 canonical Roadmap 分轨计算；所有任务状态来自 ADR-002，问题保留开放与已解决历史。</p>
         </div>
         <aside class="hero-status" aria-label="当前安排">
-          <div class="status-head"><b>当前安排</b><span class="status-chip running">执行中 · SVR-02</span></div>
+          <div class="status-head"><b>当前安排</b><span class="status-chip running">执行中 · SVR-03</span></div>
           <p>RM-1.1a Event Core 严格事件契约已完成并通过 323/323 全仓验证；当前继续独立验收服务器工程师的 Hub runtime、受信部署工具、事务安装和候选隔离。</p>
           <div class="next-chain"><span>RM-1.1a ✓</span><i>·</i><span>SVR-02</span><i>→</i><span>SVR-03</span><i>→</i><span>SVR-04</span><i>→</i><span>SVR-05/06</span></div>
         </aside>
@@ -164,7 +164,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
       </section>
 
       <section id="current" aria-labelledby="current-title">
-        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">SVR-02 正在执行；右侧按已完成前置、当前任务和后续依赖展示整条路线。</p></div>
+        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">SVR-03 正在执行；SVR-02 的 HTTPS 现场项等待 FQDN/证书，右侧继续展示完整依赖路线。</p></div>
         <div class="current-layout">
           <article class="current-card" id="current-task"></article>
           <div class="todo-panel" id="route-list" aria-label="推荐任务顺序"></div>
@@ -231,10 +231,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 58,
-  "updatedAt": "2026-08-24 01:58 CST",
+  "revision": 59,
+  "updatedAt": "2026-08-24 02:01 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "SVR-02",
+  "currentTaskId": "SVR-03",
   "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-23 23:08 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":29,"eventSchemaTotal":29,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
@@ -260,8 +260,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"HUB-C","scope":"roadmap","phase":"Hub","title":"任务对象与人工验收原型","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["HUB-B.1"],"acceptance":"created → assigned → running → review → human completed 真机闭环。","source":"todo.html#hub","summary":"Agent 不能自行完成验收；README 状态文案仍需同步。"},
 
     {"id":"SVR-01","scope":"route","phase":"Server","title":"Ubuntu / Windows 基线与部署契约","status":"completed","progress":100,"priority":"P0","owner":"服务器工程师","dependsOn":["C-REMOTE-01"],"blockedBy":[],"acceptance":"脱敏记录两端版本、端口、TLS、服务、目录和 ACL；不做远端变更，不以公网 HTTP 代替 HTTPS。","source":{"label":"server branch · deploy/README.md @ 3454ca0","href":"https://github.com/cabinw/agent-os/commit/3454ca0"},"summary":"提交 3454ca0 已推送：两端只读盘点、staging 拓扑、身份/目录、生命周期、耐久性边界和全部上线阻塞已由主任务审查通过。"},
-    {"id":"SVR-02","scope":"route","phase":"Server","title":"Ubuntu Hub 可部署单元","status":"running","progress":93,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":["PROB-HUB-DEPLOY-TRUST","PROB-HUB-ACTIVATION"],"acceptance":"非 root Hub 只监听 loopback，经 HTTPS 代理暴露；systemd、受限 env、health、升级与回滚在 staging 验证。","source":{"label":"server branch · 658cd6c","href":"https://github.com/cabinw/agent-os/commit/658cd6cb97af03b3f341a3bba270e28c17e73dcc"},"summary":"提交 658cd6c 已推送且 commit tree 精确等于冻结 2a1bdf…；本地/独立/Ubuntu/安装验收全绿。剩余 7 分仅是依赖 FQDN/证书的 HTTPS 激活、真实 start/restart/health。","progressBasis":[{"label":"Runtime、认证与资源边界","earned":25,"total":25},{"label":"Portable artifact 与 admin trust","earned":15,"total":15},{"label":"systemd / env / health / HTTPS proxy","earned":12,"total":15},{"label":"安装、升级、回滚与维护事务","earned":25,"total":25},{"label":"Ubuntu staging 与交付","earned":16,"total":20}]},
-    {"id":"SVR-03","scope":"route","phase":"Server","title":"持久状态、备份恢复与运维安全","status":"created","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-02"],"blockedBy":[],"acceptance":"placement/request/session 状态完成备份→破坏副本→恢复演练；日志轮转和容量检查不泄漏凭据。","source":"apps/chat-spike/README.md","summary":"为 Remote placement 与 request replay 增加安全的备份、恢复、升级前快照和日志运维路径。"},
+    {"id":"SVR-02","scope":"route","phase":"Server","title":"Ubuntu Hub 可部署单元","status":"blocked","progress":93,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":["PROB-HUB-DEPLOY-TRUST","PROB-HUB-ACTIVATION"],"acceptance":"非 root Hub 只监听 loopback，经 HTTPS 代理暴露；systemd、受限 env、health、升级与回滚在 staging 验证。","source":{"label":"server branch · 658cd6c","href":"https://github.com/cabinw/agent-os/commit/658cd6cb97af03b3f341a3bba270e28c17e73dcc"},"summary":"提交 658cd6c 已推送且 commit tree 精确等于冻结 2a1bdf…；本地/独立/Ubuntu/安装验收全绿。剩余 7 分仅是依赖 FQDN/证书的 HTTPS 激活、真实 start/restart/health。","progressBasis":[{"label":"Runtime、认证与资源边界","earned":25,"total":25},{"label":"Portable artifact 与 admin trust","earned":15,"total":15},{"label":"systemd / env / health / HTTPS proxy","earned":12,"total":15},{"label":"安装、升级、回滚与维护事务","earned":25,"total":25},{"label":"Ubuntu staging 与交付","earned":16,"total":20}]},
+    {"id":"SVR-03","scope":"route","phase":"Server","title":"持久状态、备份恢复与运维安全","status":"running","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-02"],"blockedBy":[],"acceptance":"placement/request/session 状态完成备份→破坏副本→恢复演练；日志轮转和容量检查不泄漏凭据。","source":"apps/chat-spike/README.md","summary":"已开始 staging JSONL 的可审计备份、恢复、升级前快照、日志轮转和容量门禁；明确不把它包装成 RM-1.1b 的 production durability。"},
     {"id":"SVR-04","scope":"route","phase":"Server","title":"Windows Remote Worker 正式启动路径","status":"created","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":[],"acceptance":"PowerShell 安装/启动/停止/健康/卸载可恢复；Grok、路径、ACL、进程终止、workspace containment 和凭据隔离通过。","source":"docs/architecture/agent-runtime.md","summary":"在 Windows 测试机把 outbound Worker 与 Grok 做成可长期运行、可重启恢复的执行面，并补跨平台自动测试。"},
     {"id":"SVR-05","scope":"route","phase":"Server","title":"Ubuntu Hub ↔ Windows Grok 真实联调","status":"created","progress":0,"priority":"P0","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-03","SVR-04"],"blockedBy":[],"acceptance":"真实 Grok 完成注册→指派→事件→review；断线、Hub 重启、重复请求、取消、超时、离线与旧 lease 均按契约处理。","source":"docs/decisions/ADR-008-server-hub-local-first-runners.md","summary":"Windows 只主动连出，Hub 不持有 working copy 或 vendor credential；我负责接口对照、故障注入和最终签收。"},
     {"id":"SVR-06","scope":"route","phase":"Server","title":"服务器自动验收入口与交付矩阵","status":"created","progress":0,"priority":"P1","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-05"],"blockedBy":[],"acceptance":"静态部署门禁、双机 smoke 命令、全量 verify、脱敏证据矩阵和逐任务 commit 全部可复核。","source":"CLAUDE.md","summary":"交付本地安全门禁与明确的双机 smoke 入口；服务器工程师推送分支，我 review 后再决定集成。"},
@@ -365,6 +365,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 02:01","kind":"decision","entity":"SVR-03","title":"不等待证书，切换到持久状态与运维安全","detail":"SVR-02 以 93% 等待 FQDN/证书的 7 分现场项；服务器工程师继续 SVR-03，主任务并行制定一致性、恢复事务、轮转与磁盘故障验收清单。"},
     {"at":"2026-08-24 01:58","kind":"verified","entity":"SVR-02","title":"SVR-02 原子提交推送，进度升至 93%","detail":"658cd6c 已在 codex/server-runtime，commit tree 精确等于 2a1bdf…，未包含 board.html；总体改用两位小数显示，2293/6300 即 36.40%，细小但真实的变化不再被一位小数吞掉。"},
     {"at":"2026-08-24 01:56","kind":"verified","entity":"SVR-02","title":"冻结 tree 通过 Ubuntu 与主任务独立验收，进度升至 91%","detail":"2a1bdf… 本地 206/206、tree/archive 148/148、终审 P0/P1=0、Ubuntu gate exit 0/PASS；root admin kit 17/17 哈希和权限一致，缺 env 固定 exit 1。总体进度同步为 36.4%。"},
     {"at":"2026-08-24 01:56","kind":"problem","entity":"PROB-HUB-OPENSSL-EMPTY","title":"登记非阻断空值 OpenSSL set-state P2","detail":"非空配置/模块/engine 注入及子进程环境已闭合；空值变量仅缺显式存在性拒绝，留作后续 hardening，不改已冻结 tree。"},
