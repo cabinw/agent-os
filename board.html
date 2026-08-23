@@ -231,11 +231,11 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 66,
-  "updatedAt": "2026-08-24 02:44 CST",
+  "revision": 67,
+  "updatedAt": "2026-08-24 02:46 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-03",
-  "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-23 23:08 CST"},
+  "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-24 02:46 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":29,"eventSchemaTotal":29,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
   "roadmapPhases": [
@@ -366,6 +366,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 02:46","kind":"verified","entity":"REPO-01","title":"主分支完整仓库门禁复跑全绿","detail":"corepack pnpm verify：build、类型契约、Biome、4 条分层规则和 Vitest 全通过；15/15 文件、323/323 测试，零 lint 错误。"},
     {"at":"2026-08-24 02:44","kind":"problem","entity":"PROB-HUB-RECOVERY","title":"恢复门禁转入损坏树与旧 block 语义","detail":"首轮 metadata、recover-old 绑定、root trust 和同盘峰值缺口已在 WIP 修正；独立审计继续阻断损坏 live state 严格快照前置，以及非-restore durable block 无法进入 restore 的两条路径。"},
     {"at":"2026-08-24 02:40","kind":"problem","entity":"PROB-HUB-RECOVERY","title":"整链审计发现 restore 与 recover-old 冻结阻断","detail":"restore 缺少 metadata 发布即进入 prepared；recover-old 尚无执行 case；cold recovery 还存在 source trust 时序风险。精确位置已回传服务器工程师，禁止用组件测试绿灯提前计分。"},
     {"at":"2026-08-24 02:36","kind":"verified","entity":"SVR-03","title":"五组专项回归并行合跑 76/76","detail":"snapshot/CLI、open-fd、EventLog、容量和 Hub 测试全绿；/proc link-count 竞态已修正，writer-stop 与任意类型 Nginx sentinel 的 fail-closed 路径已封住。"},
