@@ -3,7 +3,7 @@
 ## Objects
 
 ```
-Project ── the container: code, docs, decisions, agents, history
+Project ── the Hub container: metadata, decisions, agents, history
    │
 Goal ───── a human-stated outcome
    │
@@ -19,16 +19,17 @@ Knowledge  durable, sourced conclusion
 Message and Approval hang off this spine: a Message is agent-to-agent
 communication scoped to a task, an Approval is a suspended action awaiting a
 human. A Thread is the derived grouping of a task's messages — see
-[product/threads.md](../product/threads.md).
+[product/threads.md](../product/threads.md). Host placement and vendor session
+are operational runtime records; see [agent-runtime](agent-runtime.md).
 
 ## Definitions
 
 | Object | Key fields | Notes |
 | --- | --- | --- |
-| **Project** | `id, name, state, stack, cover, lastActivity` | `state` ∈ active / paused / archived / completed |
+| **Project** | `id, name, gitRemote, state, stack, cover, lastActivity` | Hub metadata; working-copy paths belong to Runner hosts |
 | **Goal** | `id, project, statement, status` | Decomposed by the Supervisor into tasks |
 | **Task** | see [task-schema](../protocol/task-schema.md) | The unit routing and progress attach to |
-| **Agent** | see [agent-schema](../protocol/agent-schema.md) | Identity is per-project registration |
+| **Agent** | see [agent-schema](../protocol/agent-schema.md) | Logical identity is per project; capability is per `(agent, host)` placement |
 | **Message** | `id, from, to, type, task?, content, replyTo?, attachments?` | Types: instruction, question, answer, progress, report, review, warning |
 | **Thread** | `project, task?` | **Derived, not stored.** One per task plus one project thread. See [ADR-006](../decisions/ADR-006-threads-as-a-view-in-agents.md) |
 | **Event** | see [event-catalog](../protocol/event-catalog.md) | The only writable object |

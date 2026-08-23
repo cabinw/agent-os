@@ -60,14 +60,16 @@ whenever one agent delegates to another, which is the normal case.
 
 ## Assignment
 
-The engine does not pick an agent by name. It asks the Agent Runtime for one that
-satisfies the task's required capabilities and is not saturated.
+The engine does not pick an agent by name. It asks the Agent Runtime for an
+`(agent, host)` placement that satisfies the task's required capabilities and is
+not saturated. The task stores the logical agent as `executor`; the runtime
+placement supplies the host used for dispatch.
 
 ```
 task.requires = ["coding", "testing"]
         │
         ▼
-find_agent(capabilities) ──▶ candidates ranked by
+find_agent(capabilities) ──▶ `(agent, host)` candidates ranked by
                               (capability match, current load, past outcomes)
 ```
 

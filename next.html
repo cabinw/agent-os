@@ -187,8 +187,8 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
     <a class="nav-link" href="todo.html"><span class="nav-dot"></span>完整 TODO</a>
     <a class="nav-link" href="doc.html"><span class="nav-dot"></span>项目说明</a>
     <div class="side-status">
-      <div class="status-line"><span class="status-pulse"></span><strong>验证门禁当前为红</strong></div>
-      <p>65 个行为测试通过；完整 <code>verify</code> 被 19 个 lint 错误阻断。</p>
+      <div class="status-line"><span class="status-pulse"></span><strong>验证门禁当前为绿</strong></div>
+      <p>完整 <code>pnpm verify</code> 已通过；测试数量以当前命令输出为准。</p>
       <div class="side-actions">
         <button class="tiny-btn" id="theme" type="button">切换主题</button>
         <button class="tiny-btn" id="density" type="button">紧凑模式</button>
@@ -200,7 +200,7 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
     <div class="content">
       <div class="topbar">
         <div class="crumb"><span>项目库</span><span>/</span><b>Agent OS</b><span>/</span><span>下一步</span></div>
-        <div class="date-pill">基线日期 · 2026-08-20</div>
+        <div class="date-pill">状态更新 · 2026-08-23</div>
       </div>
 
       <header class="hero" id="overview">
@@ -227,13 +227,13 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
 
       <div class="alert">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3.5v.5M10.3 4.3 2.8 17.2A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.8L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <div><strong>先解决一个“谁说了算”的问题</strong><p><a href="docs/decisions/ADR-007-implementation-stack.md">ADR-007</a> 仍规定单机，而最新 <a href="HANDOFF.md">HANDOFF</a> 已决定 Server Hub + Remote Runner。方向已经清楚，但正式规范尚未同步；在大规模实现前应新增 superseding ADR，而不是让代码替文档做决定。</p></div>
+        <div><strong>拓扑已经收敛，下一步落实唯一执行面</strong><p><a href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008</a> 已取代 <a href="docs/decisions/ADR-007-implementation-stack.md">ADR-007</a> 的单机范围：Server Hub 只 dispatch，Local / Remote Runner 共用契约。当前应让 Runner 成为服务组合根的必经路径并移除 direct-adapter fallback，再开发 Remote Runner。</p></div>
       </div>
 
       <div class="kpis" aria-label="当前状态">
         <article class="kpi"><div class="kpi-top"><span>正式实现阶段</span><span class="kpi-icon tone-info">P0</span></div><div class="kpi-value">Phase 0</div><div class="kpi-meta">packages 仍是契约与类型</div></article>
-        <article class="kpi"><div class="kpi-top"><span>行为测试</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">65 / 65</div><div class="kpi-meta">Vitest 当前全绿</div></article>
-        <article class="kpi"><div class="kpi-top"><span>完整验证门禁</span><span class="kpi-icon tone-risk">!</span></div><div class="kpi-value tone-risk">19</div><div class="kpi-meta">Biome 错误导致 verify 失败</div></article>
+        <article class="kpi"><div class="kpi-top"><span>行为测试</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">全绿</div><div class="kpi-meta">以 pnpm verify 输出为准</div></article>
+        <article class="kpi"><div class="kpi-top"><span>完整验证门禁</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">PASS</div><div class="kpi-meta">build · Biome · layers · tests</div></article>
         <article class="kpi"><div class="kpi-top"><span>可运行实现</span><span class="kpi-icon tone-warn">S</span></div><div class="kpi-value">Spike</div><div class="kpi-meta">实验依据，不是最终产品</div></article>
       </div>
 
@@ -280,8 +280,8 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
         <div class="work-grid">
           <article class="work-card" data-tone="risk">
             <div class="work-top"><div><div class="work-id">GATE-01</div><h3>恢复 <code>pnpm verify</code></h3></div><a class="source-link" href="tests/hub.test.ts">测试源文件 →</a></div>
-            <p>修复 19 个 Biome 错误，并让 HANDOFF 的“门禁全绿”重新成为事实。只做类型和表达清理，不借机改运行逻辑。</p>
-            <div class="tags"><span class="tag risk">现在</span><span class="tag">0.5 天</span><span class="tag">零架构风险</span></div>
+            <p>Biome 与分层检查已经恢复，完整门禁重新成为可信准绳。</p>
+            <div class="tags"><span class="tag ok">已完成</span><span class="tag">持续执行</span><span class="tag">零架构风险</span></div>
             <div class="done-when"><b>完成判据：</b><code>corepack pnpm verify</code> 一次完整通过。</div>
           </article>
 
@@ -307,9 +307,9 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           </article>
 
           <article class="work-card" data-tone="info">
-            <div class="work-top"><div><div class="work-id">ADR-008</div><h3>固化 Local / Remote Runner 共享契约</h3></div><a class="source-link" href="HANDOFF.md">最新决定 →</a></div>
-            <p>根据本地闭环的实测结果新增 superseding ADR，明确本地与远程 Runner 共享调用语义、事件和 session，只允许 transport 不同；同步相关架构文档。</p>
-            <div class="tags"><span class="tag info">先决决策</span><span class="tag">0.5–1 天</span><span class="tag">不写实现</span></div>
+            <div class="work-top"><div><div class="work-id">ADR-008</div><h3>落实 Local / Remote Runner 共享契约</h3></div><a class="source-link" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">正式决策 →</a></div>
+            <p>拓扑、身份、host capability、session placement 与共享请求／事件／结果契约已经定案；下一步让 Runner 成为服务组合根的唯一执行面。</p>
+            <div class="tags"><span class="tag ok">决策已完成</span><span class="tag info">实现继续</span><span class="tag">先于 Remote</span></div>
             <div class="done-when"><b>完成判据：</b>仓库中只有一个 Runner contract；本地与远程调用的差异被限制在 transport 和网络失败恢复。</div>
           </article>
 
@@ -349,7 +349,7 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           <p class="section-desc">勾选状态只保存在这个浏览器的 localStorage，不会写回项目，也不代表 canonical 计划已经改变。</p>
         </div>
         <div class="check-panel" id="checks">
-          <label class="check-row"><input class="check" type="checkbox" data-key="verify"><span><span class="check-title">完整 verify 恢复绿色</span><span class="check-sub">build · biome · layers · 65 tests 全部执行</span></span><span class="check-kind">门禁</span></label>
+          <label class="check-row"><input class="check" type="checkbox" data-key="verify"><span><span class="check-title">完整 verify 恢复绿色</span><span class="check-sub">build · Biome · layers · 完整 Vitest 套件</span></span><span class="check-kind">门禁</span></label>
           <label class="check-row"><input class="check" type="checkbox" data-key="auth"><span><span class="check-title">每条 Hub 路由都有认证</span><span class="check-sub">包括 SSE、MCP、任务、验收与 reset</span></span><span class="check-kind">安全</span></label>
           <label class="check-row"><input class="check" type="checkbox" data-key="identity"><span><span class="check-title">caller 不再来自调用 payload</span><span class="check-sub">身份由连接／token/session 推导</span></span><span class="check-kind">信任边界</span></label>
           <label class="check-row"><input class="check" type="checkbox" data-key="evidence"><span><span class="check-title">context 实验走真实 Hub 路径</span><span class="check-sub">1200 条 haystack 的结论可迁移到日常 Hub</span></span><span class="check-kind">证据</span></label>
@@ -401,14 +401,14 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           <a class="source-chip" href="todo.html">todo.html · 完整工作清单</a>
           <a class="source-chip" href="docs/development/roadmap.md">roadmap · 正式阶段顺序</a>
           <a class="source-chip" href="apps/chat-spike/FINDINGS.md">FINDINGS · 实验依据</a>
-          <a class="source-chip" href="docs/decisions/ADR-007-implementation-stack.md">ADR-007 · 当前 accepted scope</a>
+          <a class="source-chip" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008 · 当前 Runner 拓扑</a>
           <a class="source-chip" href="docs/design/design-language.md">design-language · 视觉规范</a>
         </div>
       </section>
 
       <footer class="foot">
         <span>Agent OS · 下一步决策导航</span>
-        <span>这是决策辅助视图，不是新的 canonical roadmap · 生成于 2026-08-20</span>
+        <span>这是决策辅助视图，不是新的 canonical roadmap · 更新于 2026-08-23</span>
       </footer>
     </div>
   </main>

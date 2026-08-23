@@ -8,6 +8,8 @@ Supersedes the former `monorepo.md`, `package-architecture.md` and
 ```
 agent-os/
 ├── apps/
+│   ├── hub/            server composition root; dispatch only
+│   ├── runner/         Local / Remote Runner composition root
 │   └── macos/          native client: Pulse, Canvas, Library, menu bar
 ├── packages/
 │   ├── event-core/     kernel
@@ -25,17 +27,23 @@ agent-os/
 `A ──▶ B` reads **A imports B**. Arrows only ever point downward.
 
 ```
-                    apps/macos
-                         │
-                         ▼
-                    mcp-server
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-     agent-sdk     task-engine     memory-core
-          └──────────────┼──────────────┘
-                         ▼
-                    event-core          ← kernel, zero dependencies
+                  apps/hub                       apps/runner
+                     │                                │
+                     ▼                                ▼
+                mcp-server ────────────────▶      agent-sdk
+                     │                                │
+              ┌──────┼──────────────┐                 │
+              ▼      ▼              ▼                 │
+         agent-sdk  task-engine  memory-core          │
+              └──────┴──────────────┴─────────────────┘
+                              ▼
+                         event-core      ← kernel, zero dependencies
 ```
+
+Only `apps/hub` composes the event store. `apps/runner` uses shared event types
+through `agent-sdk` and sends requests to the Hub; it never opens the store.
+`apps/macos` is an authenticated Hub client, not part of this server import
+graph.
 
 `event-core` is the **bottom** of the stack, not the middle. It exports
 `registerReducer`; the domain packages register into it. A kernel that imported
@@ -48,8 +56,9 @@ Three consequences worth stating explicitly:
   sibling package. It should be testable with the other four absent.
 - `task-engine` and `memory-core` are siblings and must not import each other.
   They communicate only by emitting and reducing events.
-- `agent-sdk` sits beside them, not above them. It needs the log to emit onto;
-  it does not need task state.
+- `agent-sdk` sits beside the domain packages. It defines the shared Runner and
+  adapter contract. A Runner reports through that contract; only the Hub admits
+  a request and appends an event.
 
 Mechanically checked by `pnpm check:layers`.
 
@@ -60,7 +69,7 @@ Mechanically checked by `pnpm check:layers`.
 | `event-core` | `append`, `subscribe`, `replay`, `registerReducer` | The log, ordering, snapshots |
 | `task-engine` | `createTask`, `assignTask`, `transition`, `taskState` | Legal transitions, dependencies |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
-| `agent-sdk` | `register`, `receiveTask`, `reportProgress`, `reportResult`, `sendEvent` | Adapter surface |
+| `agent-sdk` | strict `dispatch`, normalized result / event / error shapes, `cancel`, adapter `send` | Shared Local / Remote Runner and adapter contract |
 | `mcp-server` | MCP tool handlers | Validation, authorization, rate limits |
 
 ## Rules
@@ -70,3 +79,8 @@ Mechanically checked by `pnpm check:layers`.
   exported API or through events.
 - A package that needs data it cannot derive from events is a design smell —
   raise it rather than adding a table.
+- `apps/hub` may compose execution but may not import a vendor adapter or open a
+  project working copy.
+- `apps/runner` may own vendor and filesystem details but may not write the Hub
+  event store.
+- Local and Remote Runner transports must pass the same contract suite.

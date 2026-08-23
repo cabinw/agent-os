@@ -3,6 +3,7 @@
 ## Reading order
 
 New to the project: [vision](vision.md) → [architecture/overview](architecture/overview.md) →
+[ADR-008](decisions/ADR-008-server-hub-local-first-runners.md) →
 [protocol/mcp-protocol](protocol/mcp-protocol.md) → [development/roadmap](development/roadmap.md).
 
 ## Index
@@ -14,7 +15,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [overview](architecture/overview.md) | The runtime loop, layers, and how components fit |
 | [event-core](architecture/event-core.md) | The kernel: bus, store, replay, reduction |
 | [task-engine](architecture/task-engine.md) | Task lifecycle, assignment, dependencies |
-| [agent-runtime](architecture/agent-runtime.md) | Agent lifecycle, registry, capability matching, adapters |
+| [agent-runtime](architecture/agent-runtime.md) | Local / Remote Runners, sessions, host capability, adapters |
 | [supervisor-agent](architecture/supervisor-agent.md) | The AI project manager |
 | [memory](architecture/memory.md) | Events → knowledge → project memory |
 | [packages](architecture/packages.md) | Monorepo layout and dependency direction |
@@ -68,7 +69,8 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-004](decisions/ADR-004-capability-first-agent-catalog.md) | Agents are matched by capability, never by provider |
 | [ADR-005](decisions/ADR-005-derived-state-only.md) | No component stores state the event log can derive |
 | [ADR-006](decisions/ADR-006-threads-as-a-view-in-agents.md) | Threads live in Agents and are scoped to tasks |
-| [ADR-007](decisions/ADR-007-implementation-stack.md) | TypeScript + Tauri 2 + SQLite, single-machine |
+| [ADR-007](decisions/ADR-007-implementation-stack.md) | TypeScript + Tauri 2 + SQLite; deployment scope superseded |
+| [ADR-008](decisions/ADR-008-server-hub-local-first-runners.md) | Server Hub; Local Runner first, Remote Runner next |
 
 ## Assets
 

@@ -1,6 +1,7 @@
 # ADR-007: Implementation Stack
 
-Status: accepted
+Status: accepted; single-machine scope superseded by
+[ADR-008](ADR-008-server-hub-local-first-runners.md)
 
 ## Context
 
@@ -11,8 +12,9 @@ provider names below `agent-sdk`. Together they rule out several stacks that
 would otherwise be reasonable.
 
 Three things also had to be settled before Phase 0 could start: what the desktop
-shell is, whether the product is single-machine, and which model tier the
-Supervisor runs on.
+shell is, the initial deployment scope, and which model tier the Supervisor runs
+on. ADR-008 later replaced that deployment scope after the Hub spike supplied
+evidence for a server control plane and Runner execution planes.
 
 ## Decision
 
@@ -25,8 +27,9 @@ not a shortcut), native window chrome, and a UI that can import the same event
 types as `packages/`. Rust appears only in `apps/macos/src-tauri/` for window and
 tray concerns; it never touches domain logic.
 
-**Scope: single-machine.** One person, one Mac, one local event log. No server,
-no multi-writer coordination.
+**Original scope: single-machine.** Superseded by ADR-008. The Hub now owns the
+server event log and Runners own execution and working copies. Local-first is an
+implementation order, not the product topology.
 
 **Event store: SQLite (better-sqlite3, WAL).** Append-only table, per-project
 monotonic `seq`, separate snapshot table. The synchronous API keeps reducers pure
@@ -51,8 +54,8 @@ gained.
 the UI across an IPC boundary and costs iteration speed in the adapter layer,
 which is where change is most frequent.
 
-**Postgres.** Rejected with the single-machine decision — a desktop product
-should not require the user to install a database.
+**Postgres.** Still deferred. The Hub is initially a single writer, so SQLite
+remains sufficient; multiple active Hub writers require another ADR.
 
 **Multi-writer from day one.** Rejected as speculative. The cost is real and
 localized: it lands in the event store's `seq` allocation and conflict handling.
@@ -66,10 +69,9 @@ downstream, and mixed tiers make regressions harder to attribute.
 - **Native feel becomes design work.** Tauri renders in a WebView. Scroll
   inertia, context menus, and window behavior have to be tuned deliberately;
   budget for it rather than expecting it free.
-- **The single-machine assumption is load-bearing in exactly one place.** If
-  multi-user is ever needed, the change is concentrated in the event store's
-  ordering and conflict model — not spread across the packages. Revisit this ADR
-  rather than patching around it.
+- **Deployment is defined by ADR-008.** The Hub is the single event-log writer;
+  Runners connect outbound and never write the store. This preserves the
+  ordering boundary without preserving the old single-machine topology.
 - **`event-core` must compile with no vendor SDK and no UI import.** This is
   mechanically checkable; see the layering checks in
   [development/package-development-guide.md](../development/package-development-guide.md).

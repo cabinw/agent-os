@@ -2,40 +2,31 @@
 
 ## The runtime loop
 
-This cycle is the whole system. Every component exists to serve one arrow.
+This cycle is the whole system. Deployment separates its control and execution
+planes per [ADR-008](../decisions/ADR-008-server-hub-local-first-runners.md).
 
 ```
-   Human states a Goal
-            │
-            ▼
-   ┌─────────────────┐
-   │ Supervisor Agent│  plans, decomposes, assigns
-   └────────┬────────┘
-            │ create_task / assign_task
-            ▼
-   ┌─────────────────┐
-   │   Task Engine   │  owns lifecycle, dependencies
-   └────────┬────────┘
-            │ task.assigned
-            ▼
-   ┌─────────────────┐
-   │   MCP Server    │  the only ingress for agents
-   └────────┬────────┘
-            │ tool calls, both directions
-            ▼
-   ┌─────────────────┐
-   │ Agent Execution │  Claude / Codex / Gemini / any adapter
-   └────────┬────────┘
-            │ every action emits an event
-            ▼
-   ┌─────────────────┐
-   │   Event Core    │  bus → store → reducers
-   └────────┬────────┘
-            │
-   ┌────────┴──────────────────────────────┐
-   ▼                ▼                      ▼
-Task State      Project Memory        Human Surfaces
-                                  (Pulse / Canvas / Library)
+Human states a Goal
+        │
+        ▼
+Supervisor ──▶ Task Engine ──▶ Server Hub
+                                  │ dispatch only
+                         established outbound connection
+                                  │
+                                  ▼
+                           Local / Remote Runner
+                                  │
+                           adapter ──▶ vendor CLI
+                                  │ MCP requests + result stream
+                                  ▼
+                              Server Hub
+                                  │ validate + emit
+                                  ▼
+                              Event Core
+                                  │
+              ┌───────────────────┼──────────────────┐
+              ▼                   ▼                  ▼
+          Task State        Project Memory      Human Surfaces
 ```
 
 The loop closes: what the human sees in Project Pulse is a reduction of the same
@@ -45,13 +36,15 @@ events the Task Engine used to advance state. There is no second source of truth
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  apps/macos                Pulse, Canvas, Library    │  presentation
+│  apps/macos            Pulse, Canvas, Library       │  presentation
+│  apps/hub              server composition root     │  control plane
+│  apps/runner           local / remote execution    │  execution plane
 ├──────────────────────────────────────────────────────┤
-│  mcp-server                protocol ingress          │  boundary
+│  mcp-server            protocol ingress             │  boundary
 ├──────────────────────────────────────────────────────┤
-│  agent-sdk  ·  task-engine  ·  memory-core           │  integration + domain
+│  agent-sdk · task-engine · memory-core               │  integration + domain
 ├──────────────────────────────────────────────────────┤
-│  event-core                bus, store, reducers      │  kernel
+│  event-core            bus, store, reducers         │  kernel
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -67,8 +60,10 @@ reducers into it, never the reverse. See
 | Component | Responsibility | Never does |
 | --- | --- | --- |
 | **Supervisor Agent** | Decompose goals, assign work, detect drift | Execute the work itself |
-| **Agent Runtime** | Track agent lifecycle, match capability to task | Know vendor-specific APIs outside an adapter |
-| **MCP Server** | Validate and admit agent calls, emit events | Hold state |
+| **Server Hub** | Authenticate, route, dispatch; own events and project metadata | Start a vendor CLI or open a working copy |
+| **Agent Runtime** | Track `(agent, host)` lifecycle and match capability to task | Know vendor-specific APIs outside an adapter |
+| **Runner** | Own adapters, vendor sessions and project working copies | Write the Hub event store directly |
+| **MCP Server** | Validate and admit authenticated agent calls, emit events | Trust caller identity from a body field |
 | **Event Core** | Append, order, persist, replay, reduce | Interpret domain meaning |
 | **Task Engine** | Enforce legal state transitions | Talk to agents directly |
 | **Memory Core** | Turn event history into durable knowledge | Store raw transcripts as knowledge |
@@ -88,12 +83,18 @@ systems. Building them on an event log requires none.
 ## Trust boundary
 
 Everything an external agent sends crosses one boundary — the MCP Server — and is
-validated there. An agent cannot write an event directly, cannot set task status,
-and cannot mark its own high-risk action approved. It can only *request*; the
-runtime decides and emits.
+authenticated and validated there. A credential maps to a principal on the Hub;
+a claimed caller id is not authority. An agent cannot write an event directly,
+set task status, or mark its own high-risk action approved. It can only
+*request*; the runtime decides and emits.
 
 ```
-external agent ──▶ MCP Server ──▶ [validate, authorize] ──▶ Event Core
-                                            │
-                                            └─▶ Approval Gate ──▶ human
+external agent ──MCP──▶ Server Hub ──▶ [authenticate, authorize, validate]
+                                                     │
+                                      ┌──────────────┴─────────────┐
+                                      ▼                            ▼
+                                  Event Core              Approval Gate ──▶ human
 ```
+
+Runners connect outbound and receive work over that established connection.
+Vendor credentials and working files never cross this trust boundary.

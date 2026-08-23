@@ -31,14 +31,17 @@ most likely to be corrupted by a well-meaning fix.
 
 | Target | Asserts |
 | --- | --- |
-| MCP Server | Boundary validation, unknown-field rejection, authorization |
-| Adapters | Two providers execute the same task type identically |
+| MCP Server | Authentication, principal authorization, unknown-field rejection; body caller cannot impersonate |
+| Runner contract | Local and Remote transports produce the same normalized result and event sequence |
+| Local Runner | Real subprocess, stable failure, workspace containment, restart-session and user isolation |
+| Hub → Local Runner | Runtime-owned correlation, streaming, task review, normalized failure and queue recovery |
+| Adapters | Two providers execute the same task type identically behind the Runner contract |
 | Event propagation | A tool call reaches its reducer and its subscribers |
 | Approval Gate | No path grants without a human; expiry never grants |
 
 ### End to end
 
-One scenario, run in CI:
+One scenario, run through the repository gate:
 
 ```
 goal → supervisor plans → task routed by capability → agent executes
@@ -47,6 +50,16 @@ goal → supervisor plans → task routed by capability → agent executes
 ```
 
 Asserted on the resulting event log, not on screenshots.
+
+The Local Runner is the reference implementation. The Remote Runner reruns the
+same task and contract cases unchanged, then adds transport-only cases for
+authentication, reconnect, duplicate delivery, timeout and cancellation.
+
+## Repository gate
+
+There is no hosted CI. `corepack pnpm verify` is the manual release and commit
+gate: build, Biome, architectural layer checks and the full Vitest suite. Do not
+copy a test count into this strategy; the command output is authoritative.
 
 ## Replay as a test
 

@@ -1,6 +1,6 @@
 # Agent Schema
 
-## Object
+## Logical Agent
 
 ```json
 {
@@ -8,9 +8,6 @@
   "name": "Codex",
   "provider": "openai",
   "role": "developer",
-  "capabilities": ["coding", "testing", "git"],
-  "status": "working",
-  "currentTask": "TASK-014",
   "parentAgent": "supervisor",
   "concurrency": 2,
   "registeredAt": "2026-07-20T09:00:00Z"
@@ -24,10 +21,33 @@
 | `id` | Stable, human-readable, unique per project |
 | `provider` | Recorded for display and billing only. **Never branch on this.** |
 | `role` | Display grouping: supervisor, architect, developer, researcher, reviewer, designer |
-| `capabilities` | Controlled vocabulary below. The only field routing reads. |
-| `status` | registered / idle / working / waiting / blocked / disconnected |
 | `parentAgent` | Delegation tree; failures escalate to the parent |
-| `concurrency` | Max simultaneous tasks. Saturation removes the agent from matching. |
+| `concurrency` | Logical upper bound across the agent's placements |
+
+## Host placement
+
+An agent id is logical and stable within a project. Each reachable execution
+location is a separate `HostPlacement`:
+
+```json
+{
+  "agent": "codex-developer",
+  "host": "wk-macbook",
+  "os": "macos",
+  "arch": "arm64",
+  "mcpServers": ["agent-os"],
+  "capabilities": ["coding", "testing", "git"],
+  "status": "working",
+  "currentTask": "TASK-014",
+  "lastSeenAt": "2026-07-20T09:42:00Z"
+}
+```
+
+The Hub derives `host` from the authenticated Runner connection. A request may
+not claim another host. The same agent may expose different capabilities on a
+different host; reachability, status, current load and task routing apply to the
+placement, not the logical Agent. See
+[ADR-008](../decisions/ADR-008-server-hub-local-first-runners.md).
 
 ## Capability vocabulary
 
@@ -116,7 +136,7 @@ See [ADR-004](../decisions/ADR-004-capability-first-agent-catalog.md). The shipp
 adapter catalog is configuration; core code contains no provider list. Swapping
 one vendor for another is a registration change, not a code change.
 
-## Lifecycle
+## Placement lifecycle
 
 ```
 registered → idle ⇄ working → idle

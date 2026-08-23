@@ -11,8 +11,12 @@ executes, and accumulates memory that outlives any single session.
 
 ## Status
 
-Specification stage. No implementation yet — this repository contains the
-architecture, protocol, product and design specs that Phase 1 will build from.
+Architecture plus an executable chat / Hub spike. The spike contains the event
+log, MCP trust boundary, Hub runtime and four vendor adapters; formal
+`packages/*` still contain contracts and foundational types. Hub hardening is
+complete, and the Hub runtime has a tested injectable Local Runner vertical
+slice. Next is finishing the shared contract and making Runner injection
+mandatory in the composition root, then Remote Runner → formal Event Core.
 
 ## Where to start
 
@@ -20,6 +24,7 @@ architecture, protocol, product and design specs that Phase 1 will build from.
 | --- | --- |
 | Understand the idea | [docs/vision.md](docs/vision.md) |
 | Understand the system | [docs/architecture/overview.md](docs/architecture/overview.md) |
+| Understand Hub / Runner deployment | [ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md) |
 | Integrate an agent | [docs/protocol/mcp-protocol.md](docs/protocol/mcp-protocol.md) |
 | Build the UI | [docs/product/navigation.md](docs/product/navigation.md), [docs/design/design-language.md](docs/design/design-language.md) |
 | Know what to build next | [docs/development/roadmap.md](docs/development/roadmap.md) |
@@ -27,6 +32,9 @@ architecture, protocol, product and design specs that Phase 1 will build from.
 
 A full walkthrough — architecture plus a user-facing guide with high-fidelity
 interface designs — is in [doc.html](doc.html). Open it in a browser.
+
+Run the current implementation and its full gate from
+[apps/chat-spike](apps/chat-spike/README.md).
 
 ## Core principles
 

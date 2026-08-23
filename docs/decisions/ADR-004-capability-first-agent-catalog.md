@@ -16,7 +16,8 @@ is exactly the coupling ADR-001 exists to prevent.
 
 No provider list exists in core code or in normative documentation.
 
-- Task routing reads `capabilities` only.
+- Task routing reads effective `capabilities` for `(agent, host)` only. Agent
+  skill plus host tools / hardware determines the value.
 - `provider` is recorded for display and billing, and is never branched on.
 - The capability vocabulary is a controlled list in
   [protocol/agent-schema.md](../protocol/agent-schema.md); extending it is a
@@ -43,9 +44,9 @@ prompt through the same core with no provider branching above the adapter layer.
 Switching between them is a registration change, exactly as predicted.
 
 **But capability has two axes, not one.** This ADR governs *task* capability
-(coding, research…). Integration capability — can it stream tokens, does it
-expose reasoning, can a session be resumed — varies independently and is not
-interchangeable with it:
+(coding, research…), scoped to an authenticated Runner host. Integration
+capability — can it stream tokens, does it expose reasoning, can a session be
+resumed — varies independently and is not interchangeable with it:
 
 | | streaming | reasoning | session | usage |
 | --- | --- | --- | --- | --- |
@@ -64,8 +65,8 @@ second axis. See [protocol/agent-schema.md](../protocol/agent-schema.md).
 ## Consequences
 
 - Swapping a vendor is a registration change, not a code change.
-- A capability that no registered agent has causes tasks to sit unassigned; the
-  Supervisor must surface that rather than let them sit.
+- A capability that no connected `(agent, host)` placement has causes tasks to
+  sit unassigned; the Supervisor must surface that rather than let them sit.
 - Documentation naming specific agents is illustrative only. Any example naming
   Codex or Claude means "an agent with that capability".
 - Surfaces must degrade on declared integration capability rather than assume the

@@ -134,7 +134,7 @@ td code{white-space:nowrap}
   <a href="#arch-notes">③ 四个关键判断</a>
   <h4>清单</h4>
   <a href="#p0">Phase 0 地基<span class="pc" data-pc="p0"></span></a>
-  <a href="#hub">Agent Hub（插入）<span class="pc" data-pc="hub"></span></a>
+  <a href="#hub">Hub / Runner 路线<span class="pc" data-pc="hub"></span></a>
   <a href="#p1">Phase 1 核心循环<span class="pc" data-pc="p1"></span></a>
   <a href="#p2">Phase 2 记忆<span class="pc" data-pc="p2"></span></a>
   <a href="#p3">Phase 3 界面<span class="pc" data-pc="p3"></span></a>
@@ -150,7 +150,7 @@ td code{white-space:nowrap}
 <div class="hero">
   <div class="eyebrow">从规格到代码</div>
   <h1>实施 TODO</h1>
-  <p class="lede" style="margin-top:12px;max-width:640px">当前状态：35 份规格、7 条 ADR，<b>Phase 0 已完成</b>——workspace 可构建、<code>pnpm verify</code> 全绿，但尚未实现任何行为。四个前置决策已拍板（Tauri 2 · 单机 · opus-5/high · 不做 CI）。下一步是 <a href="#p1">1.1 事件信封</a>。</p>
+  <p class="lede" style="margin-top:12px;max-width:680px">当前状态：docs 下 36 份文档（含 8 条 ADR）。可执行的 chat / Hub spike 已包含事件日志、MCP 边界、Hub runtime 和四家适配器；正式 <code>packages/*</code> 仍是契约。当前路线是 <b>质量门禁与认证 → Local Runner → 共享契约 → Remote Runner → Event Core</b>。</p>
 
   <div class="progress-wrap">
     <div class="progress-top">
@@ -166,7 +166,7 @@ td code{white-space:nowrap}
 <!-- ===================== 需要拍板 ===================== -->
 <section id="ask">
 <h2>① 已定的四件事</h2>
-<p>四个决策已拍板。A、B 两条约束未来工作，已按仓库规矩记入 <a href="docs/decisions/ADR-007-implementation-stack.md"><code>ADR-007</code></a>；C、D 是调参和流程，只记在这里。</p>
+<p>四个决策已拍板。A、C 由 <a href="docs/decisions/ADR-007-implementation-stack.md"><code>ADR-007</code></a> 记录；B 由 <a href="docs/decisions/ADR-008-server-hub-local-first-runners.md"><code>ADR-008</code></a> 取代原单机范围；D 是流程决策。</p>
 
 <div class="dec">
   <div class="dh"><span class="dt">决策 A ✓</span><span class="dv">桌面外壳：<code>Tauri 2</code></span></div>
@@ -175,9 +175,9 @@ td code{white-space:nowrap}
 </div>
 
 <div class="dec">
-  <div class="dh"><span class="dt">决策 B ✓</span><span class="dv">单机</span></div>
-  <p>一个人、一台 Mac、一份本地事件日志。无服务端、无多写者协调。</p>
-  <p><b>这个假设只在一个地方承重：</b>事件存储的 <code>seq</code> 分配和冲突处理。真要做多人，改动集中在那里，不会散落到各个包——到时候重开一条 ADR，别绕着补丁。</p>
+  <div class="dh"><span class="dt">决策 B ✓</span><span class="dv">Server Hub + Local-first Runners</span></div>
+  <p>Hub 是服务端控制面，只负责认证、路由、派发、事件和项目元数据；Runner 负责适配器、厂商会话和项目工作副本。Runner 主动连出，工作站不开入站端口。</p>
+  <p><b>实现顺序不是部署拓扑：</b>先用 Local Runner 跑通真实 CLI 并冻结共享契约，再只替换 transport 做 Remote Runner。项目文件跨机器靠 Git remote，不靠网络盘。</p>
 </div>
 
 <div class="dec">
@@ -215,8 +215,8 @@ td code{white-space:nowrap}
 
 <div class="dec">
   <div class="dh"><span class="dt">事件存储</span><span class="dv"><code>SQLite</code> · better-sqlite3 · WAL</span></div>
-  <p><b>为什么：</b>append-only 表 + 项目内单调 <code>seq</code> + 独立快照表，正好是 event-core 需要的全部。同步 API 让 reducer 保持纯函数（异步 reducer 会毁掉重放的确定性）。WAL 模式解决崩溃恢复。</p>
-  <div class="rej"><b>否决 Postgres：</b>桌面产品不该要求用户装数据库。<b>否决纯文件追加：</b>排序、幂等、崩溃恢复全要自己实现，等于重写一个更差的 SQLite。</div>
+  <p><b>为什么：</b>Hub 是单写者。append-only 表 + 项目内单调 <code>seq</code> + 独立快照表，正好是 event-core 需要的全部。同步 API 让 reducer 保持纯函数；WAL 负责崩溃恢复。</p>
+  <div class="rej"><b>暂不采用 Postgres：</b>只有出现多个 active Hub writer 才需要重开 ADR。<b>否决纯文件追加：</b>排序、幂等、崩溃恢复全要自己实现，等于重写一个更差的 SQLite。</div>
 </div>
 
 <div class="dec">
@@ -234,7 +234,7 @@ td code{white-space:nowrap}
 
 <div class="dec">
   <div class="dh"><span class="dt">MCP</span><span class="dv"><code>@modelcontextprotocol/sdk</code></span></div>
-  <p>stdio（本地进程智能体）+ Streamable HTTP（远程）两种 transport 都要支持。ADR-001 决定了这是唯一入口。</p>
+  <p>MCP 是 agent 参与 Agent OS 的唯一入口。它不是唤醒通道：Hub 派发由共享 Runner contract 承担，Local / Remote 的差别只在 transport。两条通道都必须经过 Hub 的认证 principal。</p>
 </div>
 
 <div class="dec">
@@ -268,6 +268,8 @@ td code{white-space:nowrap}
 
 <h3>目录（✓ = Phase 0 已建）</h3>
 <pre><code>agent-os/
+├── apps/hub/                  服务端控制面：认证、路由、派发
+├── apps/runner/               Local / Remote 执行面
 ├── apps/macos/                Tauri 壳 + React UI          （Phase 3）
 │   ├── src-tauri/             Rust：窗口、tray、菜单栏挂件
 │   └── src/                   React：七个界面
@@ -283,14 +285,15 @@ td code{white-space:nowrap}
 └── pnpm-workspace.yaml  tsconfig.base.json  biome.json      ✓</code></pre>
 <p class="lede" style="font-size:14px">Tauri 会引入 Rust——但只在 <code>src-tauri/</code>，用于窗口和 tray，不碰领域逻辑。这是可以接受的边界。</p>
 
-<div class="note"><b>依赖方向（写 tsconfig 时修正过一次）：</b><code>A ──▶ B</code> 读作 A imports B。</p>
-<pre style="margin:10px 0 0"><code>mcp-server ──▶ { agent-sdk, task-engine, memory-core } ──▶ event-core</code></pre>
+<div class="note"><p><b>依赖方向（写 tsconfig 时修正过一次）：</b><code>A ──▶ B</code> 读作 A imports B。</p>
+<pre style="margin:10px 0 0"><code>apps/hub ──▶ mcp-server ──▶ { agent-sdk, task-engine, memory-core } ──▶ event-core
+apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 <p style="margin-top:8px"><code>event-core</code> 在<b>最底层且零依赖</b>——它导出 <code>registerReducer</code>，是别人注册进来，不是反过来。原规格图把它画在中间，等于说内核依赖领域层；已修正并加了箭头图例。</p></div>
 </section>
 
 <!-- ===================== 关键判断 ===================== -->
 <section id="arch-notes">
-<h2>③ 四个容易做错的关键判断</h2>
+<h2>③ 五个容易做错的关键判断</h2>
 
 <div class="grid2">
   <div class="tile">
@@ -308,6 +311,10 @@ td code{white-space:nowrap}
   <div class="tile">
     <h4>4. 别让 provider 泄进内核</h4>
     <p>写完 Phase 1 时跑一次：<code>grep -rE 'openai|anthropic' packages/event-core packages/task-engine</code>。有命中就说明抽象漏了。这条可以做成 CI 检查。</p>
+  </div>
+  <div class="tile">
+    <h4>5. Local first 不等于单机产品</h4>
+    <p>Local Runner 是共享契约的参考实现。它跑通后 Remote Runner 只能增加认证、序列化、重连和背压，不能改派发、事件、会话或错误语义。</p>
   </div>
 </div>
 </section>
@@ -336,21 +343,21 @@ td code{white-space:nowrap}
 
   <li><input type="checkbox" id="t-0-2" checked><label for="t-0-2" class="tb">
     <span class="tt"><span class="tid">0.2</span>Vitest + Biome</span>
-    <span class="td">11 个测试。<code>workspace.test.ts</code> 断言 event-core 零依赖、兄弟包互不引用、<code>package.json</code> 的 deps 与 tsconfig 的 references 一致、base config 不含 DOM。Biome 需开 <code>json.parser.allowComments</code>——tsconfig 是 JSONC。</span>
+    <span class="td"><code>workspace.test.ts</code> 断言 event-core 零依赖、兄弟包互不引用、<code>package.json</code> 的 deps 与 tsconfig 的 references 一致、base config 不含 DOM。Biome 需开 <code>json.parser.allowComments</code>——tsconfig 是 JSONC。全仓实时计数以 <code>pnpm verify</code> 输出为准。</span>
     <span class="tm"><span class="tag sz">2 小时</span></span>
-    <span class="done-when"><b>已验证：</b>11/11 通过</span>
+    <span class="done-when"><b>已验证：</b>workspace、Hub、MCP、事件日志与分层套件全部进入统一 gate</span>
   </label></li>
 
   <li><input type="checkbox" id="t-0-3" checked><label for="t-0-3" class="tb">
     <span class="tt"><span class="tid">0.3</span>分层检查脚本 <code>pnpm check:layers</code></span>
-    <span class="td">四条规则：厂商名泄漏、依赖方向、兄弟包互引、事件类型绕过目录。<b>守卫自己也被测试</b>——<code>layering.test.ts</code> 往包里植入四种真实违规，断言脚本确实非零退出并报出对应规则。一个从不失败的守卫等于没有守卫。它同时挂在 <code>pnpm test</code> 里，测试套件不可能在分层被破坏时变绿。</span>
+    <span class="td">四条规则：厂商名泄漏、依赖方向、兄弟包互引、事件类型绕过目录。<b>守卫自己也被测试</b>——真实违规、空事件目录、同行 import 和动态 import 都必须 hard fail。它同时挂在 <code>pnpm test</code> 里，测试套件不可能在分层被破坏时变绿。</span>
     <span class="tm"><span class="tag crit">别省这个</span><span class="tag dep">依赖 0.1</span><span class="tag sz">2 小时</span></span>
     <span class="done-when"><b>已验证：</b>往 event-core 写一行 <code>openai</code>，报 <code>[厂商名泄漏]</code> 并指出行号，退出码 1</span>
   </label></li>
 
   <li><input type="checkbox" id="t-0-4" checked><label for="t-0-4" class="tb">
     <span class="tt"><span class="tid">0.4</span>更新 CLAUDE.md 的「无构建命令」段落</span>
-    <span class="td">换成真实命令表，并写明<b>没有 CI、<code>pnpm verify</code> 是唯一且手动的关口</b>。仓库状态段改为「Phase 0 done，但没有实现任何行为」，免得未来的 agent 以为包里已经有逻辑。</span>
+    <span class="td">换成真实命令表，并写明<b>没有 hosted CI、<code>pnpm verify</code> 是手动关口</b>。仓库状态区分 executable spike 与尚未开始的正式 package kernel，免得未来的 agent 去错目录。</span>
     <span class="tm"><span class="tag sz">10 分钟</span></span>
   </label></li>
 </ul>
@@ -359,11 +366,11 @@ td code{white-space:nowrap}
 
 <section id="hub">
 <div class="phase-hd">
-  <h3 id="hubh">Agent Hub — 人当 Supervisor 的最小验证</h3>
-  <span class="badge done">✓ 已完成</span>
+  <h3 id="hubh">Hub / Runner — 从已验证 spike 到正式边界</h3>
+  <span class="badge now">← 现在这里</span>
   <span class="phase-count" data-count="hub"></span>
 </div>
-<p class="phase-goal">插在 Phase 1 之前的 side project。<b>唯一要验的是两条通道的接缝</b>：一条消息从 A 发出，经过事件日志，把 B 叫醒并让 B 干了活。其余都是为了让这句话可观察。人扮演 Supervisor，agent 之间可以互相委派。</p>
+<p class="phase-goal">A / B / C 已证明两条通道、能力路由和任务审阅。现在沿 ADR-008 把 co-located spike 收敛成正式边界：先保护 Hub，再抽 Local Runner、冻结共享契约，最后启动 Remote Runner。</p>
 
 <div class="note"><b>为什么现在做。</b>spike 分别证了唤醒通道（四家都通）和参与通道（四家里三家零适配器），但<b>从没测过把它们接起来</b>——spike 里 <code>to</code> 永远是 <code>you</code>，人是唯一收件人。这个接缝不通，Agent OS 就只是一个多窗口聊天工具。</div>
 
@@ -411,6 +418,41 @@ td code{white-space:nowrap}
     <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">验规则 3 / 5</span><span class="tag dep">依赖 B.1</span><span class="tag sz">1 天</span></span>
     <span class="done-when"><b>已验证（真机）：</b>人一句话 → <code>task.created</code> → <code>task.assigned</code>（协调者<b>没填 executor</b>，运行时按 research 匹配到 Grok）→ <code>task.started</code> → <code>task.review.requested</code> → 人点验收 → <code>task.completed</code>。<b>六个事件，一条消息都没有。</b>agent 报 <code>status:"completed"</code> 仍然只到 <code>review</code>；验收<b>没有任何 MCP 工具</b>，只在人的界面上</span>
   </label></li>
+
+  <li><input type="checkbox" id="t-h-g" checked><label for="t-h-g" class="tb">
+    <span class="tt"><span class="tid">G</span>质量门禁 + Hub 认证边界</span>
+    <span class="td">默认只监听 <code>127.0.0.1</code>；bearer token 在服务端映射 human / agent principal。public bootstrap shell 不含数据或能力；所有数据、控制、SSE 与 MCP 路径强制认证。界面与验收仅 human，MCP 仅 agent；body 里的 caller 没有权限意义。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">已完成</span></span>
+    <span class="done-when"><b>已验证：</b><code>pnpm verify</code> 全绿；未认证、错角色、冒充 caller、跨站请求和严格分层失败路径都有回归</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-lf" checked><label for="t-h-lf" class="tb">
+    <span class="tt"><span class="tid">LF</span>Local Runner 严格契约与持久 session 基础</span>
+    <span class="td">strict dispatch；统一 result / event / error；真实子进程 adapter；按 <code>(user, project, agent)</code> 串行和持久化。workspace 先做 lexical 再做 realpath containment，拒绝 <code>..</code> 与 symlink 越界。</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">已完成</span></span>
+    <span class="done-when"><b>已验证：</b>成功与流、失败、workspace 越界、Runner 重启恢复和 user 隔离 4/4 通过</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-l" checked><label for="t-h-l" class="tb">
+    <span class="tt"><span class="tid">L</span>Hub → Local Runner 完整调用</span>
+    <span class="td">把现有 Hub dispatch 接到 LF；Runner 持有厂商登录、会话和项目 working copy，Hub 不再直接创建 adapter。</span>
+    <span class="tm"><span class="tag crit">关键路径</span><span class="tag dep">依赖 LF</span></span>
+    <span class="done-when"><b>已验证：</b>真实子进程走 Hub → Local Runner → adapter；stream 回写、任务到 review、failure 归一化与同 agent 队列恢复 3/3</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-c"><label for="t-h-c" class="tb">
+    <span class="tt"><span class="tid">RC</span>冻结 Local / Remote 共享契约</span>
+    <span class="td">统一 dispatch、<code>{text, sessionId, ms, fresh}</code>、event stream、取消、重试、错误和 liveness。逻辑 session 键固定为 <code>(user, project, agent)</code>，能力固定为 <code>(agent, host)</code>。server composition root 强制注入 Runner，并删除 direct-adapter fallback；无 Runner 必须 fail closed。</span>
+    <span class="tm"><span class="tag crit">关键路径</span><span class="tag dep">依赖 L</span></span>
+    <span class="done-when"><b>完成判据：</b>contract tests 不知道 transport 是 local 还是 remote</span>
+  </label></li>
+
+  <li><input type="checkbox" id="t-h-r"><label for="t-h-r" class="tb">
+    <span class="tt"><span class="tid">R</span>Remote Runner transport</span>
+    <span class="td">Runner 主动连 Hub；新增 host auth、序列化、重连和背压，不改变调用语义。项目文件留在 Runner，跨 host 共享以 Git remote 为边界。</span>
+    <span class="tm"><span class="tag crit">关键路径</span><span class="tag dep">依赖 RC</span></span>
+    <span class="done-when"><b>完成判据：</b>Local 验收任务不改一行地远程运行，normalized event sequence 一致</span>
+  </label></li>
 </ul>
 
 <div class="note warn"><b>三个同族 bug，全是真机跑出来的。</b>每一个都是<b>运行时信任了 agent 能控制的字段</b>：① <code>replyTo</code> 不填就脱离因果链，预算失效；② 重复注册写了第二条事件，污染此后所有重放；③ 「这一轮说过话没有」按因果链判断，而任务唤醒没有真实 cause 事件，于是交付内容被回显了两遍。<br><b>共同的修法</b>：改成按运行时自己掌握的东西判断——运行时补链、按 <code>seq</code> 位置判断写没写过。<b>任何以 agent 提供的数据为准的限制都是形同虚设。</b></div>
@@ -425,10 +467,10 @@ td code{white-space:nowrap}
 <section id="p1">
 <div class="phase-hd">
   <h3>Phase 1 — 核心循环（无 UI）</h3>
-  <span class="badge now">← 现在这里</span>
+  <span class="badge">Runner 后进入</span>
   <span class="phase-count" data-count="p1"></span>
 </div>
-<p class="phase-goal">目标：headless 跑通完整运行循环。<b>刻意不做任何界面</b>。预计 3–4 周。骨架已就绪，<code>packages/*/src/index.ts</code> 里已有各包契约和基础类型（<code>ProjectId</code>/<code>Seq</code>/<code>EventId</code>、<code>TaskStatus</code> 全八态、<code>Capability</code> 受控词表），从 1.1 接着写即可。</p>
+<p class="phase-goal">目标：把 Runner track 证明过的边界移进正式 packages，headless 跑通完整运行循环。<b>刻意不做任何界面</b>。骨架已有契约和基础类型；Remote Runner 验收通过后从 1.1 接着写。</p>
 
 <ul class="tasks" data-phase="p1">
   <li><input type="checkbox" id="t-1-1"><label for="t-1-1" class="tb">
@@ -480,7 +522,7 @@ td code{white-space:nowrap}
   </label></li>
 
   <li><input type="checkbox" id="t-1-8"><label for="t-1-8" class="tb">
-    <span class="tt"><span class="tid">1.8</span>MCP Server：11 个工具 + strict 校验</span>
+    <span class="tt"><span class="tid">1.8</span>MCP Server：12 个工具 + strict 校验</span>
     <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。<br><b>spike 已跑通其中三个</b>（<code>register_agent / get_context / send_message</code>），Claude Code 零适配器接入验证过——<code>apps/chat-spike/src/mcp-tools.mjs</code> 的形状可以直接搬。</span>
     <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.7</span><span class="tag sz">4 天</span></span>
   </label></li>
@@ -713,13 +755,14 @@ td code{white-space:nowrap}
 
 <table>
 <tr><th>天</th><th>做什么</th><th>产出</th></tr>
-<tr style="opacity:.5"><td><b>1</b> ✓</td><td><s>0.1 + 0.2 + 0.3 + 0.4 —— workspace 骨架、Vitest、Biome、分层检查脚本</s></td><td><s><code>pnpm verify</code> 全绿，11/11 测试通过</s></td></tr>
-<tr><td><b>2</b></td><td>1.1 —— 事件信封 + 29 个 payload schema</td><td>非法事件被拒绝的测试</td></tr>
-<tr><td><b>3–4</b></td><td>1.2 —— SQLite 存储、seq 分配、幂等 token</td><td>并发 append 测试通过</td></tr>
-<tr><td><b>5</b></td><td>1.3 —— 总线 + 重放 + reducer 注册</td><td><b>重放等价性测试通过 → 内核成立</b></td></tr>
+<tr style="opacity:.65"><td><b>1</b> ✓</td><td><s>G —— Hub principal、能力路由认证、安全响应头、严格分层 gate</s></td><td><s><code>pnpm verify</code> 全绿</s></td></tr>
+<tr style="opacity:.65"><td><b>2</b> ✓</td><td><s>LF —— strict contract、真实子进程、workspace containment、持久 session</s></td><td><s>Local Runner 4/4</s></td></tr>
+<tr style="opacity:.65"><td><b>3</b> ✓</td><td><s>L —— Hub dispatch 接入 Local Runner</s></td><td><s>纵向切片 3/3</s></td></tr>
+<tr><td><b>4</b></td><td>RC —— cancel / retry / liveness contract，删除 direct fallback</td><td>共享契约固定，Hub 只派发</td></tr>
+<tr><td><b>5</b></td><td>同一任务跑 Local 与 Remote</td><td><b>normalized event sequence 一致 → 才进入 1.1</b></td></tr>
 </table>
 
-<div class="note"><b>第 5 天的那条测试是整个项目的分水岭。</b>「从 seq 0 重放整条日志，得到与增量归约完全一致的状态」——这条一旦通过，ADR-005 就从一句原则变成了一个被机器守住的性质。后面所有派生状态的正确性都挂在它上面。先写这条测试，再写实现。</div>
+<div class="note"><b>Remote 不是第二套调用实现。</b>第 5 天只允许替换 transport；如果为远程路径修改 dispatch、session key、事件或错误语义，说明 RC 尚未冻结，应回到 Local contract 修正。</div>
 
 <h3>命令</h3>
 <p>pnpm 由 corepack 提供，没有全局安装。嫌每次敲 <code>corepack</code> 麻烦可以 <code>corepack enable</code>（会写全局 shim）。</p>
@@ -747,6 +790,7 @@ corepack pnpm test</code></pre>
 <tr><td><b>reducer 被绕过</b></td><td>出现「先写表，再补一条事件给 UI 看」的代码</td><td>事件日志退化成通知通道，历史不可重建 → 除 event-core 外任何模块不得直接写库，评审时按这条看</td></tr>
 <tr><td><b>厂商名泄进内核</b></td><td><code>if (provider === 'openai')</code></td><td>抽象已经漏了。<code>pnpm check:layers</code>（0.3）</td></tr>
 <tr><td><b>砍了 CI 之后检查也没人跑</b></td><td><code>check:layers</code> 写完就再没执行过</td><td>没有 CI 就没有强制点。挂 pre-commit，或至少写进每次提交前的例行动作——决策 D 砍的是 Actions，不是检查</td></tr>
+<tr><td><b>Remote Runner 长成第二套实现</b></td><td>remote 分支出现新的 session / event / error 语义</td><td>同一 contract suite 先跑 Local 再跑 Remote；差异只能在认证、序列化、重连和背压</td></tr>
 <tr><td><b>重放性能</b></td><td>项目跑几个月后启动变慢</td><td>快照就是为这个存在的（1.4）。别等到慢了才做</td></tr>
 <tr><td><b>Tauri 的原生手感落差</b></td><td>用户说「感觉像网页」</td><td>预期之内的代价。滚动、右键菜单、窗口行为要专门调，预留时间</td></tr>
 <tr><td><b>LLM 成本失控</b></td><td>记忆摘要对每条事件都调一次</td><td>2.2 的窗口化设计就是为这个。另外考虑 <code>task_budget</code> 给 Supervisor 设上限</td></tr>
@@ -757,7 +801,7 @@ corepack pnpm test</code></pre>
 
 <p style="margin-top:26px;padding-top:18px;border-top:1px solid var(--border);color:var(--muted);font-size:13px">
 勾选状态存在浏览器 <code>localStorage</code>，换设备不同步。工作量估算是单人全职的粗略量级，不是承诺。<br>
-规格依据：<code>docs/development/roadmap.md</code> · <code>docs/architecture/packages.md</code> · <code>docs/product/threads.md</code> · ADR-001 至 ADR-007。
+规格依据：<code>docs/development/roadmap.md</code> · <code>docs/architecture/packages.md</code> · <code>docs/product/threads.md</code> · ADR-001 至 ADR-008。
 </p>
 </section>
 

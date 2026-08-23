@@ -3,6 +3,11 @@
 A protocol spike, not a product. It exists to answer questions that only running
 code can answer, and it is expected to be partly thrown away.
 
+It is also the executable baseline for
+[ADR-008](../../docs/decisions/ADR-008-server-hub-local-first-runners.md): first
+route a real CLI through a Local Runner contract, then move the same contract
+behind a Remote Runner transport.
+
 ## What it proves
 
 **Two channels, not one.** The specs described agents as MCP servers we call;
@@ -24,12 +29,39 @@ write to the log crosses it. Claude Code drove it with no adapter at all
 Codex cannot, so its adapter speaks the protocol on its behalf. Same boundary
 either way.
 
+The default server composition still shares one process, but an injected
+Local Runner now crosses the measured boundary: Hub dispatch on one side,
+Runner execution on the other. The next refactor makes that path mandatory and
+removes the direct-adapter fallback. Project files and vendor logins stay with
+the Runner.
+
 ## Run it
 
 ```bash
 corepack pnpm --filter @agent-os/chat-spike start
-# → http://localhost:4173
+# → http://127.0.0.1:4173
 ```
+
+Startup prints a one-time human token when `AGENT_OS_HUMAN_TOKEN` is not set.
+Open the URL and enter that token in the public bootstrap shell. The shell has no
+project data or capability until the token is accepted; it keeps the token in
+memory and sends it as `Authorization: Bearer …` on data and control requests.
+For one-step local opening,
+`http://127.0.0.1:4173/#token=<URL-encoded-token>` is also accepted. A fragment
+is never sent to the server; the page clears it before its first authenticated
+request. The token is not written to a query, cookie or `localStorage`, so a
+refresh asks again.
+
+For a stable development credential, set a random value of at least 32
+non-whitespace characters:
+
+```bash
+AGENT_OS_HUMAN_TOKEN='<human-token-at-least-32-chars>' \
+  corepack pnpm --filter @agent-os/chat-spike start
+```
+
+The Hub defaults to `127.0.0.1`. Widen `HOST` only with an explicit Origin
+allowlist; authentication remains mandatory.
 
 Requires `codex` on PATH (verified against codex-cli 0.142.5) and a logged-in
 Codex account. The agent runs `sandbox: read-only`, `approval-policy: never`,
@@ -100,8 +132,10 @@ than about context windows.
 - [x] **0 — dispatch works, across four vendors.** No event log, no MCP server of our own.
 - [x] **1 — event log.** Every message becomes `message.sent`; the UI projects the log; restart replays it. **Verified: kill the process, restart, the conversation comes back.**
 - [x] **2 — participation channel.** Our MCP server (`register_agent` / `get_context` / `send_message`). **Verified: Claude Code registered and spoke through it with no adapter; impersonation was refused.**
-- [x] **A+B — the Agent Hub.** A human plays Supervisor; agents delegate to each other. **Verified: one human turn produced `you → claude → grok → claude → you`, with the coordinator choosing `find_agent` unprompted.** Task objects (C) deliberately deferred.
+- [x] **A+B — the Agent Hub.** A human plays Supervisor; agents delegate to each other. **Verified: one human turn produced `you → claude → grok → claude → you`, with the coordinator choosing `find_agent` unprompted.** Task objects were deferred to stage C.
 - [x] **3 — the experiment.** Persistent session vs. rebuilding from `get_context`. **Result: 8/8 perfect recall, and it held under a 100× larger log. The cost is a ~2× per-turn premium for re-entering, almost independent of context volume.**
+- [x] **C — task review loop.** Tasks, capability routing and human acceptance
+  now run through the Hub; a Runner result reaches `review`, never self-accepts.
 
 ## The participation channel
 
@@ -115,10 +149,15 @@ corepack pnpm --filter @agent-os/chat-spike start        # terminal 1
 cat > /tmp/mcp.json <<'JSON'
 {"mcpServers":{"agent-os":{"command":"node",
   "args":["<repo>/apps/chat-spike/bin/agent-os-mcp.mjs"],
-  "env":{"AGENT_OS_URL":"http://localhost:4173","AGENT_OS_CALLER":"claude-code"}}}}
+  "env":{"AGENT_OS_URL":"http://localhost:4173","AGENT_OS_TOKEN":"<token-for-claude>"}}}}
 JSON
 claude -p '注册进 Agent OS 然后发一条消息' --mcp-config /tmp/mcp.json
 ```
+
+Start the Hub with the matching scoped token, for example
+`AGENT_OS_AGENT_TOKENS='{"claude":"<token-for-claude>"}'`. The token maps to
+principal `claude`; request fields cannot change that identity. Generated MCP
+configuration files are written with mode `0600`.
 
 The three things an agent cannot do are enforced by **absence**, not by checks —
 there is no field that reaches the envelope, no status tool, no approval tool
@@ -171,13 +210,27 @@ knows how events are stored.
 
 ## What is deliberately absent
 
-Tasks, Supervisor, capability routing, memory extraction, the approval gate,
-the seven screens, Tauri. Adding `create_task` in particular drags in the state
-machine and the router; chat alone is the whole target here.
+A formal Supervisor agent, memory extraction, the general risk-approval
+workflow, the seven screens and Tauri. The spike has only the task and human
+review behavior needed to prove the Hub / Runner boundary.
 
 ## Expected to survive
 
-The adapter contract, the three tool schemas and their validation semantics, and
+The shared Runner / adapter contract, tool schemas and validation semantics, and
 the thread reducer — `src/thread.mjs` is already shared verbatim with the
-browser, which imports it rather than reimplementing it. `server.mjs`'s
-orchestration and `log.mjs` are scaffolding.
+browser, which imports it rather than reimplementing it. `server.mjs`'s current
+co-located orchestration and `log.mjs` are scaffolding.
+
+## Next execution order
+
+1. **Done:** protect every capable Hub route with authenticated principals.
+2. **Done:** Local Runner foundation — strict dispatch, normalized events /
+   result / error, real subprocess, workspace containment and persistent
+   `(user, project, agent)` sessions.
+3. **Done:** the Hub supports injected Local Runner dispatch; normalized
+   streaming, task review, failure and queue recovery have vertical-slice
+   coverage.
+4. **Next:** freeze cancellation, retry and liveness tests, make Runner injection
+   mandatory in the server composition root, then remove the direct fallback.
+5. Add an outbound Remote Runner connection and rerun the same acceptance task.
+6. Move the proven envelope and contracts into formal packages.

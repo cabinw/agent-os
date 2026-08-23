@@ -22,11 +22,23 @@ is in `apps/chat-spike/`, not in `packages/`.
 
 ## Repository status
 
-Phase 0 done: workspace skeleton, five empty packages, tooling. **No behavior implemented yet** — `packages/*/src/index.ts` hold contracts and foundational types, not logic.
+The executable implementation is in `apps/chat-spike/`: event log, MCP boundary,
+Hub runtime and four vendor adapters. `packages/*/src/index.ts` still hold formal
+contracts and foundational types, not the Phase 1 kernel.
 
 Alongside the code: Markdown specs under `docs/`, high-fidelity renders under `ui/`, a generated walkthrough at `doc.html`, an implementation plan at `todo.html`.
 
-Stack: TypeScript + Tauri 2 + SQLite, single-machine ([ADR-007](docs/decisions/ADR-007-implementation-stack.md)). Next is Phase 1.1 — the event envelope ([roadmap](docs/development/roadmap.md)).
+Stack: TypeScript + Tauri 2 + SQLite. Deployment is Server Hub plus outbound
+Runners ([ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md));
+ADR-007's single-machine scope is superseded. Gates / auth and the Local Runner
+vertical slice are complete; current order is shared contract → Remote Runner → formal Event Core
+([roadmap](docs/development/roadmap.md)).
+
+The Local Runner has strict request / result / event / error shapes, workspace
+containment and persistent `(user, project, agent)` sessions. The Hub supports
+Runner injection and has vertical-slice regression coverage. The default
+composition still permits a direct-adapter fallback; make Runner injection
+mandatory while finishing the shared contract so the Hub becomes dispatch-only.
 
 ## What Agent OS is
 
@@ -46,6 +58,7 @@ The specs were rewritten to remove conflicts. When anything disagrees, these win
 | Navigation | [navigation.md](docs/product/navigation.md) / [ADR-003](docs/decisions/ADR-003-navigation-information-architecture.md) |
 | Visual style | [design-language.md](docs/design/design-language.md) |
 | Build order | [roadmap.md](docs/development/roadmap.md) |
+| Hub / Runner deployment | [ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md) |
 
 [docs/README.md](docs/README.md) is the full index.
 
@@ -54,8 +67,9 @@ The specs were rewritten to remove conflicts. When anything disagrees, these win
 Everything serves one cycle ([overview.md](docs/architecture/overview.md)):
 
 ```
-Goal → Supervisor → Task Engine → MCP Server → Agent Execution
-     → Event Core → { task state, memory, human surfaces }
+Goal → Supervisor → Task Engine → Server Hub → Local / Remote Runner
+     → MCP requests / result stream → Event Core
+     → { task state, memory, human surfaces }
 ```
 
 Object spine: `Project → Goal → Task → Agent → Event → Knowledge`.
@@ -70,12 +84,15 @@ Object spine: `Project → Goal → Task → Agent → Event → Knowledge`.
 
 ## Package architecture
 
-Target layout: `apps/macos/`, `packages/`, `docs/`, `ui/`, `tests/`.
+Target layout: `apps/hub/`, `apps/runner/`, `apps/macos/`, `packages/`, `docs/`,
+`ui/`, `tests/`. The Hub composes state and dispatches only; Runners own adapters,
+vendor sessions and working copies.
 
 `A → B` reads **A imports B**:
 
 ```
-apps/macos → mcp-server → { agent-sdk, task-engine, memory-core } → event-core
+apps/macos / apps/hub → mcp-server → { agent-sdk, task-engine, memory-core } → event-core
+apps/runner → agent-sdk → event-core types
 ```
 
 `event-core` is the bottom of the stack and depends on nothing — it exports `registerReducer` and the domain packages register into it, never the reverse. `task-engine` and `memory-core` are siblings and must not import each other. Enforced by `pnpm check:layers`.

@@ -18,6 +18,25 @@ participate in the same team without bespoke integration.
 | Added `get_context`, `write_memory`, `query_memory` | Shared context was described but had no API |
 | Task states lowercased and unified | Three conflicting lifecycles existed; see ADR-002 |
 | Every tool documents its emitted event | Events were specified separately and drifted |
+| Caller identity comes from authentication | An agent-controlled `caller` / `from` field is not authority |
+
+## Authentication and caller identity
+
+Every data, control, event-stream and MCP call is authenticated before handling.
+The only public resource is an inert bootstrap shell with no project data or
+capability. An HTTP bearer token maps server-side to a human or agent principal;
+the stdio bridge receives a scoped agent credential from its Runner. Vendor
+credentials never reach the Hub.
+
+The authenticated principal is the caller. A `caller`, `from` or agent id in a
+request body cannot change it. Registration ids must match the authenticated
+agent principal. Human-only actions, including acceptance, are not exposed as
+MCP tools.
+
+Remote Runners use a separate host credential on their outbound connection. The
+Hub derives host placement from that connection rather than accepting `host`
+from a dispatch body. See
+[ADR-008](../decisions/ADR-008-server-hub-local-first-runners.md).
 
 ## Objects
 
@@ -54,8 +73,10 @@ mid-task; events are permanent, so a duplicate puts a spurious "X joined" into
 every future replay of that log.
 
 Registration must also make the agent *reachable*, not merely valid. An id that
-passes registration but has no way to be woken is a sender everyone can reply to
-and nobody can reach.
+passes registration but has no authenticated Runner placement is a sender
+everyone can reply to and nobody can reach. Effective capability is stored on
+that `(agent, host)` placement. The runtime adds `host` to the registration event
+from the Runner principal; it is not a `register_agent` parameter.
 
 ### find_agent
 
@@ -65,7 +86,9 @@ Discover by capability, never by vendor.
 { "method": "find_agent", "params": { "capabilities": ["architecture"], "available": true } }
 ```
 
-Returns candidates ranked by capability match, current load and past outcomes.
+Returns reachable `(agent, host)` candidates ranked by capability match, current
+load and past outcomes. Callers select a logical agent; the Hub keeps the chosen
+host placement for dispatch.
 
 ### create_task
 
@@ -261,6 +284,8 @@ Emits `knowledge.created`.
 - An agent may never approve its own request.
 - Every tool call is validated at the MCP Server boundary. Unknown fields are
   rejected, not ignored.
+- Caller and host identity come from authenticated principals, never request
+  fields.
 - Calls are idempotent by client token; retries do not duplicate work.
 
 ## Planned

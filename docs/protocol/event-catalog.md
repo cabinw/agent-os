@@ -14,9 +14,13 @@ tense. Events record what happened, never what should happen.
 
 | Event | Payload | Emitted when |
 | --- | --- | --- |
-| `agent.registered` | `{ id, name, provider, role, capabilities }` | An agent joins a project |
-| `agent.status.changed` | `{ from, to, reason? }` | idle / working / waiting / blocked transitions |
-| `agent.disconnected` | `{ id, graceful }` | Heartbeat lost or clean exit |
+| `agent.registered` | `{ id, name, provider, role, host?, capabilities }` | An agent placement joins a project |
+| `agent.status.changed` | `{ host?, from, to, reason? }` | idle / working / waiting / blocked transitions |
+| `agent.disconnected` | `{ id, host?, graceful }` | Heartbeat lost or clean exit |
+
+`host` is runtime-owned and identifies the authenticated Runner placement. It is
+optional only for replay compatibility with pre-Runner spike logs. Effective
+capability belongs to `(agent, host)`.
 
 ## task.*
 

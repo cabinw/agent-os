@@ -11,6 +11,11 @@ Follows the dependency direction in
 means writing against contracts that do not exist yet, and the usual result is a
 package that stores its own state to compensate.
 
+This is the formal package dependency order. The current executable-spike track
+comes first: `Local Runner → shared contract → Remote Runner`. It proves the
+execution boundary before that contract moves into `agent-sdk`; see
+[ADR-008](../decisions/ADR-008-server-hub-local-first-runners.md).
+
 ## Rules
 
 1. **Contract before implementation.** The exported API goes in
@@ -45,6 +50,14 @@ catalog entry is the design review.
 
 ## Adding an adapter
 
-Adapters are configuration. Implement the Agent SDK surface, register
-capabilities, ship it. If adding an adapter requires touching `agent-runtime`,
-the abstraction has leaked — fix that instead.
+Adapters are Runner-side configuration. Implement the Agent SDK surface,
+register capability for `(agent, host)`, ship it. If adding an adapter requires
+touching Hub routing, the abstraction has leaked — fix that instead.
+
+## Adding a Runner transport
+
+1. Pass the shared contract suite against the Local Runner.
+2. Keep dispatch, event, cancellation and error shapes unchanged.
+3. Add only transport auth, serialization, reconnect and liveness behavior.
+4. Run the same real-CLI acceptance task through both transports and compare the
+   normalized event sequence.

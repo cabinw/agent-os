@@ -1,7 +1,27 @@
 # Agent Runtime
 
-Manages the lifecycle of connected agents and answers one question well: *which
-agent should do this?*
+Manages logical agents, their host placements and vendor sessions. It answers
+one question well: *which agent on which host should do this?*
+
+## Hub and Runners
+
+Per [ADR-008](../decisions/ADR-008-server-hub-local-first-runners.md), the Hub is
+the control plane and dispatches only. A Runner is the execution plane:
+
+```
+Server Hub ⇄ outbound Runner connection
+                  │
+                  ├── adapter ── vendor CLI
+                  └── project working copy
+```
+
+Every Runner initiates its Hub connection. It owns vendor credentials, adapter
+processes and local project paths. The Hub owns authorization, routing, events
+and project metadata; it never starts a CLI or reads the working copy.
+
+Local and Remote Runners use the same dispatch and event-stream contract. Build
+and test the Local Runner first. Remote work changes transport only after a real
+local CLI task passes the contract suite.
 
 ## Agent lifecycle
 
@@ -14,9 +34,9 @@ registered ──▶ idle ──▶ working ──▶ idle
                  └──▶ disconnected ──▶ (re-register)
 ```
 
-`disconnected` is expected, not exceptional — agent processes are ephemeral. Any
-task held by a disconnected agent returns to `assigned` after a grace period and
-is re-matched.
+`disconnected` is expected, not exceptional — Runner and agent processes are
+ephemeral. Any task held by a disconnected placement returns to `assigned`
+after a grace period and is re-matched to an eligible `(agent, host)`.
 
 **This is now measured, not assumed.** Dropping the vendor session every turn and
 rebuilding from `get_context` lost none of four planted facts across four vendors,
@@ -35,26 +55,43 @@ schedules agents:
 
 ## Model
 
+The logical agent and its host placement are separate records:
+
 ```json
 {
-  "id": "codex-developer",
-  "name": "Codex",
-  "provider": "openai",
-  "role": "developer",
+  "agent": "codex-developer",
+  "host": "wk-macbook",
   "capabilities": ["coding", "testing", "git"],
+  "environment": {
+    "os": "macos",
+    "arch": "arm64",
+    "mcpServers": ["agent-os", "ghidra"]
+  },
   "status": "working",
-  "currentTask": "TASK-014",
-  "parentAgent": "supervisor",
-  "concurrency": 2
+  "currentTask": "TASK-014"
 }
 ```
+
+The agent record still owns name, provider-for-display, role, parent and
+concurrency. The placement owns reachability, effective capability and load.
+
+## Sessions
+
+A logical vendor session is keyed by `(user, project, agent)`. The Hub persists
+its owning host; that Runner persists the opaque vendor session id, adapter and
+canonical workspace. Resume requires the same host, adapter and workspace. The
+mapping is operational state, not project truth: if any of those change or
+resume fails, the Runner starts fresh and rebuilds from `get_context`.
+
+That fallback is proven. It changes latency and cost, not correctness.
 
 ## Capability, not provider
 
 See [ADR-004](../decisions/ADR-004-capability-first-agent-catalog.md). Nothing in
-the runtime branches on `provider`. Task routing reads `capabilities` only, so a
-project can swap Codex for Gemini by registering a different agent — no task, no
-document, no line of core code changes.
+the runtime branches on `provider`. Task routing reads the effective capability
+of `(agent, host)`: an agent may have `testing` on a host with the required
+toolchain and lack it elsewhere. Swapping vendors or hosts changes registration,
+not tasks or core code.
 
 Capability vocabulary is defined in
 [protocol/agent-schema.md](../protocol/agent-schema.md); it is a controlled list
@@ -62,19 +99,21 @@ so that `find_agent` is not guessing at free text.
 
 ## Adapters
 
-An adapter is the thin translation between a vendor's interface and the Agent SDK.
-It is the only place a provider name may appear.
+An adapter is the thin translation between a vendor's interface and the shared
+Runner contract. It runs on the Runner and is the only place a provider name may
+appear.
 
 ```
-       Agent SDK  (register, receiveTask, reportProgress, reportResult)
+       Runner contract  (dispatch, event stream, cancel, health)
             ▲
    ┌────────┼────────┬──────────┬──────────┐
 Claude   Codex    Gemini    Perplexity   …          ← adapters
 ```
 
-Adapters are configuration, not architecture: the shipped set is a catalog that
-grows without touching `agent-runtime`. Agents that already speak MCP need no
-adapter at all — they call the MCP Server directly.
+Adapters are configuration, not architecture: the shipped set grows without
+touching `agent-runtime`. An agent that participates through MCP needs no
+translation for its calls, but wake, connection mounting and vendor invocation
+remain Runner responsibilities.
 
 ## Supervision tree
 

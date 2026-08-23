@@ -1,18 +1,19 @@
 # Handoff
 
-Written 2026-08-14 for an agent picking this up cold. Read this before
+Updated 2026-08-23 for an agent picking this up cold. Read this before
 `CLAUDE.md`.
 
 ## Read this first: the code is not where you will look for it
 
-`main` is current — everything is merged, and `corepack pnpm verify` passes on it
-(65 tests, four layering rules). There is no open PR.
+Run `corepack pnpm verify` before trusting the working tree. The gate is build,
+Biome, the architectural layer checker and the full Vitest suite; the command's
+reported test count is authoritative.
 
 But the directory layout is misleading:
 
 ```
-packages/*        contracts and TYPES ONLY — no behaviour. Phase 1.1 has not started
-apps/chat-spike/  ~2 500 lines of working code. This is the whole implementation
+packages/*        formal contracts and types; the Phase 1 kernel has not started
+apps/chat-spike/  the executable event log, Hub, MCP boundary and vendor adapters
 ```
 
 Someone reading `packages/` first will conclude the project is an empty skeleton.
@@ -28,7 +29,7 @@ Supervisor decomposes it into tasks, agents from any vendor execute over MCP,
 every state change is an event, and events reduce into task state, UI views and
 durable project knowledge.
 
-`CLAUDE.md` holds the working rules and `docs/README.md` indexes 37 specs. Do not
+`CLAUDE.md` holds the working rules and `docs/README.md` indexes 36 documents. Do not
 re-derive architecture from the code; the specs are canonical and were rewritten
 to remove conflicts.
 
@@ -38,10 +39,10 @@ to remove conflicts.
 | --- | --- |
 | `apps/chat-spike/` | The implementation. Event log, MCP tools, hub runtime, four vendor adapters, one experiment |
 | `apps/chat-spike/FINDINGS.md` | The measurements. Several specs were decided here |
-| `packages/*` | Contracts and types only. Phase 1.1 starts here |
-| `docs/` | 37 specs, 7 ADRs. Canonical |
-| `doc.html` / `todo.html` | Generated walkthrough and implementation plan. Both current |
-| `tests/` | 65 tests, all passing |
+| `packages/*` | Formal contracts and types. The Phase 1 kernel starts here after the Runner track |
+| `docs/` | 36 documents, including 8 ADRs. Canonical |
+| `doc.html` / `todo.html` | Generated walkthrough and implementation plan |
+| `tests/` | Gate, Hub, MCP, event-log, workspace and layering regression suites |
 
 The spike is where every architectural claim was actually tested. Treat
 `apps/chat-spike/FINDINGS.md` as evidence, not notes — the numbers in it decided
@@ -49,7 +50,8 @@ several specs.
 
 ## Verify before you commit
 
-There is **no CI, by decision.** `pnpm verify` is the only gate and it is manual.
+There is **no hosted CI, by decision.** `pnpm verify` is the gate and it is
+manual.
 
 ```bash
 corepack pnpm verify
@@ -57,8 +59,32 @@ corepack pnpm verify
 
 That runs `tsc --build`, Biome, `check:layers`, and Vitest. `check:layers`
 mechanically enforces four rules, including that **no event type may be emitted
-unless it exists in `docs/protocol/event-catalog.md`**. It reads the catalog's
-table rows only.
+unless it exists in `docs/protocol/event-catalog.md`**. Its parser and failure
+paths have regression tests; do not replace it with a permissive grep.
+
+The suite is changing during the Runner extraction. Use the final
+`pnpm verify` output rather than a copied test count.
+
+## Hub authentication that is now load-bearing
+
+- Default bind is `127.0.0.1:4173`; widening `HOST` does not weaken auth.
+- `AGENT_OS_HUMAN_TOKEN` supplies the human credential. If absent, startup
+  creates a 256-bit token and prints it once.
+- `AGENT_OS_AGENT_TOKENS` may map agent ids to tokens. Unspecified roster agents
+  receive process-local random tokens. Authentication lookup is hash-indexed;
+  scoped raw values remain only in process memory for Runner injection.
+- The public bootstrap shell contains no project data or capability. After it
+  collects a token into memory, event, task and acceptance routes are human-only;
+  MCP routes are agent-only. `/mcp/call` derives caller from the token;
+  `body.caller` is ignored, and `register_agent.id` must match the principal.
+- The shell accepts a password input or `#token=…`, clears the fragment before
+  its first request, and writes no token to a query, cookie or `localStorage`.
+- The MCP bridge receives `AGENT_OS_TOKEN`, not a caller id. Generated credential
+  files use mode `0600`.
+- Allowed Origins are exact-match (`AGENT_OS_ALLOWED_ORIGINS`); CSP, `nosniff`
+  and frame denial are set on responses.
+
+Do not add a compatibility path that accepts an unauthenticated caller field.
 
 ## Measurements that already constrain design
 
@@ -146,58 +172,69 @@ provenance must be captured live.
 
 ## What to do next
 
-Pick from these. Each has an acceptance criterion, which is the point.
+Follow one route. Do not start Remote Runner work early:
 
-**A · Phase 1.1 — event envelope + Zod schemas + ULID** *(2 days, critical path)*
-Implement the envelope from `docs/architecture/event-core.md` in
-`packages/event-core`. One payload schema per catalog type (**29 now**), closed
-with a discriminated union.
-*Done when:* an unknown `type` or an extra field is rejected at parse time.
-*Reuse:* the spike's ULID generator and `seq`-assigned-at-write boundary are
-already proven; `tests/event-log.test.ts` has the replay-equivalence test.
+```
+Gates + Hub auth ✓
+       ↓
+Local Runner foundation ✓
+       ↓
+Local Runner end-to-end ✓
+       ↓
+Shared Runner contract ← next
+       ↓
+Remote Runner transport
+       ↓
+Phase 1.1 Event Core
+```
 
-**B · Stop the hub listening on every interface; require a token** *(half a day)*
-`apps/chat-spike/src/server.mjs` calls `server.listen(PORT)` with no host, so Node
-binds `::` — every interface, no auth, while the process spawns agent CLIs with
-file access. This is a live exposure, not a hypothetical.
-*Done when:* the bind address is explicit (default `127.0.0.1`, widened only by
-config) and a bearer token is required on every route.
-*Note:* since the hub is going to run on a server (below), the token is the
-load-bearing half — a server that binds only loopback is useless, so the
-protection has to be authentication, not address.
+**G · Gates and Hub trust boundary — complete.** Every data, control,
+event-stream and MCP route authenticates before handling; a public bootstrap
+shell is inert. A server-side principal supplies caller identity; human and
+agent routes are separate. The Hub defaults to loopback and widens only by
+configuration.
+Missing token, wrong role, caller impersonation and cross-site requests have
+regression coverage.
 
-**C · Hub v2 — projects, sessions, remote runners** *(see `todo.html`)*
-Design is settled. The permission/isolation half was **cut by the owner** (trusted
-collaborators only, subscription billing) — do not reintroduce separate Unix
-users, containers, or a credential broker.
+**LF · Local Runner foundation — complete.** `src/runners/contract.mjs` defines
+strict request, normalized event / result / error shapes. `LocalRunner` calls a
+real subprocess through the adapter boundary, rejects `..` and symlink workspace
+escapes, serializes work per logical session and restores an atomic `0600`
+session snapshot after restart. Four focused tests cover success / stream,
+failure, containment and `(user, project, agent)` isolation.
 
-**The hub runs on a server. Every machine is a runner, including the owner's Mac.**
-That decision is made, and it shapes the rest:
+**L · Local Runner end to end — complete as an injectable vertical slice.** When
+a Runner is injected, Hub dispatch supplies runtime-owned
+`requestId / causedBy`, streams normalized events and writes the Runner reply
+through the existing tool callback. Tests drive a real subprocess through Hub →
+Local Runner → adapter, carry a task to review, normalize failure and prove the
+per-agent queue recovers.
 
-- The hub **dispatches only** — it never spawns a vendor CLI, so the server needs
-  no vendor logins. Each runner has its own.
-- The event log and project metadata live on the server, which also makes backup
-  and multi-device access fall out for free.
-- **Project files live on runners, not on the hub.** A project on the hub is
-  metadata plus which runners hold a working copy; the shared state between
-  machines is the **git remote**, not a filesystem. Do not reach for a network
-  mount.
-- Capability belongs to `(agent, host)`, not to the agent: "reverse engineering"
-  is Claude *on the box with the tooling*. A runner reports its OS, hardware and
-  installed MCP servers, and those become capabilities. Routing still reads
-  capabilities only, so ADR-004 is unaffected.
-- The adapter contract (`send(prompt) → {text, sessionId, ms, fresh}` plus an
-  `onEvent` stream) already **is** the runner wire protocol. It was extracted from
-  four vendors and survives being moved across a network unchanged.
-- Runners connect **out** to the hub, so no workstation needs an inbound port.
+**C · Finish the shared contract — next.** Keep adapter result
+`{text, sessionId, ms, fresh}` plus its event stream. Specify cancellation,
+retry, errors and liveness. Persist logical ownership at
+`(user, project, agent)`: the Hub records the host; that Runner keeps the opaque
+vendor handle, adapter and canonical workspace.
+Make Runner injection mandatory in the server composition root and remove the
+Hub's temporary direct-adapter fallback: without a Runner it must fail closed,
+not execute. *Done when:* contract tests do not know whether the transport is
+local or remote and the Hub has no vendor execution path.
 
-Sessions become second-class objects keyed by `(user, project, agent)` and must
-survive a restart — today the vendor session id is an in-memory field that dies
-with the process.
+**R · Remote Runner.** Add authentication, serialization, reconnect and
+backpressure to an outbound Runner connection. Workstations expose no inbound
+port. Capability is registered for `(agent, host)`.
+*Done when:* the unchanged Local acceptance task runs remotely and produces the
+same normalized event sequence.
 
-Order the owner leaned toward: **B → C → A.** C first because the owner uses it
-daily, and every valuable finding in this project so far came from running
-something rather than reasoning about it.
+**A · Phase 1.1 Event Core.** Move the proven envelope into
+`packages/event-core`: Zod schemas for all catalog types, ULID and strict unknown
+field rejection.
+*Done when:* an unknown `type` or extra field is rejected at parse time.
+
+The deployment decision is canonical in
+`docs/decisions/ADR-008-server-hub-local-first-runners.md`: the Hub owns project
+metadata and events; working copies live on Runners; the Git remote is the
+cross-host file boundary. ADR-007's single-machine scope is superseded.
 
 ## Do not do these
 
