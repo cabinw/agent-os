@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Agent OS 项目执行看板：项目进度、当前任务、待办、问题、完成项和 Agent 维护记录。">
+<title>Agent OS — 项目执行看板</title>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#F7F8FA;--surface:#FFFFFF;--surface-soft:#FAFAFC;--border:#E8EAED;
+  --text:#111827;--muted:#6B7280;--faint:#9CA3AF;--accent:#6366F1;--accent-2:#8B5CF6;
+  --accent-soft:#F1F0FF;--ok:#10B981;--ok-soft:#ECFDF5;--warn:#F59E0B;--warn-soft:#FFFBEB;
+  --risk:#EF4444;--risk-soft:#FEF2F2;--info:#3B82F6;--info-soft:#EFF6FF;
+  --shadow:0 1px 2px rgba(15,23,42,.04);--panel-shadow:0 14px 44px rgba(15,23,42,.09);
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;--bg:#0E1014;--surface:#161A21;--surface-soft:#12161C;--border:#282E38;
+  --text:#E8EAEE;--muted:#A0A7B3;--faint:#747D8A;--accent-soft:#252342;
+  --ok-soft:#102A22;--warn-soft:#302613;--risk-soft:#321919;--info-soft:#16263C;
+  --shadow:0 1px 2px rgba(0,0,0,.18);--panel-shadow:0 18px 54px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:20px}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}a{color:inherit}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.sidebar{position:sticky;top:0;height:100vh;padding:22px 16px;border-right:1px solid var(--border);background:color-mix(in srgb,var(--surface) 92%,transparent);overflow:auto;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;font-size:15px;font-weight:680;letter-spacing:-.02em}
+.brand-mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:#fff;box-shadow:0 6px 18px rgba(99,102,241,.22)}
+.brand-mark svg{width:17px;height:17px}.nav-label{padding:13px 10px 5px;color:var(--faint);font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.nav-link{display:flex;align-items:center;gap:9px;padding:7px 10px;margin:2px 0;border-radius:8px;color:var(--muted);text-decoration:none;transition:.12s ease}
+.nav-link:hover,.nav-link.active{background:var(--accent-soft);color:var(--accent)}.nav-dot{width:7px;height:7px;border:1.5px solid currentColor;border-radius:50%;flex:none}
+.side-card{margin-top:22px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
+.live-line{display:flex;align-items:center;gap:8px;color:var(--ok);font-size:11.5px;font-weight:650}.live-dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 13%,transparent)}
+.side-card p{margin:7px 0 0;color:var(--muted);font-size:11px}.side-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:11px}
+.tiny-btn{border:1px solid var(--border);background:var(--surface-soft);padding:6px 7px;border-radius:7px;cursor:pointer;color:var(--muted);font-size:10.5px}.tiny-btn:hover{color:var(--text)}
+.main{min-width:0;padding:0 28px 90px}.content{max-width:1380px;margin:0 auto}.topbar{height:58px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);gap:16px}
+.crumb{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}.crumb b{color:var(--text);font-weight:600}.top-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.meta-pill{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 9px;color:var(--muted);font-size:10.5px;font-variant-numeric:tabular-nums}
+.meta-pill.live{color:#047857;background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 22%,var(--border))}
+.overall-progress{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(280px,.72fr);gap:22px;align-items:center;padding:20px;margin:28px 0 0;border:1px solid color-mix(in srgb,var(--accent) 25%,var(--border));border-radius:15px;background:linear-gradient(135deg,var(--surface),color-mix(in srgb,var(--accent-soft) 72%,var(--surface)));box-shadow:var(--panel-shadow)}
+.overall-ring{--overall-pct:0%;position:relative;width:116px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--overall-pct),var(--border) 0)}
+.overall-ring::after{content:"";position:absolute;inset:9px;border-radius:50%;background:var(--surface);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 10%,var(--border))}.overall-number{position:relative;z-index:1;text-align:center}.overall-number strong{display:block;font-size:31px;line-height:1;font-weight:720;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.overall-number small{display:block;color:var(--muted);font-size:9.5px;margin-top:6px}
+.overall-copy h1{font-size:24px;margin:2px 0 6px}.overall-copy p{margin:0;color:var(--muted);font-size:11.5px;max-width:620px}.overall-bar{height:8px;border-radius:999px;background:var(--surface);border:1px solid var(--border);overflow:hidden;margin-top:14px}.overall-bar span{display:block;height:100%;width:var(--pct);border-radius:inherit;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .4s ease-in-out}.overall-bar-meta{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font:10.5px var(--mono);margin-top:6px}
+.overall-breakdown{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.overall-stat{border:1px solid var(--border);border-radius:9px;background:color-mix(in srgb,var(--surface) 82%,transparent);padding:10px}.overall-stat small{display:block;color:var(--muted);font-size:9.5px}.overall-stat b{display:block;font:680 16px/1.2 var(--mono);margin-top:3px}.overall-stat.ok b{color:var(--ok)}.overall-stat.risk b{color:var(--risk)}
+.hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(300px,.7fr);gap:18px;padding:24px 0 18px}.eyebrow{color:var(--accent);font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px}
+h1{font-size:34px;line-height:1.16;letter-spacing:-.035em;margin:0;font-weight:720}.lede{font-size:14px;line-height:1.75;color:var(--muted);max-width:760px;margin:13px 0 0}
+.hero-status{border:1px solid color-mix(in srgb,var(--accent) 26%,var(--border));background:linear-gradient(145deg,var(--surface),color-mix(in srgb,var(--accent-soft) 62%,var(--surface)));border-radius:14px;padding:17px;box-shadow:var(--panel-shadow)}
+.status-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.status-head b{font-size:13px}.status-chip,.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface-soft);color:var(--muted);font-size:10px;white-space:nowrap}
+.status-chip.waiting{color:var(--accent);background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 20%,var(--border))}.hero-status p{color:var(--muted);font-size:11.5px;margin:10px 0 12px}
+.next-chain{display:flex;gap:5px;align-items:center;flex-wrap:wrap;font:600 10px var(--mono);color:var(--muted)}.next-chain span{padding:4px 7px;border-radius:6px;background:var(--surface);border:1px solid var(--border)}.next-chain i{font-style:normal;color:var(--accent)}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:10px 0 32px}.kpi{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px 15px;box-shadow:var(--shadow);min-width:0}
+.kpi-label{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:10.5px}.kpi-dot{width:7px;height:7px;border-radius:50%;background:var(--metric,var(--info));flex:none}.kpi-value{font-size:27px;line-height:1.15;font-weight:680;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-top:10px}.kpi-sub{font-size:10.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+section{padding:20px 0 25px;scroll-margin-top:15px}.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:14px}.section-kicker{color:var(--accent);font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+h2{font-size:21px;line-height:1.3;letter-spacing:-.025em;margin:3px 0 0;font-weight:690}.section-desc{max-width:600px;color:var(--muted);font-size:11.8px;margin:0;text-align:right}
+.progress-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}.progress-card{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.progress-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.progress-card h3{font-size:13.5px;margin:0}.progress-card p{font-size:11px;color:var(--muted);margin:4px 0 0}.fraction{font:650 12px var(--mono);color:var(--muted)}
+.bar{height:7px;border-radius:999px;background:var(--surface-soft);border:1px solid var(--border);overflow:hidden;margin-top:14px}.bar>span{display:block;height:100%;width:var(--pct);background:var(--bar-color,var(--accent));border-radius:inherit;transition:width .4s ease-in-out}.bar-meta{display:flex;justify-content:space-between;gap:12px;color:var(--faint);font-size:10.5px;margin-top:7px;font-variant-numeric:tabular-nums}
+.current-layout{display:grid;grid-template-columns:minmax(280px,.75fr) minmax(0,1.25fr);gap:11px}.current-card,.todo-panel{border:1px solid var(--border);background:var(--surface);border-radius:13px;box-shadow:var(--shadow)}
+.current-card{padding:19px;background:linear-gradient(150deg,var(--accent-soft),var(--surface))}.empty-icon{width:38px;height:38px;border-radius:11px;background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 23%,var(--border));display:grid;place-items:center;color:var(--accent);font-size:19px}
+.current-card h3{font-size:17px;margin:13px 0 6px}.current-card p{color:var(--muted);font-size:12px;margin:0}.current-hint{border-top:1px solid color-mix(in srgb,var(--accent) 16%,var(--border));margin-top:15px;padding-top:12px;font-size:11px;color:var(--muted)}
+.todo-panel{padding:8px 17px}.todo-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}.todo-row:last-child{border-bottom:0}
+.todo-num{width:25px;height:25px;border-radius:8px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font:650 10px var(--mono)}.todo-row b{font-size:12px}.todo-row small{display:block;color:var(--muted);font-size:10.5px;margin-top:1px}.todo-state{font-size:9.5px;color:var(--faint);white-space:nowrap}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px;flex-wrap:wrap}.search{display:flex;align-items:center;gap:8px;min-width:min(340px,100%);border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:7px 10px;color:var(--muted)}
+.search input{border:0;background:transparent;outline:0;min-width:0;width:100%;font-size:11.5px}.filters{display:flex;gap:6px;flex-wrap:wrap}.filter-btn{border:1px solid var(--border);background:var(--surface);border-radius:7px;padding:6px 9px;color:var(--muted);cursor:pointer;font-size:10.5px}.filter-btn[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 24%,var(--border))}
+.kanban-wrap{overflow-x:auto;padding-bottom:6px}.kanban{display:grid;grid-template-columns:repeat(4,minmax(245px,1fr));gap:10px;min-width:1030px;align-items:start}.column{border:1px solid var(--border);border-radius:13px;background:color-mix(in srgb,var(--surface-soft) 78%,var(--bg));min-height:220px;overflow:hidden}
+.column-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 13px;border-bottom:1px solid var(--border);background:var(--surface)}.column-title{display:flex;align-items:center;gap:7px;font-weight:650;font-size:12px}.column-title i{width:8px;height:8px;border-radius:50%;background:var(--col,var(--faint))}.column-count{font:10.5px var(--mono);color:var(--faint)}
+.column-body{display:grid;gap:8px;padding:9px;max-height:660px;overflow:auto}.task-card{display:block;width:100%;text-align:left;border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:11px;cursor:pointer;box-shadow:var(--shadow);transition:border-color .12s ease,background .12s ease}.task-card:hover{border-color:color-mix(in srgb,var(--accent) 32%,var(--border));background:color-mix(in srgb,var(--accent-soft) 25%,var(--surface))}
+.task-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.task-id{font:650 9.5px var(--mono);color:var(--faint)}.priority{font:700 9px var(--mono);color:var(--priority,var(--muted))}.task-card h3{font-size:12.2px;line-height:1.35;margin:6px 0 5px}.task-card p{font-size:10.5px;color:var(--muted);line-height:1.45;margin:0}.task-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:9px}.task-scope{font-size:9px;color:var(--faint)}
+.mini-progress{display:flex;align-items:center;gap:6px;color:var(--faint);font:9.5px var(--mono)}.mini-bar{width:45px;height:4px;border-radius:9px;background:var(--border);overflow:hidden}.mini-bar span{display:block;height:100%;background:var(--state-color,var(--accent));width:var(--p)}.empty-column{padding:22px 12px;text-align:center;color:var(--faint);font-size:10.5px}
+.inventory{border:1px solid var(--border);background:var(--surface);border-radius:13px;overflow:hidden;box-shadow:var(--shadow)}.phase-row{border-bottom:1px solid var(--border)}.phase-row:last-child{border-bottom:0}.phase-row summary{list-style:none;display:grid;grid-template-columns:minmax(190px,1fr) minmax(180px,.55fr) 70px 20px;gap:14px;align-items:center;padding:13px 16px;cursor:pointer}.phase-row summary::-webkit-details-marker{display:none}.phase-row summary:hover{background:var(--surface-soft)}
+.phase-name b{display:block;font-size:12.5px}.phase-name small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}.phase-progress{display:flex;align-items:center;gap:9px}.phase-progress .bar{margin:0;flex:1}.phase-count{font:10.5px var(--mono);color:var(--muted);text-align:right}.chev{color:var(--faint);transition:transform .16s ease}.phase-row[open] .chev{transform:rotate(90deg)}
+.roadmap-list{border-top:1px solid var(--border);padding:5px 16px 11px;background:var(--surface-soft)}.roadmap-task{display:grid;grid-template-columns:72px minmax(0,1fr) 90px;gap:10px;align-items:start;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer}.roadmap-task:last-child{border-bottom:0}.roadmap-task:hover .roadmap-title{color:var(--accent)}.roadmap-id{font:600 9.5px var(--mono);color:var(--faint)}.roadmap-title{font-size:11.5px;font-weight:580}.roadmap-accept{display:block;color:var(--muted);font-size:10px;margin-top:2px}.roadmap-state{text-align:right;font-size:9.5px}
+.problem-controls{display:flex;gap:6px;margin-bottom:11px}.problems{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.problem{border:1px solid var(--border);background:var(--surface);border-radius:11px;padding:14px;position:relative;overflow:hidden}.problem::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--severity,var(--warn))}.problem-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.problem-id{font:650 9.5px var(--mono);color:var(--faint)}.problem h3{font-size:12.5px;margin:5px 0 6px}.problem p{color:var(--muted);font-size:10.8px;margin:0}.problem-next{border-top:1px dashed var(--border);padding-top:9px;margin-top:10px;color:var(--muted);font-size:10.5px}.problem-next b{color:var(--text)}
+.problem-links{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:9px}.problem-links a{font-size:9.5px;color:var(--accent);text-decoration:none}.problem.resolved{opacity:.72}.problem.resolved::before{background:var(--ok)}
+.activity-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:11px}.timeline,.maintenance{border:1px solid var(--border);background:var(--surface);border-radius:13px;padding:8px 16px;box-shadow:var(--shadow)}.activity-item{display:grid;grid-template-columns:82px 10px minmax(0,1fr);gap:10px;padding:11px 0;border-bottom:1px solid var(--border);animation:arrive .2s ease-out}.activity-item:last-child{border-bottom:0}.activity-time{font:9.5px var(--mono);color:var(--faint)}.activity-mark{width:8px;height:8px;border-radius:50%;background:var(--event-color,var(--info));margin-top:4px}.activity-copy b{font-size:11.5px}.activity-copy p{font-size:10.5px;color:var(--muted);margin:2px 0 0}
+.maintenance{padding:16px}.maintenance h3{font-size:13px;margin:0 0 9px}.maint-rule{display:grid;grid-template-columns:24px minmax(0,1fr);gap:9px;padding:8px 0;border-bottom:1px solid var(--border)}.maint-rule:last-child{border-bottom:0}.maint-num{width:23px;height:23px;border-radius:7px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font:650 9px var(--mono)}.maint-rule b{display:block;font-size:11px}.maint-rule small{display:block;color:var(--muted);font-size:10px;margin-top:1px}
+.sources{display:flex;gap:7px;flex-wrap:wrap}.source-chip{padding:6px 9px;border:1px solid var(--border);border-radius:8px;background:var(--surface);text-decoration:none;color:var(--muted);font-size:10.5px}.source-chip:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,var(--border))}.foot{display:flex;justify-content:space-between;gap:16px;color:var(--faint);font-size:10px;padding:24px 0 0;margin-top:14px;border-top:1px solid var(--border)}
+dialog{width:min(620px,calc(100vw - 30px));max-height:min(760px,calc(100vh - 30px));border:1px solid var(--border);border-radius:15px;padding:0;background:var(--surface);color:var(--text);box-shadow:0 24px 80px rgba(0,0,0,.25)}dialog::backdrop{background:rgba(15,23,42,.42);backdrop-filter:blur(3px)}.dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:18px 20px;border-bottom:1px solid var(--border)}.dialog-head h3{font-size:17px;margin:4px 0 0}.dialog-body{padding:18px 20px;overflow:auto}.close-btn{width:30px;height:30px;border:1px solid var(--border);border-radius:8px;background:var(--surface-soft);cursor:pointer}.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:15px}.detail{border:1px solid var(--border);border-radius:8px;padding:9px;background:var(--surface-soft)}.detail small{display:block;color:var(--faint);font-size:9.5px}.detail b{display:block;font-size:11px;margin-top:2px}.detail-block{margin-top:13px}.detail-block h4{font-size:11px;margin:0 0 5px}.detail-block p{font-size:11px;color:var(--muted);margin:0}.detail-block a{color:var(--accent)}
+.chip.ok{color:#047857;background:var(--ok-soft)}.chip.risk{color:var(--risk);background:var(--risk-soft)}.chip.warn{color:#B45309;background:var(--warn-soft)}.chip.info{color:#2563EB;background:var(--info-soft)}
+code{font-family:var(--mono);font-size:.9em;background:var(--surface-soft);border:1px solid var(--border);border-radius:4px;padding:.08em .32em}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.compact .column-body{gap:6px;padding:7px}body.compact .problem{padding:11px}
+@keyframes arrive{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+@media(max-width:1180px){.overall-progress{grid-template-columns:auto minmax(0,1fr)}.overall-breakdown{grid-column:1/-1;grid-template-columns:repeat(4,minmax(0,1fr))}.kpis{grid-template-columns:repeat(3,1fr)}.progress-grid{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.hero-status{max-width:720px}}
+@media(max-width:780px){.app{display:block}.sidebar{position:static;height:auto;padding:11px 13px;border-right:0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;overflow:auto}.brand{padding:0 10px 0 0;white-space:nowrap}.brand-mark{width:27px;height:27px}.nav-label,.side-card{display:none}.nav-link{white-space:nowrap;margin:0}.nav-dot{display:none}.main{padding:0 15px 60px}.topbar{height:auto;min-height:51px;padding:8px 0}.top-meta .meta-pill:not(.live){display:none}.overall-progress{grid-template-columns:1fr;padding:16px;margin-top:18px;gap:14px}.overall-ring{width:104px}.overall-breakdown{grid-column:auto;grid-template-columns:repeat(2,minmax(0,1fr))}.hero{padding-top:24px}h1{font-size:29px}.kpis{grid-template-columns:repeat(2,1fr)}.current-layout,.activity-layout{grid-template-columns:1fr}.section-head{display:block}.section-desc{text-align:left;margin-top:6px}.problems{grid-template-columns:1fr}.kanban{display:block;min-width:0}.kanban-wrap{overflow:visible}.column{margin-bottom:9px}.column-body{max-height:none}.phase-row summary{grid-template-columns:minmax(0,1fr) 82px 18px}.phase-progress{display:none}.detail-grid{grid-template-columns:1fr}.foot{display:block}.foot span{display:block;margin-top:4px}}
+@media print{.sidebar,.topbar,.toolbar,.problem-controls,.side-actions{display:none!important}.app{display:block}.main{padding:0}.content{max-width:none}.kanban{min-width:0}.column-body{max-height:none}.task-card,.problem,.progress-card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" aria-label="看板导航">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 21 19H3L12 3Z" stroke="currentColor" stroke-width="2"/><path d="m9 15 3-6 3 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+      Agent OS
+    </div>
+    <div class="nav-label">项目执行</div>
+    <a class="nav-link active" href="#overview"><span class="nav-dot"></span>总览</a>
+    <a class="nav-link" href="#progress"><span class="nav-dot"></span>进度</a>
+    <a class="nav-link" href="#current"><span class="nav-dot"></span>当前 Task</a>
+    <a class="nav-link" href="#board"><span class="nav-dot"></span>Task 看板</a>
+    <a class="nav-link" href="#roadmap"><span class="nav-dot"></span>完整路线</a>
+    <a class="nav-link" href="#problems"><span class="nav-dot"></span>Problems</a>
+    <a class="nav-link" href="#activity"><span class="nav-dot"></span>维护记录</a>
+    <div class="nav-label">其他页面</div>
+    <a class="nav-link" href="next.html"><span class="nav-dot"></span>下一步建议</a>
+    <a class="nav-link" href="todo.html"><span class="nav-dot"></span>原始 TODO</a>
+    <a class="nav-link" href="doc.html"><span class="nav-dot"></span>项目说明</a>
+    <div class="side-card">
+      <div class="live-line"><span class="live-dot"></span>Agent 维护视图</div>
+      <p>任务开始、发现问题、实现结束和验证结束时，我会更新同一份数据并刷新这里。</p>
+      <div class="side-actions">
+        <button class="tiny-btn" id="refresh" type="button">刷新数据</button>
+        <button class="tiny-btn" id="theme" type="button">切换主题</button>
+        <button class="tiny-btn" id="density" type="button">紧凑模式</button>
+        <button class="tiny-btn" type="button" onclick="window.print()">打印看板</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+      <div class="topbar">
+        <div class="crumb"><span>项目库</span><span>/</span><b>Agent OS</b><span>/</span><span>执行看板</span></div>
+        <div class="top-meta"><span class="meta-pill live">● Agent maintained</span><span class="meta-pill" id="revision"></span><span class="meta-pill" id="updated-at"></span></div>
+      </div>
+
+      <section class="overall-progress" id="overview" aria-labelledby="overall-title">
+        <div class="overall-ring" id="overall-ring" aria-label="总体进度">
+          <div class="overall-number"><strong id="overall-percent">0%</strong><small>总体完成度</small></div>
+        </div>
+        <div class="overall-copy">
+          <div class="eyebrow">Overall progress</div>
+          <h1 id="overall-title">项目总体进度</h1>
+          <p>按 canonical Roadmap 中状态为 <code>completed</code> 的 Task 计算。验证实验、门禁和工具覆盖保留为独立指标，不会被混进这个百分比。</p>
+          <div class="overall-bar" aria-hidden="true"><span id="overall-bar"></span></div>
+          <div class="overall-bar-meta"><span id="overall-fraction"></span><span>完成后自动重算</span></div>
+        </div>
+        <div class="overall-breakdown" id="overall-breakdown" aria-label="总体进度拆分"></div>
+      </section>
+
+      <header class="hero">
+        <div>
+          <div class="eyebrow">Project execution board</div>
+          <h1>项目进度、Task、待办和问题，在一处持续更新</h1>
+          <p class="lede">这里不把“跑通的实验原型”误写成“正式产品已完成”。进度按验证原型、当前执行路线和 canonical Roadmap 分轨计算；所有任务状态来自 ADR-002，问题保留开放与已解决历史。</p>
+        </div>
+        <aside class="hero-status" aria-label="当前安排">
+          <div class="status-head"><b>当前安排</b><span class="status-chip waiting">等待你安排</span></div>
+          <p>项目任务尚未进入执行。推荐的第一项是恢复完整验证门禁，然后封住 Hub 的访问和身份边界。</p>
+          <div class="next-chain"><span>GATE</span><i>→</i><span>SECURITY</span><i>→</i><span>LOCAL</span><i>→</i><span>CONTRACT</span><i>→</i><span>REMOTE</span></div>
+        </aside>
+      </header>
+
+      <div class="kpis" id="kpis" aria-label="关键进度指标"></div>
+
+      <section id="progress" aria-labelledby="progress-title">
+        <div class="section-head"><div><div class="section-kicker">Progress</div><h2 id="progress-title">分轨进度</h2></div><p class="section-desc">总数全部从任务数据派生；<code>progress: 100</code> 不会自动把任务改成完成。</p></div>
+        <div class="progress-grid" id="progress-grid"></div>
+      </section>
+
+      <section id="current" aria-labelledby="current-title">
+        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">当前没有已授权的实现任务。右侧是建议顺序，不代表已经开工。</p></div>
+        <div class="current-layout">
+          <article class="current-card" id="current-task"></article>
+          <div class="todo-panel" id="route-list" aria-label="推荐任务顺序"></div>
+        </div>
+      </section>
+
+      <section id="board" aria-labelledby="board-title">
+        <div class="section-head"><div><div class="section-kicker">Task board</div><h2 id="board-title">Task 看板</h2></div><p class="section-desc">默认同时显示未完成和已完成。点击卡片查看依赖、验收标准和证据来源。</p></div>
+        <div class="toolbar">
+          <label class="search"><span aria-hidden="true">⌕</span><input id="task-search" type="search" placeholder="搜索 ID、标题、阶段或验收标准" autocomplete="off"></label>
+          <div class="filters" role="group" aria-label="任务范围">
+            <button class="filter-btn" type="button" data-scope="all" aria-pressed="true">全部</button>
+            <button class="filter-btn" type="button" data-scope="route" aria-pressed="false">当前路线</button>
+            <button class="filter-btn" type="button" data-scope="roadmap" aria-pressed="false">Roadmap 47</button>
+          </div>
+        </div>
+        <div class="kanban-wrap"><div class="kanban" id="kanban"></div></div>
+      </section>
+
+      <section id="roadmap" aria-labelledby="roadmap-title">
+        <div class="section-head"><div><div class="section-kicker">Canonical inventory</div><h2 id="roadmap-title">完整 Roadmap · 47 项</h2></div><p class="section-desc">Phase 0 和 Hub 属于已验证地基／Spike；正式包仍从 Phase 1 开始。展开阶段查看具体任务。</p></div>
+        <div class="inventory" id="roadmap-list"></div>
+      </section>
+
+      <section id="problems" aria-labelledby="problems-title">
+        <div class="section-head"><div><div class="section-kicker">Problems & blockers</div><h2 id="problems-title">遇到的问题</h2></div><p class="section-desc">开放问题不会藏在 Task 文案里；已解决问题也保留，避免重复踩坑。</p></div>
+        <div class="problem-controls" role="group" aria-label="问题状态">
+          <button class="filter-btn problem-filter" type="button" data-problem="all" aria-pressed="true">全部</button>
+          <button class="filter-btn problem-filter" type="button" data-problem="open" aria-pressed="false">仅开放</button>
+          <button class="filter-btn problem-filter" type="button" data-problem="resolved" aria-pressed="false">已解决</button>
+        </div>
+        <div class="problems" id="problem-list"></div>
+      </section>
+
+      <section id="activity" aria-labelledby="activity-title">
+        <div class="section-head"><div><div class="section-kicker">Agent maintenance log</div><h2 id="activity-title">看板维护记录</h2></div><p class="section-desc">后续每次任务执行，都按开始、问题、实现、验证四个节点更新。</p></div>
+        <div class="activity-layout">
+          <div class="timeline" id="activity-list"></div>
+          <article class="maintenance">
+            <h3>我会怎样实时维护</h3>
+            <div class="maint-rule"><span class="maint-num">01</span><span><b>开始任务</b><small>进入 assigned / running，写清目标与 checklist。</small></span></div>
+            <div class="maint-rule"><span class="maint-num">02</span><span><b>发现问题</b><small>立即新增 Problem，并关联受影响 Task。</small></span></div>
+            <div class="maint-rule"><span class="maint-num">03</span><span><b>完成实现</b><small>记录产物与证据；验证前不会标 completed。</small></span></div>
+            <div class="maint-rule"><span class="maint-num">04</span><span><b>完成验证</b><small>通过才 completed；失败则 blocked 并写下一步。</small></span></div>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="sources-title">
+        <div class="section-head"><div><div class="section-kicker">Source of truth</div><h2 id="sources-title">数据来源</h2></div><p class="section-desc">看板负责状态汇总；协议、生命周期和路线仍以 canonical 文档为准。</p></div>
+        <div class="sources" id="sources"></div>
+      </section>
+
+      <footer class="foot"><span>Agent OS · 项目执行看板</span><span id="footer-meta"></span></footer>
+    </div>
+  </main>
+</div>
+
+<dialog id="task-dialog">
+  <div class="dialog-head"><div><div class="task-id" id="dialog-id"></div><h3 id="dialog-title"></h3></div><button class="close-btn" id="dialog-close" type="button" aria-label="关闭">×</button></div>
+  <div class="dialog-body" id="dialog-body"></div>
+</dialog>
+
+<script id="board-data" type="application/json">
+{
+  "schemaVersion": 1,
+  "revision": 6,
+  "updatedAt": "2026-08-23 19:45 CST",
+  "updatedBy": "Codex",
+  "currentTaskId": "REPO-01",
+  "verification": {"testsPassed":65,"testsTotal":65,"filesPassed":5,"filesTotal":5,"gatePassed":3,"gateTotal":4,"lintErrors":19,"checkedAt":"2026-08-23 17:41 CST"},
+  "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":0,"eventSchemaTotal":29,"adapters":4},
+  "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1"],
+  "roadmapPhases": [
+    {"id":"Phase 0","title":"工程地基","goal":"Workspace、测试、Biome 与分层守卫","order":0},
+    {"id":"Hub","title":"Agent Hub 验证","goal":"两条通道、能力路由、任务与人工验收的 Spike","order":1},
+    {"id":"Phase 1","title":"核心循环","goal":"无 UI 的正式 Event Core、Task Engine、MCP、SDK 与 Demo","order":2},
+    {"id":"Phase 2","title":"记忆","goal":"可追溯知识、supersedes、context 与图 API","order":3},
+    {"id":"Phase 3","title":"人的界面","goal":"Tauri、Pulse、审批、项目、任务、智能体与会话","order":4},
+    {"id":"Phase 4","title":"复活与画布","goal":"Revival、快照、Canvas 与知识图","order":5},
+    {"id":"Phase 5","title":"多智能体深度","goal":"协商、规划、自主路由与性能分析","order":6}
+  ],
+  "tasks": [
+    {"id":"FND-0.1","scope":"roadmap","phase":"Phase 0","title":"pnpm workspace + 五个空包骨架","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":[],"acceptance":"五个包可构建并产出声明；event-core 机械保持零依赖。","source":"todo.html#p0","summary":"正式实现的类型和包边界地基。"},
+    {"id":"FND-0.2","scope":"roadmap","phase":"Phase 0","title":"Vitest + Biome 基线","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["FND-0.1"],"acceptance":"测试与格式检查基线可运行。","source":"todo.html#p0","summary":"建立项目最初的自动验证工具。"},
+    {"id":"FND-0.3","scope":"roadmap","phase":"Phase 0","title":"分层检查脚本","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["FND-0.1"],"acceptance":"四条分层规则能主动检出违规并以非零退出。","source":"todo.html#p0","summary":"守住厂商泄漏、依赖方向、兄弟互引和事件目录。"},
+    {"id":"FND-0.4","scope":"roadmap","phase":"Phase 0","title":"更新开发命令与手工门禁说明","status":"completed","progress":100,"priority":"P1","owner":"—","dependsOn":["FND-0.1"],"acceptance":"仓库写明 pnpm verify 是唯一且手工的关口。","source":"todo.html#p0","summary":"让接手者不会误读构建状态。"},
+    {"id":"HUB-A.1","scope":"roadmap","phase":"Hub","title":"适配器池：多个 Agent 同时在线","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["FND-0.1"],"acceptance":"独立会话与队列；单进程并发写入 seq 单调无洞。","source":"todo.html#hub","summary":"Spike 中多 Agent 并行的运行基础。"},
+    {"id":"HUB-B.1","scope":"roadmap","phase":"Hub","title":"Agent 收件人触发真实唤醒","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["HUB-A.1"],"acceptance":"真机出现 you → claude → grok → claude → you 完整链路。","source":"todo.html#hub","summary":"连接 wake 与 participate 两条通道。"},
+    {"id":"HUB-B.2","scope":"roadmap","phase":"Hub","title":"回环预算与 runtime-owned 因果链","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["HUB-B.1"],"acceptance":"Agent 回环在预算内停止，causedBy 由 runtime 补链。","source":"todo.html#hub","summary":"避免 Agent 通过省略 replyTo 绕过预算。"},
+    {"id":"HUB-B.3","scope":"roadmap","phase":"Hub","title":"按能力委派，不按厂商点名","status":"completed","progress":100,"priority":"P1","owner":"—","dependsOn":["HUB-B.1"],"acceptance":"协调者主动 find_agent 并按 capability 委派。","source":"todo.html#hub","summary":"用真机验证 ADR-004 可行。"},
+    {"id":"HUB-B.4","scope":"roadmap","phase":"Hub","title":"Hub 花名册、定向消息与任务线程","status":"completed","progress":100,"priority":"P1","owner":"—","dependsOn":["HUB-B.1"],"acceptance":"三方协作可读；跳数显示与 runtime 预算同源。","source":"todo.html#hub","summary":"Spike 的最小人类观察面。"},
+    {"id":"HUB-C","scope":"roadmap","phase":"Hub","title":"任务对象与人工验收原型","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":["HUB-B.1"],"acceptance":"created → assigned → running → review → human completed 真机闭环。","source":"todo.html#hub","summary":"Agent 不能自行完成验收；README 状态文案仍需同步。"},
+
+    {"id":"RM-1.1","scope":"roadmap","phase":"Phase 1","title":"事件信封 + 29 个 strict schema + ULID","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":[],"acceptance":"未知 type 或任何多余字段在 parse 时被拒绝。","source":"todo.html#p1","summary":"正式 Event Core 的第一块实现。"},
+    {"id":"RM-1.2","scope":"roadmap","phase":"Phase 1","title":"SQLite 事件存储：append-only + 幂等","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1"],"acceptance":"并发 append 无重复 seq；同一 token 重试只落一条。","source":"todo.html#p1","summary":"用事务存储替换 throwaway JSONL。"},
+    {"id":"RM-1.3","scope":"roadmap","phase":"Phase 1","title":"事件总线、重放与 reducer 注册","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.2"],"acceptance":"从 seq 0 重放与增量归约状态完全一致。","source":"todo.html#p1","summary":"把 ADR-005 变成机器守住的性质。"},
+    {"id":"RM-1.4","scope":"roadmap","phase":"Phase 1","title":"快照与恢复","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.3"],"acceptance":"删除全部快照后重启，状态不变。","source":"todo.html#p1","summary":"快照只是缓存，不能成为真相来源。"},
+    {"id":"RM-1.5","scope":"roadmap","phase":"Phase 1","title":"任务状态转移矩阵与穷举测试","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.3"],"acceptance":"8 状态 × 10 事件全覆盖；progress 不触发状态转移。","source":"todo.html#p1","summary":"实现 ADR-002 的完整生命周期。"},
+    {"id":"RM-1.6","scope":"roadmap","phase":"Phase 1","title":"依赖图、环检测与就绪重算","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.5"],"acceptance":"未满足依赖不能离开 created；创建时拒绝环。","source":"todo.html#p1","summary":"让任务图的可执行性可证明。"},
+    {"id":"RM-1.7","scope":"roadmap","phase":"Phase 1","title":"能力路由与 Agent 注册表","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.5"],"acceptance":"核心代码无 provider 分支；无人具备能力时显式浮出。","source":"todo.html#p1","summary":"按能力、负载和结果路由。"},
+    {"id":"RM-1.8","scope":"roadmap","phase":"Phase 1","title":"MCP Server：12 个工具 + strict 校验","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.7"],"acceptance":"canonical 12 个工具全部 strict 校验并通过边界测试。","source":"todo.html#p1","summary":"Spike 当前只实现 7/12。"},
+    {"id":"RM-1.9","scope":"roadmap","phase":"Phase 1","title":"授权边界：Agent 不能写事件、设状态或审批","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.8"],"acceptance":"Agent 不能写事件、设置任务状态、审批或冒充身份。","source":"todo.html#p1","summary":"以不存在的字段和工具守住边界。"},
+    {"id":"RM-1.10","scope":"roadmap","phase":"Phase 1","title":"审批闸门接口（CLI 占位）","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.9"],"acceptance":"审批可阻塞调用；超时只 expired，绝不自动放行。","source":"todo.html#p1","summary":"为 Phase 3 UI 预留真正可阻塞的接口。"},
+    {"id":"RM-1.11","scope":"roadmap","phase":"Phase 1","title":"Agent SDK + 第一个适配器","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.8"],"acceptance":"两个不同厂商执行同类任务，核心代码零改动。","source":"todo.html#p1","summary":"正式化已测得的 adapter 边界。"},
+    {"id":"RM-1.12","scope":"roadmap","phase":"Phase 1","title":"Supervisor：目标拆解成任务图","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.7"],"acceptance":"Supervisor 输出合法任务图，选方案时记录决策。","source":"todo.html#p1","summary":"以 structured output 生成 requires 和 dependsOn。"},
+    {"id":"RM-1.13","scope":"roadmap","phase":"Phase 1","title":"会话 reducer：按任务分组并织入生命周期","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.3","RM-1.5"],"acceptance":"会话重放结果与增量投影一致。","source":"todo.html#p1","summary":"把线程变成可重放的任务投影。"},
+    {"id":"RM-1.14","scope":"roadmap","phase":"Phase 1","title":"端到端 Demo 脚本","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1","RM-1.12"],"acceptance":"完整循环以事件日志断言，不以截图验收。","source":"todo.html#p1","summary":"Phase 1 的正式验收。"},
+
+    {"id":"RM-2.1","scope":"roadmap","phase":"Phase 2","title":"知识项模型与抽取触发规则","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.14"],"acceptance":"六类知识和噪声筛选规则可测试。","source":"todo.html#p2","summary":"从事件中提取有价值的持久知识。"},
+    {"id":"RM-2.2","scope":"roadmap","phase":"Phase 2","title":"摘要管线：窗口化 + 因果上下文","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.1"],"acceptance":"每句结论都能回溯到 sourceEvents。","source":"todo.html#p2","summary":"按相关事件窗口产出结论，不逐行摘要。"},
+    {"id":"RM-2.3","scope":"roadmap","phase":"Phase 2","title":"知识覆盖机制 supersedes","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.1"],"acceptance":"新知识覆盖旧知识但旧知识仍可读。","source":"todo.html#p2","summary":"保留决策演进和原因。"},
+    {"id":"RM-2.4","scope":"roadmap","phase":"Phase 2","title":"get_context：注入相关决策","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-2.2"],"acceptance":"相关知识不被小默认 limit 截断，并重跑 recall 探针。","source":"todo.html#p2","summary":"Memory-first 的核心产品能力。"},
+    {"id":"RM-2.5","scope":"roadmap","phase":"Phase 2","title":"query_memory + 图 API","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.3"],"acceptance":"支持类型、时间、关系查询；边由 causedBy 派生。","source":"todo.html#p2","summary":"为查询和知识图提供正式 API。"},
+
+    {"id":"RM-3.1","scope":"roadmap","phase":"Phase 3","title":"Tauri 壳、七项导航与 design token","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-2.5"],"acceptance":"CSS token 与 canonical 设计语言一致，导航按 ADR-003。","source":"todo.html#p3","summary":"正式 macOS 人类界面的地基。"},
+    {"id":"RM-3.2","scope":"roadmap","phase":"Phase 3","title":"i18n 骨架（zh-CN / en）","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"界面文案从第一天外部化。","source":"todo.html#p3","summary":"避免后补国际化。"},
+    {"id":"RM-3.3","scope":"roadmap","phase":"Phase 3","title":"项目脉冲 Project Pulse","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"KPI 可追到事件，头条按后果严重性排序。","source":"todo.html#p3","summary":"面向人类的每日工作摘要。"},
+    {"id":"RM-3.4","scope":"roadmap","phase":"Phase 3","title":"审批闸门 UI 与菜单栏挂件","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.1","RM-1.10"],"acceptance":"不可逆动作只能在应用内审批；拒绝必须有理由。","source":"todo.html#p3","summary":"Human-in-the-loop 的正式界面。"},
+    {"id":"RM-3.5","scope":"roadmap","phase":"Phase 3","title":"项目库与项目详情","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"项目状态、五列清单和详情抽屉可用。","source":"todo.html#p3","summary":"跨项目管理入口。"},
+    {"id":"RM-3.6","scope":"roadmap","phase":"Phase 3","title":"任务视图与智能体视图","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"能表达 100% 仍 review 与无人具备能力两种状态。","source":"todo.html#p3","summary":"正式 Tasks / Agents 人类表面。"},
+    {"id":"RM-3.7","scope":"roadmap","phase":"Phase 3","title":"会话读取界面","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.6","RM-1.13"],"acceptance":"问题 → 阻塞 → 回答 → 解除在一屏内可读。","source":"todo.html#p3","summary":"把消息和生命周期事件织成可读线程。"},
+    {"id":"RM-3.8","scope":"roadmap","phase":"Phase 3","title":"任务详情内嵌会话与跨会话搜索","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.7"],"acceptance":"复用同一组件，支持参与者筛选和全局搜索。","source":"todo.html#p3","summary":"避免会话表面分叉成两套实现。"},
+    {"id":"RM-3.9","scope":"roadmap","phase":"Phase 3","title":"人工发言（按项目可关闭）","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-3.7","RM-3.4"],"acceptance":"存在待审批时，会话操作都不能满足审批。","source":"todo.html#p3","summary":"人的消息是指导，不是批准。"},
+
+    {"id":"RM-4.1","scope":"roadmap","phase":"Phase 4","title":"复活报告与重启计划","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.4","RM-3.5"],"acceptance":"全部从事件与知识查询得出，不采新数据。","source":"todo.html#p4","summary":"让休眠项目可低成本恢复。"},
+    {"id":"RM-4.2","scope":"roadmap","phase":"Phase 4","title":"失效推测标注","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-4.1"],"acceptance":"未知状态标为可能失效，由环境检查转成事实。","source":"todo.html#p4","summary":"明确区分推测和已验证问题。"},
+    {"id":"RM-4.3","scope":"roadmap","phase":"Phase 4","title":"项目快照捕获与胶片条","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.5"],"acceptance":"在里程碑事件上捕获可回看的项目快照。","source":"todo.html#p4","summary":"形成项目演进的视觉历史。"},
+    {"id":"RM-4.4","scope":"roadmap","phase":"Phase 4","title":"Canvas 三个缩放级别","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"缩放改变细节层级，边由 causedBy 派生。","source":"todo.html#p4","summary":"空间化呈现任务与因果关系。"},
+    {"id":"RM-4.5","scope":"roadmap","phase":"Phase 4","title":"记忆中的知识图谱视图","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.5"],"acceptance":"列表与图谱是一等切换，不增加新目的地。","source":"todo.html#p4","summary":"按 ADR-003 在 Memory 内呈现知识图。"},
+
+    {"id":"RM-5.1","scope":"roadmap","phase":"Phase 5","title":"Agent 协商协议","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-4.5"],"acceptance":"架构分歧有可追溯的升级和解决机制。","source":"todo.html#p5","summary":"多 Agent 深度能力，明确最后实施。"},
+    {"id":"RM-5.2","scope":"roadmap","phase":"Phase 5","title":"多 Agent 规划提案","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-5.1"],"acceptance":"执行 Agent 可提出可审查的计划修改。","source":"todo.html#p5","summary":"Supervisor 之外也能提出计划变化。"},
+    {"id":"RM-5.3","scope":"roadmap","phase":"Phase 5","title":"自主任务路由","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-5.2"],"acceptance":"Runtime 可基于事件与能力调整分配。","source":"todo.html#p5","summary":"减少 Supervisor 对每次分配的介入。"},
+    {"id":"RM-5.4","scope":"roadmap","phase":"Phase 5","title":"Agent 性能分析","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-5.3"],"acceptance":"按能力维度的历史结果可反哺路由。","source":"todo.html#p5","summary":"只有基础数据可信后才有意义。"},
+
+    {"id":"REPO-01","scope":"route","phase":"Repository","title":"恢复原 GitHub 仓库与提交基线","status":"running","progress":90,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"origin 指向原 GitHub 仓库；修改按任务进入 codex 分支和单一职责 commit；分支已推送且可独立审查、回退。","source":"git remote -v","summary":"新 SSH 仓库方案已取消；原 GitHub origin、本地 codex 分支和首个原子提交均已就绪，正在推送。"},
+    {"id":"GATE-01","scope":"route","phase":"Gate","title":"恢复完整 pnpm verify","status":"assigned","progress":10,"priority":"P0","owner":"Codex team","dependsOn":["REPO-01"],"blockedBy":["PROB-VERIFY"],"acceptance":"corepack pnpm verify 一次完整通过；记录真实测试数。","source":"next.html#options","summary":"功能开发已按要求暂停；仓库基线完成后恢复。"},
+    {"id":"HUB-SEC-01","scope":"route","phase":"Security","title":"封住 Hub 访问和身份边界","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["GATE-01"],"blockedBy":["PROB-AUTH","PROB-IDENTITY"],"acceptance":"显式 bind；每条 HTTP/SSE 路由需要 bearer token；caller 与 human accept 均由服务器身份决定。","source":"next.html#options","summary":"先消除正在使用的 Hub 的高风险暴露。"},
+    {"id":"EVIDENCE-01","scope":"route","phase":"Evidence","title":"让实验与真实 Hub 走同一路径","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["GATE-01"],"blockedBy":["PROB-CONTEXT","PROB-REGRESSION"],"acceptance":"1200 条上下文经真实路径仍完整召回；伪造因果、重启和重指派均有回归测试。","source":"next.html#options","summary":"修正当前证据偏差和运行时回归缺口。"},
+    {"id":"C-LOCAL-01","scope":"route","phase":"Local","title":"本地 Agent 调用完整闭环","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["HUB-SEC-01","EVIDENCE-01"],"blockedBy":[],"acceptance":"Hub → Local Runner → Adapter → 真实 CLI → Events / Review 跑通；失败和重启有测试。","source":"next.html#options","summary":"先把本机作为第一个 Runner，确定完整调用语义。"},
+    {"id":"SESSION-01","scope":"route","phase":"Local","title":"持久化本地 Agent session","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["C-LOCAL-01"],"blockedBy":["PROB-SESSION"],"acceptance":"session 以 (user, project, agent) 关联，重启后可继续或从日志正确重建。","source":"HANDOFF.md","summary":"替换只存在于 adapter 内存中的 vendor session id。"},
+    {"id":"ADR-008","scope":"route","phase":"Contract","title":"固化 Local / Remote Runner 共享契约","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["C-LOCAL-01"],"blockedBy":["PROB-ARCH"],"acceptance":"Supersede ADR-007 的单机范围；明确拓扑、身份、存储、session、connect-out 与错误语义。","source":"next.html#options","summary":"将本地实测结论升格为唯一 Runner contract。"},
+    {"id":"RUNNER-CONTRACT-01","scope":"route","phase":"Contract","title":"Runner contract tests","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["C-LOCAL-01","SESSION-01","ADR-008"],"blockedBy":[],"acceptance":"Local 与 Remote 共用 request、event stream、result、session 和 error contract；本地行为成为契约测试。","source":"HANDOFF.md","summary":"远程阶段只允许 transport 和网络失败模式不同。"},
+    {"id":"C-REMOTE-01","scope":"route","phase":"Remote","title":"启动远程 Agent 调用开发","status":"created","progress":0,"priority":"P1","owner":"未安排","dependsOn":["RUNNER-CONTRACT-01","HUB-SEC-01"],"blockedBy":[],"acceptance":"认证的出站 Runner 可重连、幂等交付并恢复 session；同一任务核心事件与 Local 一致。","source":"next.html#options","summary":"复用本地契约，只替换 transport。"}
+  ],
+  "problems": [
+    {"id":"PROB-REPO-PUSH","status":"resolved","severity":"medium","title":"新 SSH 仓库方案已取消","detail":"用户决定继续使用原 GitHub 仓库；新 SSH origin 已移除，原 GitHub 远端恢复为 origin，因此不再需要向新仓库上传历史。","next":"后续仅向原 GitHub 仓库推送按任务隔离的 codex 分支。","affects":["REPO-01"],"source":"git remote -v"},
+    {"id":"PROB-VERIFY","status":"open","severity":"high","title":"完整验证门禁为红","detail":"65/65 Vitest 通过，但 Biome 在 tests/hub.test.ts 报 19 个错误，因此 verify 当前只有 3/4 步通过。HANDOFF 的 verify green 已过时。","next":"先执行 GATE-01，仅修 lint 和类型表达并完整复跑 verify。","affects":["GATE-01"],"source":"tests/hub.test.ts"},
+    {"id":"PROB-AUTH","status":"open","severity":"critical","title":"Hub 无认证并可能监听所有接口","detail":"server.listen(PORT) 未指定 host，所有 HTTP/SSE 路由均无认证，而进程能够唤醒有本机文件权限的 Agent CLI。","next":"显式 bind address；所有路由要求 bearer token，宽绑定只能由配置开启。","affects":["HUB-SEC-01"],"source":"apps/chat-spike/src/server.mjs"},
+    {"id":"PROB-IDENTITY","status":"open","severity":"critical","title":"caller 与 human actor 可由请求方伪造","detail":"HTTP /mcp/call 信任 body.caller，/accept 可直接形成 human actor；空 caller 还可绕过部分执行者检查。","next":"身份必须由 transport/session 推导，accept 使用服务器认证的人类身份。","affects":["HUB-SEC-01","RM-1.9"],"source":"apps/chat-spike/src/server.mjs"},
+    {"id":"PROB-EXEC","status":"open","severity":"critical","title":"聊天输入可进入自动批准的本机工具执行链","detail":"Grok adapter 将任意聊天输入作为 prompt，并启用自动批准工具执行；当前没有强制 sandbox，且子进程继承完整环境。","next":"在继续远程接入前约束工具批准、sandbox、环境白名单与允许的工作目录。","affects":["HUB-SEC-01","C-LOCAL-01"],"source":"apps/chat-spike/src/adapters/grok.mjs"},
+    {"id":"PROB-ARCH","status":"open","severity":"high","title":"Accepted ADR 与最新 Hub / Runner 方向冲突","detail":"ADR-007 仍规定 single-machine / no server；HANDOFF 与当前路线要求 Server Hub、Local Runner 先、Remote Runner 后。","next":"新增 ADR-008 supersede 单机范围，并同步 roadmap、todo、README 与协议图。","affects":["ADR-008","C-REMOTE-01"],"source":"docs/decisions/ADR-007-implementation-stack.md"},
+    {"id":"PROB-CONTEXT","status":"open","severity":"medium","title":"真实 Hub 默认只取最后 200 条上下文","detail":"Hub runtime 使用 slice(-200)，与 1200 条实验和 canonical 协议的“不使用小默认 limit”结论相冲突。","next":"让实验调用真实 runtime，并按相关性而非固定尾部截断。","affects":["EVIDENCE-01","RM-2.4"],"source":"apps/chat-spike/src/hub.mjs"},
+    {"id":"PROB-REGRESSION","status":"open","severity":"high","title":"四个已复现的运行时回归缺口未全部覆盖","detail":"显式伪造 replyTo 可重置深度；快速双重 assign 会产生两个 task.started；损坏 JSONL 尾后首个 append 可能在重启丢失；空 caller 可冒充身份。","next":"逐项添加事件日志与 reducer 结果断言，再做最小修复。","affects":["EVIDENCE-01","C-LOCAL-01"],"source":"tests/hub.test.ts"},
+    {"id":"PROB-LAYERS","status":"open","severity":"medium","title":"分层守卫存在可绕过路径","detail":"事件目录为空会误报通过；同一行出现 import 文本或动态 import 可绕过当前正则扫描。","next":"用 AST 解析；catalog 空时 hard fail；为三种绕过添加守卫回归测试。","affects":["GATE-01","RM-1.1"],"source":"scripts/check-layers.mjs"},
+    {"id":"PROB-SESSION","status":"open","severity":"medium","title":"Session 与 JSONL 存储不耐重启和多写者","detail":"vendor session id 只在 adapter 内存；JSONL seq 非事务，损坏尾、重试幂等和多写者均没有生产级保证。","next":"本地阶段先定义持久 session；正式 Event Core 以 SQLite/WAL 替换 JSONL。","affects":["SESSION-01","RM-1.2"],"source":"apps/chat-spike/src/log.mjs"},
+    {"id":"PROB-DOC","status":"open","severity":"medium","title":"多处文档状态和计数已经漂移","detail":"todo 仍写 verify green / 11 tests / 11 MCP tools；实际是 65 tests、12 canonical tools，且 Spike 已有任务对象。testing strategy 还写 E2E run in CI，但项目明确无 CI。","next":"在 ADR-008 与 GATE-01 之后同步原文，不新增重复文档。","affects":["ADR-008","GATE-01"],"source":"todo.html"},
+    {"id":"PROB-SUPPLY","status":"open","severity":"medium","title":"依赖审计仍有 1 critical / 3 high 等告警","detail":"Vitest、Vite、nanoid 与生产链 fast-uri 均有已知 advisory；当前配置未发现可利用数据流，但版本需要升级或 override。","next":"固定 packageManager / Node，并在独立任务中升级后复跑 verify 与 audit。","affects":["GATE-01"],"source":"pnpm-lock.yaml"},
+
+    {"id":"FIX-CAUSE","status":"resolved","severity":"high","title":"省略 replyTo 可脱离因果链","detail":"首次真机运行发现 Agent 可省略 replyTo 使深度归零。runtime 现会在调用方未提供时补 causedBy。","next":"保留回归测试并继续验证显式伪造 replyTo。","affects":["HUB-B.2"],"source":"apps/chat-spike/FINDINGS.md"},
+    {"id":"FIX-REGISTER","status":"resolved","severity":"medium","title":"重复注册污染永久事件日志","detail":"Agent 中途重复 register 曾追加第二条 agent.registered。实现已改为重复注册幂等。","next":"重启后重新注册仍需回归覆盖。","affects":["HUB-A.1"],"source":"apps/chat-spike/FINDINGS.md"},
+    {"id":"FIX-ECHO","status":"resolved","severity":"medium","title":"任务唤醒造成交付内容回显两遍","detail":"按因果链判断“这一轮是否说过话”无法覆盖任务 wake；现改为比较 runtime 拥有的 seq 位置。","next":"保留一次且仅一次交付测试。","affects":["HUB-C"],"source":"apps/chat-spike/FINDINGS.md"},
+    {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层零依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
+  ],
+  "activity": [
+    {"at":"2026-08-23 19:45","kind":"decision","entity":"REPO-01","title":"继续使用原 GitHub 仓库","detail":"按用户决定移除新 SSH origin，并将 https://github.com/cabinw/agent-os.git 恢复为 origin；后续按任务提交到 codex 分支。"},
+    {"at":"2026-08-23 19:44","kind":"verified","entity":"REPO-01","title":"建立本地原子提交基线","detail":"已创建 codex/project-control 分支；next.html 与 board.html 作为单一职责提交落库，未混入功能代码。"},
+    {"at":"2026-08-23 19:43","kind":"problem","entity":"REPO-01","title":"插入仓库建立任务并暂停功能开发","detail":"旧 GitHub origin 已保留为 upstream，新 SSH 仓库已设为 origin 且连通；远端为空，完整历史推送等待明确授权。"},
+    {"at":"2026-08-23 19:40","kind":"decision","entity":"GATE-01","title":"开始持续执行全部路线","detail":"GATE-01 进入 running；质量门禁、安全边界与 Runner ADR 三条工作流并行启动。"},
+    {"at":"2026-08-23 19:23","kind":"completed","entity":"BOARD-02","title":"首屏增加项目总体进度","detail":"总体完成度由 canonical Roadmap completed Task 自动计算，当前为 10/47，即 21%。"},
+    {"at":"2026-08-23 17:46","kind":"completed","entity":"BOARD-01","title":"项目执行看板已建立","detail":"装入 47 项 Roadmap、当前本地优先路线、开放/已解决 Problems 与维护规则。"},
+    {"at":"2026-08-23 17:41","kind":"verified","entity":"GATE-01","title":"重新校准验证基线","detail":"Vitest 65/65、5/5 files；layers 4/4；build pass；Biome 19 errors，完整门禁 3/4。"},
+    {"at":"2026-08-23 17:35","kind":"decision","entity":"C-LOCAL-01","title":"路线确认为本地先、远程后","detail":"先用 Local Runner 确定调用、事件、session 与错误语义，再替换为 Remote transport。"},
+    {"at":"2026-08-20","kind":"problem","entity":"PROB-AUTH","title":"运行时审计发现高风险信任边界","detail":"记录无认证网络暴露、caller 伪造、自动批准本机工具执行链和多项回归缺口。"},
+    {"at":"2026-08-14","kind":"decision","entity":"HANDOFF","title":"Hub v2 方向写入交接","detail":"Hub 在服务器、Runner 主动连出、工作副本留在 Runner；尚未升格为 superseding ADR。"},
+    {"at":"2026-07-31","kind":"completed","entity":"HUB-C","title":"Agent Hub Spike 闭环完成","detail":"本地多 Agent、能力路由、任务、review 和人工 completed 已经真机验证。"}
+  ],
+  "sources": [
+    {"label":"ADR-002 · Task 状态","href":"docs/decisions/ADR-002-task-lifecycle.md"},
+    {"label":"Roadmap · 正式阶段","href":"docs/development/roadmap.md"},
+    {"label":"Event Catalog · 29 类型","href":"docs/protocol/event-catalog.md"},
+    {"label":"MCP Protocol · 12 工具","href":"docs/protocol/mcp-protocol.md"},
+    {"label":"HANDOFF · 当前事实","href":"HANDOFF.md"},
+    {"label":"FINDINGS · 真机证据","href":"apps/chat-spike/FINDINGS.md"},
+    {"label":"todo.html · 47 项库存","href":"todo.html"},
+    {"label":"next.html · 当前排序","href":"next.html"}
+  ]
+}
+</script>
+
+<script>
+const DATA=JSON.parse(document.querySelector("#board-data").textContent);
+const byId=new Map(DATA.tasks.map((task)=>[task.id,task]));
+const statusLabels={created:"待安排",assigned:"已分配",running:"执行中",blocked:"阻塞",review:"待验收",completed:"已完成",failed:"失败",cancelled:"已取消"};
+const statusColors={created:"var(--faint)",assigned:"var(--info)",running:"var(--accent)",blocked:"var(--risk)",review:"var(--warn)",completed:"var(--ok)",failed:"var(--risk)",cancelled:"var(--faint)"};
+const priorityColors={P0:"var(--risk)",P1:"var(--warn)",P2:"var(--info)"};
+const view={scope:"all",query:"",problem:"all"};
+const esc=(value)=>String(value??"").replace(/[&<>\"']/g,(char)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"})[char]);
+const roadmapTasks=DATA.tasks.filter((task)=>task.scope==="roadmap");
+const routeTasks=DATA.currentRoute.map((id)=>byId.get(id)).filter(Boolean);
+const completedRoadmap=roadmapTasks.filter((task)=>task.status==="completed");
+const openProblems=DATA.problems.filter((problem)=>problem.status==="open");
+
+function setMeta(){
+  document.querySelector("#revision").textContent=`数据版本 r${DATA.revision}`;
+  document.querySelector("#updated-at").textContent=`更新 ${DATA.updatedAt}`;
+  document.querySelector("#footer-meta").textContent=`由 ${DATA.updatedBy} 维护 · schema v${DATA.schemaVersion} · ${DATA.updatedAt}`;
+}
+
+function renderOverall(){
+  const total=roadmapTasks.length;
+  const done=completedRoadmap.length;
+  const remaining=total-done;
+  const pct=total?Math.round(done/total*100):0;
+  const routeDone=routeTasks.filter((task)=>task.status==="completed").length;
+  const ring=document.querySelector("#overall-ring");
+  ring.style.setProperty("--overall-pct",`${pct}%`);
+  ring.setAttribute("aria-label",`项目总体进度 ${pct}%，${done} / ${total} 项完成`);
+  document.querySelector("#overall-percent").textContent=`${pct}%`;
+  document.querySelector("#overall-bar").style.setProperty("--pct",`${pct}%`);
+  document.querySelector("#overall-fraction").textContent=`${done} / ${total} Roadmap Tasks completed`;
+  document.querySelector("#overall-breakdown").innerHTML=[
+    `<div class="overall-stat ok"><small>已完成</small><b>${done}</b></div>`,
+    `<div class="overall-stat"><small>未完成</small><b>${remaining}</b></div>`,
+    `<div class="overall-stat"><small>当前路线</small><b>${routeDone}/${routeTasks.length}</b></div>`,
+    `<div class="overall-stat risk"><small>开放问题</small><b>${openProblems.length}</b></div>`
+  ].join("");
+}
+
+function renderKpis(){
+  const metrics=[
+    {label:"验证实验",value:`${DATA.capabilities.experimentsPassed}/${DATA.capabilities.experimentsTotal}`,sub:"5 个 Spike 阶段已证实",color:"var(--ok)"},
+    {label:"正式 Phase 1",value:"0/5",sub:"正式里程碑尚未交付",color:"var(--info)"},
+    {label:"完整门禁",value:`${DATA.verification.gatePassed}/${DATA.verification.gateTotal}`,sub:`Biome ${DATA.verification.lintErrors} errors`,color:"var(--risk)"},
+    {label:"行为测试",value:`${DATA.verification.testsPassed}/${DATA.verification.testsTotal}`,sub:`${DATA.verification.filesPassed}/${DATA.verification.filesTotal} files pass`,color:"var(--ok)"},
+    {label:"MCP 工具",value:`${DATA.capabilities.mcpImplemented}/${DATA.capabilities.mcpTotal}`,sub:"Spike / canonical",color:"var(--warn)"},
+    {label:"Strict schemas",value:`${DATA.capabilities.eventSchemas}/${DATA.capabilities.eventSchemaTotal}`,sub:"正式 Event Core",color:"var(--info)"}
+  ];
+  document.querySelector("#kpis").innerHTML=metrics.map((metric)=>`<article class="kpi" style="--metric:${metric.color}"><div class="kpi-label"><span>${metric.label}</span><i class="kpi-dot"></i></div><div class="kpi-value">${metric.value}</div><div class="kpi-sub">${metric.sub}</div></article>`).join("");
+}
+
+function progressCard(title,description,done,total,color,left,right){
+  const pct=total?Math.round(done/total*100):0;
+  return `<article class="progress-card"><div class="progress-top"><div><h3>${title}</h3><p>${description}</p></div><span class="fraction">${done}/${total}</span></div><div class="bar" style="--bar-color:${color}"><span style="--pct:${pct}%"></span></div><div class="bar-meta"><span>${left}</span><span>${right??`${pct}%`}</span></div></article>`;
+}
+
+function renderProgress(){
+  const routeDone=routeTasks.filter((task)=>task.status==="completed").length;
+  const p1=roadmapTasks.filter((task)=>task.phase==="Phase 1");
+  const p1Done=p1.filter((task)=>task.status==="completed").length;
+  document.querySelector("#progress-grid").innerHTML=[
+    progressCard("原型／验证","Phase 0 与 Agent Hub 已跑出真实证据",completedRoadmap.length,10,"var(--ok)","Spike 完成","100%"),
+    progressCard("当前本地优先路线","Gate → Security → Local → Contract → Remote → Core",routeDone,routeTasks.length,"var(--accent)","等待安排",`${routeTasks.length-routeDone} 项未完成`),
+    progressCard("正式 Phase 1","正式 packages 仍只有类型和契约",p1Done,p1.length,"var(--info)","0 个行为里程碑",`${p1.length} 项 backlog`)
+  ].join("");
+}
+
+function renderCurrent(){
+  const holder=document.querySelector("#current-task");
+  const task=DATA.currentTaskId?byId.get(DATA.currentTaskId):null;
+  if(!task){
+    holder.innerHTML=`<div class="empty-icon" aria-hidden="true">◎</div><h3>等待你安排下一项 Task</h3><p>没有项目实现任务处于 assigned、running 或 review。看板已校准，第一项建议从 <b>GATE-01</b> 开始。</p><div class="current-hint">收到你的安排后，我会立即把任务状态改为 <code>assigned</code> / <code>running</code>，并在这里展开该任务的实时 checklist。</div>`;
+    return;
+  }
+  holder.innerHTML=`<span class="chip info">${statusLabels[task.status]}</span><h3>${esc(task.title)}</h3><p>${esc(task.summary)}</p><div class="current-hint"><b>${esc(task.id)}</b> · 进度 ${task.progress}% · Owner ${esc(task.owner)}</div>`;
+}
+
+function renderRoute(){
+  document.querySelector("#route-list").innerHTML=routeTasks.map((task,index)=>`<div class="todo-row" data-open-task="${esc(task.id)}"><span class="todo-num">${String(index+1).padStart(2,"0")}</span><span><b>${esc(task.title)}</b><small>${esc(task.id)}${task.dependsOn?.length?` · 依赖 ${task.dependsOn.join(" / ")}`:" · 无前置依赖"}</small></span><span class="todo-state">${statusLabels[task.status]}</span></div>`).join("");
+}
+
+function boardColumn(statuses,title,color,tasks){
+  const cards=tasks.filter((task)=>statuses.includes(task.status));
+  return `<section class="column" style="--col:${color}"><div class="column-head"><span class="column-title"><i></i>${title}</span><span class="column-count">${cards.length}</span></div><div class="column-body">${cards.length?cards.map(taskCard).join(""):`<div class="empty-column">当前没有任务</div>`}</div></section>`;
+}
+
+function taskCard(task){
+  return `<button class="task-card" type="button" data-task-id="${esc(task.id)}" style="--state-color:${statusColors[task.status]};--priority:${priorityColors[task.priority]??"var(--muted)"}"><span class="task-top"><span class="task-id">${esc(task.id)}</span><span class="priority">${esc(task.priority)}</span></span><h3>${esc(task.title)}</h3><p>${esc(task.summary)}</p><span class="task-foot"><span class="task-scope">${task.scope==="route"?"当前路线":task.phase}</span><span class="mini-progress"><span class="mini-bar"><span style="--p:${task.progress}%"></span></span>${task.progress}%</span></span></button>`;
+}
+
+function filteredBoardTasks(){
+  const ids=new Set([...DATA.currentRoute,...completedRoadmap.map((task)=>task.id)]);
+  let tasks=view.scope==="roadmap"?roadmapTasks:DATA.tasks.filter((task)=>ids.has(task.id));
+  if(view.scope==="route")tasks=tasks.filter((task)=>DATA.currentRoute.includes(task.id));
+  if(view.query){
+    const q=view.query.toLowerCase();
+    tasks=tasks.filter((task)=>[task.id,task.title,task.phase,task.summary,task.acceptance].join(" ").toLowerCase().includes(q));
+  }
+  return tasks;
+}
+
+function renderBoard(){
+  const tasks=filteredBoardTasks();
+  document.querySelector("#kanban").innerHTML=[
+    boardColumn(["created"],"待安排","var(--faint)",tasks),
+    boardColumn(["assigned","running","review"],"进行中 / 验收","var(--accent)",tasks),
+    boardColumn(["blocked","failed"],"阻塞 / 失败","var(--risk)",tasks),
+    boardColumn(["completed"],"已完成","var(--ok)",tasks)
+  ].join("");
+}
+
+function roadmapStateChip(task){
+  const kind=task.status==="completed"?"ok":task.status==="blocked"?"risk":"";
+  return `<span class="chip ${kind}">${statusLabels[task.status]}</span>`;
+}
+
+function renderRoadmap(){
+  document.querySelector("#roadmap-list").innerHTML=DATA.roadmapPhases.map((phase)=>{
+    const tasks=roadmapTasks.filter((task)=>task.phase===phase.id);
+    const done=tasks.filter((task)=>task.status==="completed").length;
+    const pct=Math.round(done/tasks.length*100);
+    return `<details class="phase-row" ${phase.id==="Phase 1"?"open":""}><summary><span class="phase-name"><b>${esc(phase.id)} · ${esc(phase.title)}</b><small>${esc(phase.goal)}</small></span><span class="phase-progress"><span class="bar" style="--bar-color:${done===tasks.length?"var(--ok)":"var(--info)"}"><span style="--pct:${pct}%"></span></span></span><span class="phase-count">${done}/${tasks.length}</span><span class="chev">›</span></summary><div class="roadmap-list">${tasks.map((task)=>`<div class="roadmap-task" data-open-task="${esc(task.id)}"><span class="roadmap-id">${esc(task.id)}</span><span><span class="roadmap-title">${esc(task.title)}</span><span class="roadmap-accept">${esc(task.acceptance)}</span></span><span class="roadmap-state">${roadmapStateChip(task)}</span></div>`).join("")}</div></details>`;
+  }).join("");
+}
+
+function severityMeta(severity){
+  return {critical:["Critical","var(--risk)","risk"],high:["High","var(--risk)","risk"],medium:["Medium","var(--warn)","warn"],low:["Low","var(--info)","info"]}[severity]??[severity,"var(--faint)",""];
+}
+
+function renderProblems(){
+  let problems=DATA.problems;
+  if(view.problem!=="all")problems=problems.filter((problem)=>problem.status===view.problem);
+  document.querySelector("#problem-list").innerHTML=problems.map((problem)=>{
+    const [label,color,kind]=severityMeta(problem.severity);
+    return `<article class="problem ${problem.status}" style="--severity:${color}"><div class="problem-top"><div><div class="problem-id">${esc(problem.id)}</div><h3>${esc(problem.title)}</h3></div><span class="chip ${problem.status==="resolved"?"ok":kind}">${problem.status==="resolved"?"已解决":label}</span></div><p>${esc(problem.detail)}</p><div class="problem-next"><b>下一步：</b>${esc(problem.next)}</div><div class="problem-links"><span class="chip">影响 ${problem.affects.length} Task</span><a href="${esc(problem.source)}">证据来源 →</a></div></article>`;
+  }).join("");
+}
+
+function renderActivity(){
+  const colors={completed:"var(--ok)",verified:"var(--info)",decision:"var(--accent)",problem:"var(--risk)"};
+  document.querySelector("#activity-list").innerHTML=DATA.activity.map((item)=>`<div class="activity-item"><span class="activity-time">${esc(item.at)}</span><i class="activity-mark" style="--event-color:${colors[item.kind]??"var(--info)"}"></i><span class="activity-copy"><b>${esc(item.title)}</b><p><code>${esc(item.entity)}</code> · ${esc(item.detail)}</p></span></div>`).join("");
+}
+
+function renderSources(){document.querySelector("#sources").innerHTML=DATA.sources.map((source)=>`<a class="source-chip" href="${esc(source.href)}">${esc(source.label)}</a>`).join("");}
+
+function showTask(id){
+  const task=byId.get(id);if(!task)return;
+  document.querySelector("#dialog-id").textContent=task.id;
+  document.querySelector("#dialog-title").textContent=task.title;
+  const blocked=(task.blockedBy??[]).map((problemId)=>DATA.problems.find((problem)=>problem.id===problemId)).filter(Boolean);
+  document.querySelector("#dialog-body").innerHTML=`<div class="detail-grid"><div class="detail"><small>状态</small><b>${statusLabels[task.status]}</b></div><div class="detail"><small>进度</small><b>${task.progress}%</b></div><div class="detail"><small>优先级</small><b>${esc(task.priority)}</b></div><div class="detail"><small>阶段</small><b>${esc(task.phase)}</b></div><div class="detail"><small>Owner</small><b>${esc(task.owner)}</b></div><div class="detail"><small>范围</small><b>${task.scope==="route"?"当前执行路线":"Canonical Roadmap"}</b></div></div><div class="detail-block"><h4>任务说明</h4><p>${esc(task.summary)}</p></div><div class="detail-block"><h4>完成判据</h4><p>${esc(task.acceptance)}</p></div><div class="detail-block"><h4>依赖</h4><p>${task.dependsOn?.length?task.dependsOn.map(esc).join(" → "):"无"}</p></div>${blocked.length?`<div class="detail-block"><h4>关联 Problems</h4><p>${blocked.map((problem)=>`${esc(problem.id)} · ${esc(problem.title)}`).join("<br>")}</p></div>`:""}<div class="detail-block"><h4>来源</h4><p><a href="${esc(task.source)}">${esc(task.source)}</a></p></div>`;
+  document.querySelector("#task-dialog").showModal();
+}
+
+function bind(){
+  document.addEventListener("click",(event)=>{
+    const taskTarget=event.target.closest("[data-task-id],[data-open-task]");
+    if(taskTarget)showTask(taskTarget.dataset.taskId??taskTarget.dataset.openTask);
+  });
+  document.querySelector("#dialog-close").addEventListener("click",()=>document.querySelector("#task-dialog").close());
+  document.querySelector("#task-dialog").addEventListener("click",(event)=>{if(event.target===event.currentTarget)event.currentTarget.close();});
+  document.querySelector("#task-search").addEventListener("input",(event)=>{view.query=event.target.value.trim();renderBoard();});
+  document.querySelectorAll("[data-scope]").forEach((button)=>button.addEventListener("click",()=>{view.scope=button.dataset.scope;document.querySelectorAll("[data-scope]").forEach((candidate)=>candidate.setAttribute("aria-pressed",String(candidate===button)));renderBoard();}));
+  document.querySelectorAll("[data-problem]").forEach((button)=>button.addEventListener("click",()=>{view.problem=button.dataset.problem;document.querySelectorAll("[data-problem]").forEach((candidate)=>candidate.setAttribute("aria-pressed",String(candidate===button)));renderProblems();}));
+  document.querySelector("#refresh").addEventListener("click",()=>location.reload());
+  const root=document.documentElement;const savedTheme=localStorage.getItem("agent-os-board-theme");if(savedTheme)root.dataset.theme=savedTheme;
+  document.querySelector("#theme").addEventListener("click",()=>{root.dataset.theme=root.dataset.theme==="dark"?"light":"dark";localStorage.setItem("agent-os-board-theme",root.dataset.theme);});
+  if(localStorage.getItem("agent-os-board-density")==="compact")document.body.classList.add("compact");
+  document.querySelector("#density").addEventListener("click",()=>{document.body.classList.toggle("compact");localStorage.setItem("agent-os-board-density",document.body.classList.contains("compact")?"compact":"comfortable");});
+  const links=[...document.querySelectorAll(".nav-link[href^='#']")];const sections=links.map((link)=>document.querySelector(link.getAttribute("href"))).filter(Boolean);
+  const observer=new IntersectionObserver((entries)=>{const visible=entries.filter((entry)=>entry.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];if(!visible)return;links.forEach((link)=>link.classList.toggle("active",link.getAttribute("href")===`#${visible.target.id}`));},{rootMargin:"-18% 0px -70%",threshold:[0,.2,.5]});sections.forEach((section)=>observer.observe(section));
+}
+
+setMeta();renderOverall();renderKpis();renderProgress();renderCurrent();renderRoute();renderBoard();renderRoadmap();renderProblems();renderActivity();renderSources();bind();
+</script>
+</body>
+</html>
