@@ -109,6 +109,32 @@ async function handleRequest(req, res) {
     res.end(JSON.stringify(body));
   };
 
+  // Public, inert bootstrap only. It contains no project state, roster, token
+  // or capability data. The fragment credential is handled entirely in the
+  // browser and is never part of this request.
+  if (req.method === "GET" && url.pathname === "/") {
+    applySecurityHeaders(res);
+    const [source, reducerSource, htmlSource] = await Promise.all([
+      readFile(join(PUBLIC, "index.html"), "utf8"),
+      readFile(join(HERE, "thread.mjs"), "utf8"),
+      readFile(join(HERE, "html.mjs"), "utf8"),
+    ]);
+    // Module requests cannot attach an Authorization header. Inline the two
+    // pure browser modules into this no-data shell; the authenticated SSE is
+    // still the only source of project state.
+    const html = source
+      .replace(
+        'import { reduce } from "/src/thread.mjs";',
+        reducerSource.replace(/^export /gm, ""),
+      )
+      .replace(
+        'import { escapeHtml as esc } from "/src/html.mjs";',
+        `${htmlSource.replace(/^export /gm, "")}\nconst esc = escapeHtml;`,
+      );
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    return res.end(html);
+  }
+
   const principal = credentials.authenticate(req.headers.authorization);
   if (!principal) {
     applySecurityHeaders(res);
@@ -131,34 +157,6 @@ async function handleRequest(req, res) {
     json(403, { error: `${kind} credential required` });
     return false;
   };
-
-  if (req.method === "GET" && url.pathname === "/") {
-    if (!requireKind("human")) return undefined;
-    const sessionToken = credentials.issue(principal);
-    const [source, reducerSource, htmlSource] = await Promise.all([
-      readFile(join(PUBLIC, "index.html"), "utf8"),
-      readFile(join(HERE, "thread.mjs"), "utf8"),
-      readFile(join(HERE, "html.mjs"), "utf8"),
-    ]);
-    // Module requests cannot attach an Authorization header. Inline the two
-    // pure browser modules into the already-authenticated HTML response instead
-    // of weakening their routes with query credentials or cookies.
-    const html = source
-      .replace(
-        "<!--AGENT_OS_BOOTSTRAP-->",
-        `<script>globalThis.__AGENT_OS_BEARER__=${JSON.stringify(sessionToken)};</script>`,
-      )
-      .replace(
-        'import { reduce } from "/src/thread.mjs";',
-        reducerSource.replace(/^export /gm, ""),
-      )
-      .replace(
-        'import { escapeHtml as esc } from "/src/html.mjs";',
-        `${htmlSource.replace(/^export /gm, "")}\nconst esc = escapeHtml;`,
-      );
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    return res.end(html);
-  }
 
   // The browser imports the reducer rather than reimplementing it — one rule,
   // one module, two consumers.

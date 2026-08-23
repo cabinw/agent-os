@@ -274,11 +274,71 @@
     transition: opacity 120ms ease-out;
   }
   .hint { margin-top: 7px; font-size: 12px; color: var(--text-muted); }
+
+  /* --------------------------------------------------------- authentication */
+  [hidden] { display: none !important; }
+  .auth-gate {
+    position: fixed; inset: 0; z-index: 20;
+    display: grid; place-items: center;
+    padding: 24px;
+    background: rgba(247, 248, 250, .92);
+    backdrop-filter: blur(8px);
+  }
+  .auth-card {
+    width: min(380px, 100%);
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: 0 16px 48px rgba(17, 24, 39, .12);
+  }
+  .auth-mark {
+    width: 34px; height: 34px; margin-bottom: 16px;
+    border-radius: 10px;
+    display: grid; place-items: center;
+    color: #fff; font-weight: 650;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  }
+  .auth-card h1 { margin: 0 0 6px; font-size: 18px; }
+  .auth-card p { margin: 0 0 18px; color: var(--text-muted); }
+  .auth-card label { display: block; margin-bottom: 6px; font-weight: 600; }
+  .auth-row { display: flex; gap: 8px; }
+  .auth-row input {
+    min-width: 0; flex: 1;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-ctl);
+    font: inherit; outline: none;
+  }
+  .auth-row input:focus { border-color: var(--accent); }
+  .auth-row button {
+    border: 0; border-radius: var(--radius-ctl);
+    padding: 9px 15px;
+    color: #fff; font: 600 13px/1 inherit; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  }
+  .auth-error { min-height: 19px; margin-top: 8px; color: var(--risk); font-size: 12px; }
+  .auth-note { margin-top: 14px; font-size: 12px; color: var(--text-muted); }
 </style>
 </head>
 <body>
 
-<aside class="side">
+<div class="auth-gate" id="authgate" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+  <form class="auth-card" id="authform">
+    <div class="auth-mark">◈</div>
+    <h1 id="auth-title">连接 Agent OS</h1>
+    <p>输入启动 Hub 时显示的人类访问令牌。令牌只保留在当前页面内存中。</p>
+    <label for="token">Bearer token</label>
+    <div class="auth-row">
+      <input id="token" name="token" type="password" autocomplete="off" spellcheck="false" required>
+      <button type="submit">连接</button>
+    </div>
+    <div class="auth-error" id="autherror" role="alert"></div>
+    <div class="auth-note">也可以用 <code>#token=…</code> 打开；页面会在连接前立即清除地址栏片段。</div>
+  </form>
+</div>
+
+<aside class="side" data-protected inert>
   <div class="brand"><span class="mark">◈</span> Agent OS</div>
   <div class="nav off"><span class="ico">▤</span> 项目库</div>
   <div class="nav off"><span class="ico">◎</span> 项目脉搏</div>
@@ -293,13 +353,13 @@
   </div>
 </aside>
 
-<section class="roster">
+<section class="roster" data-protected inert>
   <h2 class="sect">花名册</h2>
   <p class="sect-sub">点一个人，下面的输入框就发给他</p>
   <div id="cards"></div>
 </section>
 
-<main class="main">
+<main class="main" data-protected inert>
   <header class="top">
     <h1 id="scopeline">全部</h1>
     <span class="meta" id="statusline">连接中…</span>
@@ -325,7 +385,6 @@
   </div></div>
 </main>
 
-<!--AGENT_OS_BOOTSTRAP-->
 <script type="module">
 import { reduce } from "/src/thread.mjs";
 import { escapeHtml as esc } from "/src/html.mjs";
@@ -387,13 +446,69 @@ let scope = "*";
 const streams = new Map();
 
 const $ = (id) => document.getElementById(id);
-const bearer = globalThis.__AGENT_OS_BEARER__;
-delete globalThis.__AGENT_OS_BEARER__;
-const apiFetch = (path, init = {}) => {
+const protectedSurfaces = [...document.querySelectorAll("[data-protected]")];
+let bearer = null;
+let connectionVersion = 0;
+let eventController = null;
+
+function fragmentToken() {
+  const params = new URLSearchParams(location.hash.startsWith("#") ? location.hash.slice(1) : "");
+  const token = params.get("token")?.trim() ?? "";
+  if (location.hash) {
+    // Fragments are not sent in HTTP requests. Remove it before the first
+    // authenticated fetch so it cannot survive in screenshots or copied URLs.
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+  }
+  return token;
+}
+
+function lockShell(message = "") {
+  for (const surface of protectedSurfaces) surface.setAttribute("inert", "");
+  $("authgate").hidden = false;
+  $("autherror").textContent = message;
+  requestAnimationFrame(() => $("token").focus());
+}
+
+function unlockShell() {
+  for (const surface of protectedSurfaces) surface.removeAttribute("inert");
+  $("authgate").hidden = true;
+  $("autherror").textContent = "";
+}
+
+function loseAuthentication(message) {
+  bearer = null;
+  connectionVersion++;
+  eventController?.abort();
+  eventController = null;
+  lockShell(message);
+}
+
+function authenticate(token) {
+  bearer = token;
+  connectionVersion++;
+  eventController?.abort();
+  $("authgate").hidden = true;
+  $("statusline").textContent = "正在验证…";
+  connectEvents(connectionVersion);
+}
+
+const apiFetch = async (path, init = {}) => {
+  if (!bearer) throw new Error("human bearer token required");
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${bearer}`);
-  return fetch(path, { ...init, headers });
+  const response = await fetch(path, { ...init, headers });
+  if (response.status === 401 || response.status === 403) {
+    loseAuthentication("令牌无效或不是 human 凭据，请重新输入。");
+  }
+  return response;
 };
+
+$("authform").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const token = $("token").value.trim();
+  $("token").value = "";
+  if (token) authenticate(token);
+});
 const clock = (at) => new Date(at).toLocaleTimeString("zh-CN", { hour12: false });
 const nameOf = (id) =>
   id === human ? T.you : (agents.find((a) => a.id === id)?.label ?? id);
@@ -613,13 +728,18 @@ function receive(d) {
   }
 }
 
-async function connectEvents() {
-  for (;;) {
+async function connectEvents(version) {
+  while (bearer && version === connectionVersion) {
     try {
+      const controller = new AbortController();
+      eventController = controller;
       const response = await apiFetch("/events", {
         headers: { accept: "text/event-stream" },
+        signal: controller.signal,
       });
+      if (!bearer || version !== connectionVersion) return;
       if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+      unlockShell();
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
       let buffer = "";
       for (;;) {
@@ -638,13 +758,16 @@ async function connectEvents() {
         }
       }
     } catch {
+      if (!bearer || version !== connectionVersion) return;
       $("statusline").textContent = T.disconnected;
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }
 
-connectEvents();
+const initialToken = fragmentToken();
+if (initialToken) authenticate(initialToken);
+else lockShell();
 
 // ------------------------------------------------------------------ composer
 

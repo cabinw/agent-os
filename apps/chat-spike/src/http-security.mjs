@@ -63,9 +63,6 @@ export function createCredentialStore({
     tokenForAgent(id) {
       return tokensByAgent.get(id) ?? null;
     },
-    issue(principal) {
-      return add(newBearerToken(), principal, `session token for ${principal.id}`);
-    },
     authenticate(authorization) {
       if (typeof authorization !== "string") return null;
       const match = /^Bearer ([^\s]+)$/.exec(authorization);

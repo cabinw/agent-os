@@ -23,12 +23,6 @@ let logPath: string;
 let baseUrl: string;
 let output = "";
 
-function authorized(token: string, init: RequestInit = {}) {
-  const headers = new Headers(init.headers);
-  headers.set("authorization", `Bearer ${token}`);
-  return fetch(baseUrl, { ...init, headers });
-}
-
 function at(path: string, token: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   headers.set("authorization", `Bearer ${token}`);
@@ -93,12 +87,37 @@ describe("Hub bearer trust boundary", () => {
     expect(output).toMatch(/agent hub\s+→\s+http:\/\/127\.0\.0\.1:/);
   });
 
+  it("serves an anonymous inert root shell with fragment/password bootstrap only", async () => {
+    const page = await fetch(`${baseUrl}/`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get("www-authenticate")).toBeNull();
+    expect(page.headers.get("set-cookie")).toBeNull();
+    expect(page.headers.get("content-security-policy")).toContain(
+      "frame-ancestors 'none'",
+    );
+    const html = await page.text();
+    expect(html).toContain('type="password"');
+    expect(html).toContain('params.get("token")');
+    expect(html).toContain("history.replaceState");
+    expect(html.indexOf("history.replaceState")).toBeLessThan(html.indexOf("fetch(path"));
+    expect(html).not.toContain(HUMAN_TOKEN);
+    expect(html).not.toContain(CLAUDE_TOKEN);
+    expect(html).not.toContain("__AGENT_OS_BEARER__");
+    expect(html).not.toMatch(/localStorage|document\.cookie/);
+    expect(html).not.toContain('import { reduce } from "/src/thread.mjs"');
+
+    // URL fragments are removed by the client and never cross the HTTP boundary.
+    const withFragment = await fetch(`${baseUrl}/#token=${HUMAN_TOKEN}`);
+    expect(withFragment.status).toBe(200);
+    expect(await withFragment.text()).not.toContain(HUMAN_TOKEN);
+  });
+
   it("rejects anonymous access on every HTTP and SSE surface, including 404", async () => {
     const requests: Array<Promise<Response>> = [
-      fetch(`${baseUrl}/`),
       fetch(`${baseUrl}/src/thread.mjs`),
       fetch(`${baseUrl}/src/html.mjs`),
       fetch(`${baseUrl}/events`),
+      fetch(`${baseUrl}/events?token=${HUMAN_TOKEN}`),
       fetch(`${baseUrl}/mcp/tools`),
       fetch(`${baseUrl}/mcp/call`, { method: "POST" }),
       fetch(`${baseUrl}/say`, { method: "POST" }),
@@ -115,28 +134,23 @@ describe("Hub bearer trust boundary", () => {
     }
   });
 
-  it("keeps the browser session authenticated without query tokens or cookies", async () => {
-    const page = await authorized(HUMAN_TOKEN);
-    expect(page.status).toBe(200);
-    expect(page.headers.get("content-security-policy")).toContain(
-      "frame-ancestors 'none'",
-    );
-    expect(page.headers.get("set-cookie")).toBeNull();
-    const html = await page.text();
-    const match = html.match(/__AGENT_OS_BEARER__="([A-Za-z0-9_-]+)"/);
-    expect(match?.[1]).toBeTruthy();
-    expect(match?.[1]).not.toBe(HUMAN_TOKEN);
-    expect(html).not.toContain('import { reduce } from "/src/thread.mjs"');
-
-    const module = await at("/src/html.mjs", match?.[1] ?? "");
+  it("accepts the human bearer for modules, SSE and controls", async () => {
+    const module = await at("/src/html.mjs", HUMAN_TOKEN);
     expect(module.status).toBe(200);
 
     const controller = new AbortController();
-    const events = await at("/events", match?.[1] ?? "", { signal: controller.signal });
+    const events = await at("/events", HUMAN_TOKEN, { signal: controller.signal });
     expect(events.status).toBe(200);
     const first = await events.body?.getReader().read();
     controller.abort();
     expect(new TextDecoder().decode(first?.value)).toContain('"type":"hello"');
+
+    const reset = await at("/reset", HUMAN_TOKEN, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ agent: "codex" }),
+    });
+    expect(reset.status).toBe(200);
   });
 
   it("separates human-only controls from agent-only MCP routes", async () => {
@@ -207,7 +221,13 @@ describe("Hub bearer trust boundary", () => {
   });
 
   it("rejects untrusted origins and never uses wildcard CORS", async () => {
-    const denied = await at("/", HUMAN_TOKEN, {
+    const publicShell = await fetch(`${baseUrl}/`, {
+      headers: { origin: "https://attacker.example" },
+    });
+    expect(publicShell.status).toBe(200);
+    expect(publicShell.headers.get("access-control-allow-origin")).toBeNull();
+
+    const denied = await at("/not-a-route", HUMAN_TOKEN, {
       headers: { origin: "https://attacker.example" },
     });
     expect(denied.status).toBe(403);
