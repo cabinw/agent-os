@@ -34,6 +34,7 @@ store (`RM-1.1b`).
 | Understand the system | [docs/architecture/overview.md](docs/architecture/overview.md) |
 | Understand Hub / Runner deployment | [ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md) |
 | Understand permanent event compatibility | [ADR-009](docs/decisions/ADR-009-versioned-strict-event-contract.md) |
+| Operate a staging Hub / Worker | [deploy/README.md](deploy/README.md) |
 | Integrate an agent | [docs/protocol/mcp-protocol.md](docs/protocol/mcp-protocol.md) |
 | Build the UI | [docs/product/navigation.md](docs/product/navigation.md), [docs/design/design-language.md](docs/design/design-language.md) |
 | Know what to build next | [docs/development/roadmap.md](docs/development/roadmap.md) |

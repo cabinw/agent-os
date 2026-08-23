@@ -69,6 +69,10 @@ process. Give the Hub and Worker the same dedicated Runner credential and host
 id, and give both sides the same explicit per-agent credentials. Every bearer
 value must be unique and at least 32 non-whitespace characters.
 
+The commands below are a development composition. Staging topology, identities,
+paths, HTTPS, lifecycle and known production blockers are defined once in the
+[server runtime deployment runbook](../../deploy/README.md).
+
 ```bash
 # terminal 1: Hub / inbound Runner transport
 AGENT_OS_RUNNER_MODE=remote \
