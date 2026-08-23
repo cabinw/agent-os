@@ -231,8 +231,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 63,
-  "updatedAt": "2026-08-24 02:35 CST",
+  "revision": 64,
+  "updatedAt": "2026-08-24 02:36 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-03",
   "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-23 23:08 CST"},
@@ -261,7 +261,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
     {"id":"SVR-01","scope":"route","phase":"Server","title":"Ubuntu / Windows 基线与部署契约","status":"completed","progress":100,"priority":"P0","owner":"服务器工程师","dependsOn":["C-REMOTE-01"],"blockedBy":[],"acceptance":"脱敏记录两端版本、端口、TLS、服务、目录和 ACL；不做远端变更，不以公网 HTTP 代替 HTTPS。","source":{"label":"server branch · deploy/README.md @ 3454ca0","href":"https://github.com/cabinw/agent-os/commit/3454ca0"},"summary":"提交 3454ca0 已推送：两端只读盘点、staging 拓扑、身份/目录、生命周期、耐久性边界和全部上线阻塞已由主任务审查通过。"},
     {"id":"SVR-02","scope":"route","phase":"Server","title":"Ubuntu Hub 可部署单元","status":"blocked","progress":93,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":["PROB-HUB-DEPLOY-TRUST","PROB-HUB-ACTIVATION"],"acceptance":"非 root Hub 只监听 loopback，经 HTTPS 代理暴露；systemd、受限 env、health、升级与回滚在 staging 验证。","source":{"label":"server branch · 658cd6c","href":"https://github.com/cabinw/agent-os/commit/658cd6cb97af03b3f341a3bba270e28c17e73dcc"},"summary":"提交 658cd6c 已推送且 commit tree 精确等于冻结 2a1bdf…；本地/独立/Ubuntu/安装验收全绿。剩余 7 分仅是依赖 FQDN/证书的 HTTPS 激活、真实 start/restart/health。","progressBasis":[{"label":"Runtime、认证与资源边界","earned":25,"total":25},{"label":"Portable artifact 与 admin trust","earned":15,"total":15},{"label":"systemd / env / health / HTTPS proxy","earned":12,"total":15},{"label":"安装、升级、回滚与维护事务","earned":25,"total":25},{"label":"Ubuntu staging 与交付","earned":16,"total":20}]},
-    {"id":"SVR-03","scope":"route","phase":"Server","title":"持久状态、备份恢复与运维安全","status":"running","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-02"],"blockedBy":["PROB-HUB-RECOVERY"],"acceptance":"placement/request/session 状态完成备份→破坏副本→恢复演练；日志轮转和容量检查不泄漏凭据。","source":"apps/chat-spike/README.md","summary":"candidate effective unit 已关闭；snapshot/CLI 15/15 并通过 25 个语法负例，open-fd 单跑 14/14，EventLog/容量/Hub 47/47。旧 kit/runtime 迁移、真实 hook→恢复、故障矩阵和 Ubuntu 演练仍未冻结，因此暂不计分。"},
+    {"id":"SVR-03","scope":"route","phase":"Server","title":"持久状态、备份恢复与运维安全","status":"running","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-02"],"blockedBy":["PROB-HUB-RECOVERY"],"acceptance":"placement/request/session 状态完成备份→破坏副本→恢复演练；日志轮转和容量检查不泄漏凭据。","source":"apps/chat-spike/README.md","summary":"snapshot/CLI、open-fd、EventLog、容量和 Hub 共 76 项现已并行合跑全绿；writer-stop 与 Nginx sentinel 旁路同步封闭。旧 kit/runtime 迁移、真实 hook→恢复、故障矩阵和 Ubuntu 演练仍未冻结，因此暂不计分。"},
     {"id":"SVR-04","scope":"route","phase":"Server","title":"Windows Remote Worker 正式启动路径","status":"created","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":[],"acceptance":"PowerShell 安装/启动/停止/健康/卸载可恢复；Grok、路径、ACL、进程终止、workspace containment 和凭据隔离通过。","source":"docs/architecture/agent-runtime.md","summary":"在 Windows 测试机把 outbound Worker 与 Grok 做成可长期运行、可重启恢复的执行面，并补跨平台自动测试。"},
     {"id":"SVR-05","scope":"route","phase":"Server","title":"Ubuntu Hub ↔ Windows Grok 真实联调","status":"created","progress":0,"priority":"P0","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-03","SVR-04"],"blockedBy":[],"acceptance":"真实 Grok 完成注册→指派→事件→review；断线、Hub 重启、重复请求、取消、超时、离线与旧 lease 均按契约处理。","source":"docs/decisions/ADR-008-server-hub-local-first-runners.md","summary":"Windows 只主动连出，Hub 不持有 working copy 或 vendor credential；我负责接口对照、故障注入和最终签收。"},
     {"id":"SVR-06","scope":"route","phase":"Server","title":"服务器自动验收入口与交付矩阵","status":"created","progress":0,"priority":"P1","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-05"],"blockedBy":[],"acceptance":"静态部署门禁、双机 smoke 命令、全量 verify、脱敏证据矩阵和逐任务 commit 全部可复核。","source":"CLAUDE.md","summary":"交付本地安全门禁与明确的双机 smoke 入口；服务器工程师推送分支，我 review 后再决定集成。"},
@@ -366,6 +366,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 02:36","kind":"verified","entity":"SVR-03","title":"五组专项回归并行合跑 76/76","detail":"snapshot/CLI、open-fd、EventLog、容量和 Hub 测试全绿；/proc link-count 竞态已修正，writer-stop 与任意类型 Nginx sentinel 的 fail-closed 路径已封住。"},
     {"at":"2026-08-24 02:35","kind":"verified","entity":"SVR-03","title":"第二检查点关闭 candidate 配置门禁","detail":"candidate effective template/instance/drop-in 校验已闭合；snapshot/CLI 15/15 + 25 个负例、open-fd 单跑 14/14。旧 admin-kit/runtime 迁移和真实恢复整链仍阻断冻结，进度保持 0%。"},
     {"at":"2026-08-24 02:27","kind":"verified","entity":"SVR-03","title":"首批 durability/capacity/Hub 回归 47/47","detail":"EventLog 8、容量 10、Hub 29 项通过；restore 容量门禁已前移。candidate effective unit 与旧 kit/runtime 迁移仍为 P1，工作树未冻结，因此进度保持 0%。"},
     {"at":"2026-08-24 02:09","kind":"problem","entity":"PROB-HUB-RECOVERY","title":"独立预审扩展 SVR-03 签收硬门禁","detail":"禁止轮转权威 EventLog；要求停机截点、深层 manifest、持久恢复阶段、同盘 staging、append 短写 fail-closed、bytes/inode 峰值与逐相位 kill/磁盘故障矩阵，任务仍保持 0%。"},
