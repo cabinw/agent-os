@@ -14,10 +14,13 @@ import {
 import { sessionKey } from "./session-store.mjs";
 
 const DEFAULT_PREFIX = "/runner/v1";
-const DEFAULT_POLL_TIMEOUT_MS = 25_000;
+export const REMOTE_POLL_TIMEOUT_MS = 25_000;
+export const REMOTE_POLL_RESPONSE_TIMEOUT_MS = REMOTE_POLL_TIMEOUT_MS + 5_000;
+const DEFAULT_POLL_TIMEOUT_MS = REMOTE_POLL_TIMEOUT_MS;
 const DEFAULT_LEASE_MS = 30_000;
 const DEFAULT_OFFER_LEASE_MS = 500;
 const DEFAULT_RECONNECT_DELAY_MS = 100;
+const DEFAULT_RECONNECT_MAX_DELAY_MS = 10_000;
 const DEFAULT_LIVENESS_TIMEOUT_MS = 60_000;
 const DEFAULT_CLOSE_GRACE_MS = 5_000;
 const DEFAULT_CONTROL_TIMEOUT_MS = 30_000;
@@ -29,10 +32,26 @@ const DEFAULT_MAX_EVENTS_PER_REQUEST = 10_000;
 const DEFAULT_MAX_EVENT_GAP = 1_000;
 const DEFAULT_MAX_CONCURRENT_DISPATCHES = 4;
 const DEFAULT_MAX_CONCURRENT_CONTROLS = 16;
+export const REMOTE_MAX_POLLERS = 16;
 const PLACEMENT_FORMAT_VERSION = 1;
 const REQUEST_LEDGER_FORMAT_VERSION = 1;
 const MIN_TOKEN_BYTES = 32;
-const MAX_BODY_BYTES = 1024 * 1024;
+export const REMOTE_BODY_LIMIT_BYTES = 1024 * 1024;
+export const REMOTE_BODY_TIMEOUT_MS = 3_000;
+const REMOTE_MAX_DELIVERY = Number.MAX_SAFE_INTEGER;
+const REMOTE_MAX_LEASE_ID = "00000000-0000-4000-8000-000000000000";
+export const REMOTE_POLL_ENVELOPE_BYTES =
+  remotePollWorkBytes(dispatchPollWork(null, REMOTE_MAX_DELIVERY, REMOTE_MAX_LEASE_ID)) -
+  Buffer.byteLength("null", "utf8");
+export const REMOTE_REQUEST_LIMIT_BYTES =
+  REMOTE_BODY_LIMIT_BYTES - REMOTE_POLL_ENVELOPE_BYTES;
+export const REMOTE_EVENT_LIMIT_BYTES = 256 * 1024;
+export const REMOTE_REQUEST_EVENT_LIMIT_BYTES = 4 * 1024 * 1024;
+export const REMOTE_EXECUTION_PAYLOAD_LIMIT_BYTES =
+  REMOTE_REQUEST_LIMIT_BYTES +
+  REMOTE_REQUEST_EVENT_LIMIT_BYTES +
+  REMOTE_EVENT_LIMIT_BYTES;
+export const REMOTE_CACHED_PAYLOAD_LIMIT_BYTES = 32 * 1024 * 1024;
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -107,6 +126,61 @@ function safeEqual(left, right) {
 
 function fingerprint(value) {
   return JSON.stringify(value);
+}
+
+function serializedBytes(value) {
+  return Buffer.byteLength(fingerprint(value), "utf8");
+}
+
+export function remotePollWorkBytes(work) {
+  const serialized = JSON.stringify(work);
+  if (typeof serialized !== "string") {
+    throw new TypeError("Remote Runner work 必须可序列化为 JSON");
+  }
+  return Buffer.byteLength(`${serialized}\n`, "utf8");
+}
+
+function dispatchPollWork(request, delivery, leaseId) {
+  return { kind: "dispatch", request, delivery, leaseId };
+}
+
+function controlPollWork(control, delivery, leaseId) {
+  return control.kind === "reset-session"
+    ? {
+        kind: control.kind,
+        controlId: control.controlId,
+        scope: control.scope,
+        delivery,
+        leaseId,
+      }
+    : {
+        kind: control.kind,
+        controlId: control.controlId,
+        requestId: control.requestId,
+        delivery,
+        leaseId,
+      };
+}
+
+function projectedPollWork(value) {
+  return "request" in value
+    ? dispatchPollWork(value.request, REMOTE_MAX_DELIVERY, REMOTE_MAX_LEASE_ID)
+    : controlPollWork(value, REMOTE_MAX_DELIVERY, REMOTE_MAX_LEASE_ID);
+}
+
+function pollWorkFits(work) {
+  return remotePollWorkBytes(work) <= REMOTE_BODY_LIMIT_BYTES;
+}
+
+function assertPollWorkFits(work) {
+  if (!pollWorkFits(work)) {
+    throw new ProtocolInputError(
+      500,
+      "Remote Runner work response 超出限制",
+      "response_too_large",
+    );
+  }
+  return work;
 }
 
 function sha256(value) {
@@ -267,11 +341,17 @@ function validateWireEvent(requestId, value) {
 }
 
 class ProtocolInputError extends Error {
-  constructor(status, message, code = "invalid_request") {
+  constructor(
+    status,
+    message,
+    code = "invalid_request",
+    { closeConnection = false } = {},
+  ) {
     super(message);
     this.name = "ProtocolInputError";
     this.status = status;
     this.code = code;
+    this.closeConnection = closeConnection;
   }
 }
 
@@ -301,19 +381,118 @@ function jsonResponse(response, status, value) {
   response.end(body);
 }
 
-async function readJson(request) {
-  let size = 0;
-  const chunks = [];
-  for await (const chunk of request) {
-    size += chunk.length;
-    if (size > MAX_BODY_BYTES) throw new ProtocolInputError(413, "请求体过大");
-    chunks.push(chunk);
+function failAndCloseRequest(request, response, status, value) {
+  response.setHeader("connection", "close");
+  response.once("finish", () => request.destroy());
+  request.resume();
+  jsonResponse(response, status, value);
+}
+
+export function readRemoteJsonBody(
+  request,
+  {
+    maxBytes = REMOTE_BODY_LIMIT_BYTES,
+    timeoutMs = REMOTE_BODY_TIMEOUT_MS,
+    timerApi = { setTimeout, clearTimeout },
+  } = {},
+) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new TypeError("Remote body maxBytes 必须是正整数");
   }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } catch {
-    throw new ProtocolInputError(400, "请求体必须是 JSON");
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
+    throw new TypeError("Remote body timeoutMs 必须是正整数");
   }
+  if (
+    !timerApi ||
+    typeof timerApi.setTimeout !== "function" ||
+    typeof timerApi.clearTimeout !== "function"
+  ) {
+    throw new TypeError("Remote body timerApi 必须提供 setTimeout / clearTimeout");
+  }
+
+  return new Promise((resolveBody, rejectBody) => {
+    const chunks = [];
+    let bytes = 0;
+    let settled = false;
+    let timer = null;
+
+    const cleanup = () => {
+      if (timer !== null) timerApi.clearTimeout(timer);
+      request.off("data", onData);
+      request.off("end", onEnd);
+      request.off("aborted", onAborted);
+      request.off("error", onError);
+    };
+    const resolveOnce = (value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolveBody(value);
+    };
+    const rejectOnce = (error, { drain = false } = {}) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (drain) request.resume();
+      rejectBody(error);
+    };
+    const rejectClosed = (status, message, code) => {
+      rejectOnce(
+        new ProtocolInputError(status, message, code, { closeConnection: true }),
+        { drain: true },
+      );
+    };
+    const onData = (chunk) => {
+      const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      bytes += value.length;
+      if (bytes > maxBytes) {
+        rejectClosed(413, "请求体过大", "payload_too_large");
+        return;
+      }
+      chunks.push(value);
+    };
+    const onEnd = () => {
+      try {
+        resolveOnce(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch {
+        rejectOnce(new ProtocolInputError(400, "请求体必须是 JSON"));
+      }
+    };
+    const onAborted = () => {
+      rejectOnce(
+        new ProtocolInputError(400, "请求体不可用", "invalid_request", {
+          closeConnection: true,
+        }),
+      );
+    };
+    const onError = () => {
+      rejectOnce(
+        new ProtocolInputError(400, "请求体不可用", "invalid_request", {
+          closeConnection: true,
+        }),
+      );
+    };
+    request.on("data", onData);
+    request.on("end", onEnd);
+    request.on("aborted", onAborted);
+    request.on("error", onError);
+
+    timer = timerApi.setTimeout(() => {
+      rejectClosed(408, "请求体读取超时", "request_timeout");
+    }, timeoutMs);
+    // An injected timer may fire synchronously. In that case cleanup ran while
+    // the handle was not assigned yet, so release the returned handle here.
+    if (settled && timer !== null) timerApi.clearTimeout(timer);
+
+    const rawContentLength = request.headers?.["content-length"];
+    if (
+      typeof rawContentLength === "string" &&
+      /^\d+$/u.test(rawContentLength) &&
+      Number(rawContentLength) > maxBytes
+    ) {
+      rejectClosed(413, "请求体过大", "payload_too_large");
+    }
+  });
 }
 
 function createDeferred() {
@@ -599,6 +778,11 @@ export class RemoteRunner {
     maxCompletedControls = DEFAULT_MAX_COMPLETED_CONTROLS,
     maxEventsPerRequest = DEFAULT_MAX_EVENTS_PER_REQUEST,
     maxEventGap = DEFAULT_MAX_EVENT_GAP,
+    maxPollers = REMOTE_MAX_POLLERS,
+    maxRequestBytes = REMOTE_REQUEST_LIMIT_BYTES,
+    maxEventBytes = REMOTE_EVENT_LIMIT_BYTES,
+    maxRequestEventBytes = REMOTE_REQUEST_EVENT_LIMIT_BYTES,
+    maxCachedPayloadBytes = REMOTE_CACHED_PAYLOAD_LIMIT_BYTES,
   }) {
     validateToken(token, "RemoteRunner.token");
     if (!nonEmptyString(hostId))
@@ -650,13 +834,36 @@ export class RemoteRunner {
       ["maxCompletedControls", maxCompletedControls],
       ["maxEventsPerRequest", maxEventsPerRequest],
       ["maxEventGap", maxEventGap],
+      ["maxPollers", maxPollers],
+      ["maxRequestBytes", maxRequestBytes],
+      ["maxEventBytes", maxEventBytes],
+      ["maxRequestEventBytes", maxRequestEventBytes],
+      ["maxCachedPayloadBytes", maxCachedPayloadBytes],
     ]) {
       if (!Number.isSafeInteger(value) || value < 1) {
         throw new TypeError(`RemoteRunner.${label} 必须是正整数`);
       }
     }
+    for (const [label, value, upperBound] of [
+      ["pollTimeoutMs", pollTimeoutMs, REMOTE_POLL_TIMEOUT_MS],
+      ["maxRequestBytes", maxRequestBytes, REMOTE_REQUEST_LIMIT_BYTES],
+      ["maxEventBytes", maxEventBytes, REMOTE_EVENT_LIMIT_BYTES],
+      ["maxRequestEventBytes", maxRequestEventBytes, REMOTE_REQUEST_EVENT_LIMIT_BYTES],
+      ["maxCachedPayloadBytes", maxCachedPayloadBytes, REMOTE_CACHED_PAYLOAD_LIMIT_BYTES],
+      ["maxPollers", maxPollers, REMOTE_MAX_POLLERS],
+    ]) {
+      if (value > upperBound) {
+        throw new TypeError(`RemoteRunner.${label} 不得超过 staging hard limit`);
+      }
+    }
     if (maxEventsPerRequest < 2) {
       throw new TypeError("RemoteRunner.maxEventsPerRequest 必须至少为 2");
+    }
+    if (maxRequestEventBytes < maxEventBytes) {
+      throw new TypeError("RemoteRunner.maxRequestEventBytes 不得小于 maxEventBytes");
+    }
+    if (maxCachedPayloadBytes < maxEventBytes) {
+      throw new TypeError("RemoteRunner.maxCachedPayloadBytes 不得小于 maxEventBytes");
     }
 
     this.token = token;
@@ -676,6 +883,12 @@ export class RemoteRunner {
     this.maxCompletedControls = maxCompletedControls;
     this.maxEventsPerRequest = maxEventsPerRequest;
     this.maxEventGap = maxEventGap;
+    this.maxPollers = maxPollers;
+    this.maxRequestBytes = maxRequestBytes;
+    this.maxEventBytes = maxEventBytes;
+    this.maxRequestEventBytes = maxRequestEventBytes;
+    this.maxCachedPayloadBytes = maxCachedPayloadBytes;
+    this.cachedPayloadBytes = 0;
     this.requests = new Map();
     this.controls = new Map();
     this.completedControls = new Map();
@@ -757,6 +970,39 @@ export class RemoteRunner {
       );
     }
 
+    const requestBytes = serializedBytes(request);
+    if (requestBytes > this.maxRequestBytes) {
+      return Promise.reject(
+        transportError(
+          request.requestId,
+          "Remote Runner dispatch request bytes 超出限制",
+          false,
+          RUNNER_ERROR_CODES.INVALID_REQUEST,
+        ),
+      );
+    }
+    if (!pollWorkFits(projectedPollWork({ request }))) {
+      return Promise.reject(
+        transportError(
+          request.requestId,
+          "Remote Runner dispatch work bytes 超出限制",
+          false,
+          RUNNER_ERROR_CODES.INVALID_REQUEST,
+        ),
+      );
+    }
+    const reservedBytes = this.syntheticTerminalReserveBytes(request.requestId);
+    if (!this.makeCachedPayloadCapacity(requestBytes + reservedBytes)) {
+      return Promise.reject(
+        transportError(
+          request.requestId,
+          "Remote Runner cached payload 容量不足",
+          true,
+          RUNNER_ERROR_CODES.UNAVAILABLE,
+        ),
+      );
+    }
+
     const deferred = createDeferred();
     const record = {
       request,
@@ -772,6 +1018,9 @@ export class RemoteRunner {
       eventDigests: new Map(),
       bufferedEvents: new Map(),
       events: [],
+      eventBytes: 0,
+      payloadBytes: requestBytes,
+      reservedBytes,
       nextSequence: 1,
       listeners: new Map(),
       terminal: false,
@@ -779,6 +1028,7 @@ export class RemoteRunner {
       cancelOperation: null,
     };
     this.requests.set(request.requestId, record);
+    this.cachedPayloadBytes += requestBytes + reservedBytes;
     this.subscribe(record, onEvent);
     this.wakePollers();
     return deferred.promise;
@@ -837,9 +1087,25 @@ export class RemoteRunner {
         ),
       );
     }
+    const controlId = randomUUID();
+    const projectedControl = {
+      controlId,
+      kind: "reset-session",
+      scope,
+    };
+    if (!pollWorkFits(projectedPollWork(projectedControl))) {
+      return Promise.reject(
+        transportError(
+          "unknown",
+          "Remote Runner control work bytes 超出限制",
+          false,
+          RUNNER_ERROR_CODES.INVALID_REQUEST,
+        ),
+      );
+    }
     const deferred = createDeferred();
     const control = {
-      controlId: randomUUID(),
+      controlId,
       kind: "reset-session",
       scope,
       assignedHostId: this.hostId,
@@ -909,9 +1175,21 @@ export class RemoteRunner {
       );
     }
 
+    const controlId = randomUUID();
+    const projectedControl = { controlId, kind: "cancel", requestId };
+    if (!pollWorkFits(projectedPollWork(projectedControl))) {
+      return Promise.reject(
+        transportError(
+          requestId,
+          "Remote Runner control work bytes 超出限制",
+          false,
+          RUNNER_ERROR_CODES.INVALID_REQUEST,
+        ),
+      );
+    }
     const deferred = createDeferred();
     const control = {
-      controlId: randomUUID(),
+      controlId,
       kind: "cancel",
       requestId,
       assignedHostId: record.assignedHostId,
@@ -950,16 +1228,24 @@ export class RemoteRunner {
         "failed",
         error,
       );
-      record.eventDigests.set(event.sequence, fingerprint(event));
-      record.events.push(event);
-      record.nextSequence++;
     }
+    const terminalPayload = this.planTerminalPayload(record, [
+      ...(event ? [event] : []),
+      error,
+    ]);
     this.archiveTerminalRecord(
       record,
       error.code === RUNNER_ERROR_CODES.CANCELLED ? "cancelled" : "failed",
       undefined,
       error,
+      event ? [...record.events, event] : record.events,
     );
+    this.applyTerminalPayload(record, terminalPayload);
+    if (event) {
+      record.eventDigests.set(event.sequence, sha256(fingerprint(event)));
+      record.events.push(event);
+      record.nextSequence++;
+    }
     record.state = error.code === RUNNER_ERROR_CODES.CANCELLED ? "cancelled" : "failed";
     record.error = error;
     record.terminal = true;
@@ -971,8 +1257,91 @@ export class RemoteRunner {
     }
     record.listeners.clear();
     record.deferred.reject(new RunnerDispatchError(error));
+    if (!terminalPayload.cache) {
+      this.removeCachedRequest(record.request.requestId, record);
+    }
     this.trimCompletedRequests();
     this.wakePollers();
+  }
+
+  removeCachedRequest(requestId, record) {
+    if (this.requests.get(requestId) !== record) return false;
+    this.requests.delete(requestId);
+    this.cachedPayloadBytes = Math.max(
+      0,
+      this.cachedPayloadBytes - record.payloadBytes - record.reservedBytes,
+    );
+    return true;
+  }
+
+  syntheticTerminalReserveBytes(requestId) {
+    return Math.max(
+      ...[
+        [RUNNER_ERROR_CODES.CANCELLED, "Runner request 已取消"],
+        [RUNNER_ERROR_CODES.INTERNAL, "Remote Runner cached payload 超出限制"],
+        [RUNNER_ERROR_CODES.INTERNAL, "dispatch event bytes 超出限制"],
+        [RUNNER_ERROR_CODES.INTERNAL, "Remote Runner event buffer 超出限制"],
+      ].map(([code, message]) => {
+        const error = runnerError({ requestId, code, message, retryable: false });
+        const event = runnerLifecycleEvent(requestId, 1, "failed", error);
+        return serializedBytes(error) + serializedBytes(event);
+      }),
+    );
+  }
+
+  makeCachedPayloadCapacity(additionalBytes) {
+    if (this.cachedPayloadBytes + additionalBytes <= this.maxCachedPayloadBytes) {
+      return true;
+    }
+    for (const [requestId, record] of this.requests) {
+      if (!record.terminal) continue;
+      this.removeCachedRequest(requestId, record);
+      if (this.cachedPayloadBytes + additionalBytes <= this.maxCachedPayloadBytes) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  planTerminalPayload(record, values) {
+    const actualBytes = values.reduce(
+      (total, value) => total + serializedBytes(value),
+      0,
+    );
+    const additionalBytes = actualBytes - record.reservedBytes;
+    return Object.freeze({
+      actualBytes,
+      additionalBytes,
+      cache: additionalBytes <= 0 || this.makeCachedPayloadCapacity(additionalBytes),
+    });
+  }
+
+  applyTerminalPayload(record, plan) {
+    if (!plan.cache) return;
+    record.payloadBytes += plan.actualBytes;
+    record.reservedBytes = 0;
+    this.cachedPayloadBytes += plan.additionalBytes;
+  }
+
+  rejectCachedPayload(
+    record,
+    {
+      message = "Remote Runner cached payload 超出限制",
+      code = "cached_payload_exceeded",
+    } = {},
+  ) {
+    record.bufferedEvents.clear();
+    this.cancelPendingRecord(
+      record,
+      runnerError({
+        requestId: record.request.requestId,
+        code: RUNNER_ERROR_CODES.INTERNAL,
+        message,
+        retryable: false,
+      }),
+    );
+    this.removeCachedRequest(record.request.requestId, record);
+    throw new ProtocolInputError(413, message, code);
   }
 
   trimCompletedRequests() {
@@ -982,18 +1351,18 @@ export class RemoteRunner {
     if (completed <= this.maxCompletedRequests) return;
     for (const [requestId, record] of this.requests) {
       if (!record.terminal) continue;
-      this.requests.delete(requestId);
+      this.removeCachedRequest(requestId, record);
       completed--;
       if (completed <= this.maxCompletedRequests) break;
     }
   }
 
-  archiveTerminalRecord(record, state, result, error) {
+  archiveTerminalRecord(record, state, result, error, events = record.events) {
     this.requestLedger.put({
       requestId: record.request.requestId,
       fingerprint: record.fingerprint,
       state,
-      events: record.events,
+      events,
       ...(state === "completed" ? { result } : { error }),
     });
   }
@@ -1056,27 +1425,15 @@ export class RemoteRunner {
           (requestId) => this.requests.get(requestId)?.terminal !== false,
         )
       ) {
-        control.state = "offered";
-        control.delivery++;
-        control.leaseId = randomUUID();
-        control.leaseUntil = now + this.offerLeaseMs;
+        const delivery = control.delivery + 1;
+        const leaseId = randomUUID();
         const work = Object.freeze(
-          control.kind === "reset-session"
-            ? {
-                kind: control.kind,
-                controlId: control.controlId,
-                scope: control.scope,
-                delivery: control.delivery,
-                leaseId: control.leaseId,
-              }
-            : {
-                kind: control.kind,
-                controlId: control.controlId,
-                requestId: control.requestId,
-                delivery: control.delivery,
-                leaseId: control.leaseId,
-              },
+          assertPollWorkFits(controlPollWork(control, delivery, leaseId)),
         );
+        control.state = "offered";
+        control.delivery = delivery;
+        control.leaseId = leaseId;
+        control.leaseUntil = now + this.offerLeaseMs;
         this.expireOffer(work);
         return work;
       }
@@ -1094,16 +1451,15 @@ export class RemoteRunner {
             sessionKey(other.request) === sessionKey(record.request),
         )
       ) {
+        const delivery = record.delivery + 1;
+        const leaseId = randomUUID();
+        const work = Object.freeze(
+          assertPollWorkFits(dispatchPollWork(record.request, delivery, leaseId)),
+        );
         record.state = "offered";
-        record.delivery++;
-        record.leaseId = randomUUID();
+        record.delivery = delivery;
+        record.leaseId = leaseId;
         record.leaseUntil = now + this.offerLeaseMs;
-        const work = Object.freeze({
-          kind: "dispatch",
-          request: record.request,
-          delivery: record.delivery,
-          leaseId: record.leaseId,
-        });
         this.expireOffer(work);
         return work;
       }
@@ -1144,13 +1500,24 @@ export class RemoteRunner {
   }
 
   waitForWork(hostId, capabilities, signal) {
+    if (signal?.aborted) return Promise.resolve(null);
     const immediate = this.claim(hostId, capabilities);
     if (immediate || this.closed) return Promise.resolve(immediate);
+    if (this.pollers.size >= this.maxPollers) {
+      return Promise.reject(
+        new ProtocolInputError(429, "Remote Runner poll capacity 已满", "poll_capacity", {
+          closeConnection: true,
+        }),
+      );
+    }
     return new Promise((resolve) => {
       const poller = {
         hostId,
         capabilities,
+        settled: false,
         finish: (work) => {
+          if (poller.settled) return;
+          poller.settled = true;
           clearTimeout(poller.timer);
           signal?.removeEventListener("abort", poller.abort);
           this.pollers.delete(poller);
@@ -1159,8 +1526,13 @@ export class RemoteRunner {
       };
       poller.abort = () => poller.finish(null);
       poller.timer = setTimeout(() => poller.finish(null), this.pollTimeoutMs);
+      if (signal?.aborted) {
+        poller.finish(null);
+        return;
+      }
       signal?.addEventListener("abort", poller.abort, { once: true });
       this.pollers.add(poller);
+      if (signal?.aborted) poller.abort();
     });
   }
 
@@ -1313,7 +1685,9 @@ export class RemoteRunner {
     const record = this.recordForHost(requestId, hostId);
     this.assertDelivery(record, delivery, leaseId, "dispatch");
     const event = validateWireEvent(requestId, value);
-    const digest = fingerprint(event);
+    const serializedEvent = fingerprint(event);
+    const eventBytes = Buffer.byteLength(serializedEvent, "utf8");
+    const digest = sha256(serializedEvent);
     const prior = record.eventDigests.get(event.sequence);
     if (record.terminal) {
       if (prior === digest) return true;
@@ -1328,6 +1702,15 @@ export class RemoteRunner {
       if (prior !== digest)
         throw new ProtocolInputError(409, "同一 event sequence 内容冲突", "conflict");
       return true;
+    }
+    if (
+      eventBytes > this.maxEventBytes ||
+      record.eventBytes + eventBytes > this.maxRequestEventBytes
+    ) {
+      this.rejectCachedPayload(record, {
+        message: "dispatch event bytes 超出限制",
+        code: "event_bytes_exceeded",
+      });
     }
     if (
       event.sequence > this.maxEventsPerRequest ||
@@ -1346,8 +1729,14 @@ export class RemoteRunner {
       );
       throw new ProtocolInputError(413, "dispatch event buffer 超出限制");
     }
+    if (!this.makeCachedPayloadCapacity(eventBytes)) {
+      this.rejectCachedPayload(record);
+    }
     record.leaseUntil = Date.now() + this.leaseMs;
     record.eventDigests.set(event.sequence, digest);
+    record.eventBytes += eventBytes;
+    record.payloadBytes += eventBytes;
+    this.cachedPayloadBytes += eventBytes;
     record.bufferedEvents.set(event.sequence, event);
     while (record.bufferedEvents.has(record.nextSequence)) {
       const next = record.bufferedEvents.get(record.nextSequence);
@@ -1379,15 +1768,20 @@ export class RemoteRunner {
     ) {
       throw new ProtocolInputError(409, "完成结果前缺少连续且匹配的 completed event");
     }
+    const terminalPayload = this.planTerminalPayload(record, [result]);
     if (result.sessionId) this.placementStore.set(record.request, hostId);
     else this.placementStore.delete(record.request);
     this.archiveTerminalRecord(record, "completed", result);
+    this.applyTerminalPayload(record, terminalPayload);
     record.terminal = true;
     record.state = "completed";
     record.result = result;
     record.completedAt = Date.now();
     record.listeners.clear();
     record.deferred.resolve(result);
+    if (!terminalPayload.cache) {
+      this.removeCachedRequest(requestId, record);
+    }
     this.trimCompletedRequests();
     this.wakePollers();
     return false;
@@ -1410,18 +1804,23 @@ export class RemoteRunner {
     ) {
       throw new ProtocolInputError(409, "失败结果前缺少连续且匹配的 failed event");
     }
+    const terminalPayload = this.planTerminalPayload(record, [error]);
     this.archiveTerminalRecord(
       record,
       error.code === RUNNER_ERROR_CODES.CANCELLED ? "cancelled" : "failed",
       undefined,
       error,
     );
+    this.applyTerminalPayload(record, terminalPayload);
     record.terminal = true;
     record.state = error.code === RUNNER_ERROR_CODES.CANCELLED ? "cancelled" : "failed";
     record.error = error;
     record.completedAt = Date.now();
     record.listeners.clear();
     record.deferred.reject(new RunnerDispatchError(error));
+    if (!terminalPayload.cache) {
+      this.removeCachedRequest(requestId, record);
+    }
     this.trimCompletedRequests();
     this.wakePollers();
     return false;
@@ -1429,8 +1828,8 @@ export class RemoteRunner {
 
   acceptControl(hostId, controlId, delivery, leaseId, ok, resultValue, errorValue) {
     const control = this.controls.get(controlId);
-    const digest = fingerprint(
-      ok === true ? { ok, result: resultValue } : { ok, error: errorValue },
+    const digest = sha256(
+      fingerprint(ok === true ? { ok, result: resultValue } : { ok, error: errorValue }),
     );
     if (!control) {
       const completed = this.completedControls.get(controlId);
@@ -1507,16 +1906,16 @@ export class RemoteRunner {
     }
     if (!this.authorized(request)) {
       response.setHeader("www-authenticate", 'Bearer realm="agent-os-runner"');
-      jsonResponse(response, 401, { error: "unauthorized" });
+      failAndCloseRequest(request, response, 401, { error: "unauthorized" });
       return true;
     }
     if (request.method !== "POST") {
-      jsonResponse(response, 405, { error: "method_not_allowed" });
+      failAndCloseRequest(request, response, 405, { error: "method_not_allowed" });
       return true;
     }
 
     try {
-      const body = await readJson(request);
+      const body = await readRemoteJsonBody(request);
       const route = url.pathname.slice(this.pathPrefix.length);
       if (route === "/poll") {
         if (
@@ -1530,16 +1929,23 @@ export class RemoteRunner {
         // The bearer credential selects this instance. `body.hostId` is only a
         // consistency assertion against that server-derived principal.
         const controller = new AbortController();
-        request.once("aborted", () => controller.abort());
-        response.once("close", () => controller.abort());
-        const work = await this.waitForWork(
-          hostId,
-          {
-            acceptDispatch: body.acceptDispatch,
-            acceptControl: body.acceptControl,
-          },
-          controller.signal,
-        );
+        const abortPoll = () => controller.abort();
+        request.once("aborted", abortPoll);
+        response.once("close", abortPoll);
+        let work;
+        try {
+          work = await this.waitForWork(
+            hostId,
+            {
+              acceptDispatch: body.acceptDispatch,
+              acceptControl: body.acceptControl,
+            },
+            controller.signal,
+          );
+        } finally {
+          request.off("aborted", abortPoll);
+          response.off("close", abortPoll);
+        }
         if (response.destroyed) {
           if (work) this.releaseClaim(work);
           return true;
@@ -1692,7 +2098,15 @@ export class RemoteRunner {
       }
       jsonResponse(response, 404, { error: "not_found" });
     } catch (error) {
+      if (request.aborted || response.destroyed) return true;
       const status = error instanceof ProtocolInputError ? error.status : 500;
+      if (error instanceof ProtocolInputError && error.closeConnection) {
+        failAndCloseRequest(request, response, status, {
+          error: error.code,
+          message: error.message,
+        });
+        return true;
+      }
       jsonResponse(response, status, {
         error:
           status === 500
@@ -1751,21 +2165,93 @@ export class RemoteRunner {
   }
 }
 
-function abortableDelay(ms, signal) {
+function abortableDelay(ms, signal, timerApi = { setTimeout, clearTimeout }) {
   if (signal?.aborted) return Promise.resolve();
   return new Promise((resolve) => {
-    const timer = setTimeout(finish, ms);
+    let timer = null;
+    let finished = false;
     function finish() {
+      if (finished) return;
+      finished = true;
       signal?.removeEventListener("abort", finish);
-      clearTimeout(timer);
+      if (timer !== null) timerApi.clearTimeout(timer);
       resolve();
     }
     signal?.addEventListener("abort", finish, { once: true });
+    timer = timerApi.setTimeout(finish, ms);
+    if (finished && timer !== null) timerApi.clearTimeout(timer);
   });
 }
 
-async function responseBody(response) {
-  const text = await response.text();
+async function cancelResponseBody(response) {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // Abort/parse failures can already have errored the stream. Either way the
+    // response is no longer reusable and no raw body is surfaced.
+  }
+}
+
+export async function readRemoteResponseBody(
+  response,
+  { maxBytes = REMOTE_BODY_LIMIT_BYTES } = {},
+) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1) {
+    throw new TypeError("Remote response body maxBytes 必须是正整数");
+  }
+  if (maxBytes > REMOTE_BODY_LIMIT_BYTES) {
+    throw new TypeError("Remote response body maxBytes 不得超过 staging hard limit");
+  }
+  if (!response?.body) return null;
+
+  const rawContentLength = response.headers?.get?.("content-length");
+  if (
+    typeof rawContentLength === "string" &&
+    /^\d+$/u.test(rawContentLength) &&
+    Number(rawContentLength) > maxBytes
+  ) {
+    await cancelResponseBody(response);
+    throw new RemoteProtocolError(
+      response.status,
+      "Hub 响应体超出限制",
+      "response_too_large",
+    );
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let bytes = 0;
+  let complete = false;
+  try {
+    while (true) {
+      const item = await reader.read();
+      if (item.done) {
+        complete = true;
+        break;
+      }
+      const chunk = Buffer.from(item.value);
+      bytes += chunk.length;
+      if (bytes > maxBytes) {
+        throw new RemoteProtocolError(
+          response.status,
+          "Hub 响应体超出限制",
+          "response_too_large",
+        );
+      }
+      chunks.push(chunk);
+    }
+  } finally {
+    if (!complete) {
+      try {
+        await reader.cancel();
+      } catch {
+        // The controller may already have aborted the stream.
+      }
+    }
+    reader.releaseLock();
+  }
+
+  const text = Buffer.concat(chunks).toString("utf8");
   if (!text) return null;
   try {
     return JSON.parse(text);
@@ -1787,15 +2273,34 @@ function orphanedDeliveryError(error) {
   );
 }
 
+export const REMOTE_WORKER_STOP_FAILURE_MESSAGE = "Remote Runner Worker stop failed";
+
+export class RemoteWorkerStopError extends Error {
+  constructor(code) {
+    super(REMOTE_WORKER_STOP_FAILURE_MESSAGE);
+    this.name = "RemoteWorkerStopError";
+    this.code = code;
+  }
+}
+
 async function settleWithin(promise, timeoutMs) {
   let timer;
-  await Promise.race([
-    Promise.resolve(promise).catch(() => {}),
-    new Promise((resolve) => {
-      timer = setTimeout(resolve, timeoutMs);
-    }),
-  ]);
-  clearTimeout(timer);
+  try {
+    await Promise.race([
+      Promise.resolve(promise).catch((error) => {
+        if (error instanceof RemoteWorkerStopError) throw error;
+        throw new RemoteWorkerStopError("close_failed");
+      }),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new RemoteWorkerStopError("deadline_exceeded")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -1810,13 +2315,24 @@ export class RemoteRunnerWorker {
     runner,
     pathPrefix = DEFAULT_PREFIX,
     reconnectDelayMs = DEFAULT_RECONNECT_DELAY_MS,
+    reconnectMaxDelayMs = DEFAULT_RECONNECT_MAX_DELAY_MS,
     maxCompleted = 1000,
     maxConcurrentDispatches = DEFAULT_MAX_CONCURRENT_DISPATCHES,
     maxConcurrentControls = DEFAULT_MAX_CONCURRENT_CONTROLS,
     maxEventsPerExecution = DEFAULT_MAX_EVENTS_PER_REQUEST,
+    maxRequestBytes = REMOTE_REQUEST_LIMIT_BYTES,
+    maxEventBytes = REMOTE_EVENT_LIMIT_BYTES,
+    maxExecutionPayloadBytes = REMOTE_EXECUTION_PAYLOAD_LIMIT_BYTES,
+    maxCachedPayloadBytes = REMOTE_CACHED_PAYLOAD_LIMIT_BYTES,
+    maxResponseBytes = REMOTE_BODY_LIMIT_BYTES,
+    requestTimeoutMs = REMOTE_BODY_TIMEOUT_MS,
+    pollResponseTimeoutMs = REMOTE_POLL_RESPONSE_TIMEOUT_MS,
     stopTimeoutMs = DEFAULT_STOP_TIMEOUT_MS,
     fetchImpl = globalThis.fetch,
     onState,
+    random = Math.random,
+    retryTimerApi = { setTimeout, clearTimeout },
+    requestTimerApi = { setTimeout, clearTimeout },
   }) {
     const baseUrl = validateRemoteUrl(url);
     validateToken(token, "RemoteRunnerWorker.token");
@@ -1837,11 +2353,38 @@ export class RemoteRunnerWorker {
     if (!Number.isSafeInteger(reconnectDelayMs) || reconnectDelayMs < 1) {
       throw new TypeError("RemoteRunnerWorker.reconnectDelayMs 必须是正整数");
     }
+    if (
+      !Number.isSafeInteger(reconnectMaxDelayMs) ||
+      reconnectMaxDelayMs < reconnectDelayMs
+    ) {
+      throw new TypeError(
+        "RemoteRunnerWorker.reconnectMaxDelayMs 必须是不小于 reconnectDelayMs 的正整数",
+      );
+    }
+    if (typeof random !== "function") {
+      throw new TypeError("RemoteRunnerWorker.random 必须是函数");
+    }
+    if (
+      !retryTimerApi ||
+      typeof retryTimerApi.setTimeout !== "function" ||
+      typeof retryTimerApi.clearTimeout !== "function"
+    ) {
+      throw new TypeError(
+        "RemoteRunnerWorker.retryTimerApi 必须提供 setTimeout / clearTimeout",
+      );
+    }
     for (const [label, value] of [
       ["maxCompleted", maxCompleted],
       ["maxConcurrentDispatches", maxConcurrentDispatches],
       ["maxConcurrentControls", maxConcurrentControls],
       ["maxEventsPerExecution", maxEventsPerExecution],
+      ["maxRequestBytes", maxRequestBytes],
+      ["maxEventBytes", maxEventBytes],
+      ["maxExecutionPayloadBytes", maxExecutionPayloadBytes],
+      ["maxCachedPayloadBytes", maxCachedPayloadBytes],
+      ["maxResponseBytes", maxResponseBytes],
+      ["requestTimeoutMs", requestTimeoutMs],
+      ["pollResponseTimeoutMs", pollResponseTimeoutMs],
       ["stopTimeoutMs", stopTimeoutMs],
     ]) {
       if (!Number.isSafeInteger(value) || value < 1) {
@@ -1851,12 +2394,53 @@ export class RemoteRunnerWorker {
     if (maxEventsPerExecution < 2) {
       throw new TypeError("RemoteRunnerWorker.maxEventsPerExecution 必须至少为 2");
     }
+    for (const [label, value, upperBound] of [
+      ["maxRequestBytes", maxRequestBytes, REMOTE_REQUEST_LIMIT_BYTES],
+      ["maxEventBytes", maxEventBytes, REMOTE_EVENT_LIMIT_BYTES],
+      [
+        "maxExecutionPayloadBytes",
+        maxExecutionPayloadBytes,
+        REMOTE_EXECUTION_PAYLOAD_LIMIT_BYTES,
+      ],
+      ["maxCachedPayloadBytes", maxCachedPayloadBytes, REMOTE_CACHED_PAYLOAD_LIMIT_BYTES],
+      ["maxResponseBytes", maxResponseBytes, REMOTE_BODY_LIMIT_BYTES],
+      ["requestTimeoutMs", requestTimeoutMs, REMOTE_BODY_TIMEOUT_MS],
+      ["pollResponseTimeoutMs", pollResponseTimeoutMs, REMOTE_POLL_RESPONSE_TIMEOUT_MS],
+    ]) {
+      if (value > upperBound) {
+        throw new TypeError(`RemoteRunnerWorker.${label} 不得超过 staging hard limit`);
+      }
+    }
+    if (maxExecutionPayloadBytes < maxEventBytes) {
+      throw new TypeError(
+        "RemoteRunnerWorker.maxExecutionPayloadBytes 不得小于 maxEventBytes",
+      );
+    }
+    if (maxCachedPayloadBytes < maxEventBytes) {
+      throw new TypeError(
+        "RemoteRunnerWorker.maxCachedPayloadBytes 不得小于 maxEventBytes",
+      );
+    }
+    if (pollResponseTimeoutMs < requestTimeoutMs) {
+      throw new TypeError(
+        "RemoteRunnerWorker.pollResponseTimeoutMs 不得小于 requestTimeoutMs",
+      );
+    }
     if (
       !nonEmptyString(pathPrefix) ||
       !pathPrefix.startsWith("/") ||
       pathPrefix === "/"
     ) {
       throw new TypeError("RemoteRunnerWorker.pathPrefix 必须是绝对 URL path");
+    }
+    if (
+      !requestTimerApi ||
+      typeof requestTimerApi.setTimeout !== "function" ||
+      typeof requestTimerApi.clearTimeout !== "function"
+    ) {
+      throw new TypeError(
+        "RemoteRunnerWorker.requestTimerApi 必须提供 setTimeout / clearTimeout",
+      );
     }
 
     this.baseUrl = baseUrl;
@@ -1865,13 +2449,25 @@ export class RemoteRunnerWorker {
     this.runner = runner;
     this.pathPrefix = pathPrefix.replace(/\/$/, "");
     this.reconnectDelayMs = reconnectDelayMs;
+    this.reconnectMaxDelayMs = reconnectMaxDelayMs;
     this.maxCompleted = maxCompleted;
     this.maxConcurrentDispatches = maxConcurrentDispatches;
     this.maxConcurrentControls = maxConcurrentControls;
     this.maxEventsPerExecution = maxEventsPerExecution;
+    this.maxRequestBytes = maxRequestBytes;
+    this.maxEventBytes = maxEventBytes;
+    this.maxExecutionPayloadBytes = maxExecutionPayloadBytes;
+    this.maxCachedPayloadBytes = maxCachedPayloadBytes;
+    this.maxResponseBytes = maxResponseBytes;
+    this.requestTimeoutMs = requestTimeoutMs;
+    this.pollResponseTimeoutMs = pollResponseTimeoutMs;
+    this.cachedPayloadBytes = 0;
     this.stopTimeoutMs = stopTimeoutMs;
     this.fetchImpl = fetchImpl;
     this.onState = onState ?? (() => {});
+    this.random = random;
+    this.retryTimerApi = retryTimerApi;
+    this.requestTimerApi = requestTimerApi;
     this.executions = new Map();
     this.completedControls = new Map();
     this.stopController = null;
@@ -1915,9 +2511,23 @@ export class RemoteRunnerWorker {
     const requestController = new AbortController();
     this.requestControllers.add(requestController);
     const abort = () => requestController.abort();
-    signal?.addEventListener("abort", abort, { once: true });
-    let response;
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort, { once: true });
+    let response = null;
+    let deadline = null;
+    let bodyDeadline = null;
+    let timedOut = false;
+    let bodyHandled = false;
     try {
+      const onTimeout = () => {
+        timedOut = true;
+        requestController.abort();
+      };
+      deadline = this.requestTimerApi.setTimeout(
+        onTimeout,
+        path === "/poll" ? this.pollResponseTimeoutMs : this.requestTimeoutMs,
+      );
+      deadline?.unref?.();
       response = await this.fetchImpl(this.endpoint(path), {
         method: "POST",
         redirect: "error",
@@ -1928,30 +2538,71 @@ export class RemoteRunnerWorker {
         body: JSON.stringify(body),
         signal: requestController.signal,
       });
+      if (path === "/poll" && response.body) {
+        bodyDeadline = this.requestTimerApi.setTimeout(onTimeout, this.requestTimeoutMs);
+        bodyDeadline?.unref?.();
+      }
+      if (response.status === 401 || response.status === 403) {
+        await cancelResponseBody(response);
+        bodyHandled = true;
+        throw new RemoteAuthenticationError();
+      }
+      if (response.status >= 500) {
+        await cancelResponseBody(response);
+        bodyHandled = true;
+        throw new Error("Hub 暂时不可用");
+      }
+      const parsed = await readRemoteResponseBody(response, {
+        maxBytes: this.maxResponseBytes,
+      });
+      bodyHandled = true;
+      if (!response.ok) {
+        throw new RemoteProtocolError(
+          response.status,
+          "Hub 拒绝了 Remote Runner 请求",
+          nonEmptyString(parsed?.error) ? parsed.error : "protocol_error",
+        );
+      }
+      return { status: response.status, body: parsed };
+    } catch (error) {
+      if (timedOut) {
+        throw new Error("Hub 响应读取超时");
+      }
+      if (requestController.signal.aborted) {
+        throw new Error("Remote Runner request aborted");
+      }
+      throw error;
     } finally {
+      if (response && !bodyHandled) await cancelResponseBody(response);
+      if (deadline !== null) this.requestTimerApi.clearTimeout(deadline);
+      if (bodyDeadline !== null) this.requestTimerApi.clearTimeout(bodyDeadline);
       signal?.removeEventListener("abort", abort);
       this.requestControllers.delete(requestController);
     }
-    if (response.status === 401 || response.status === 403) {
-      throw new RemoteAuthenticationError();
+  }
+
+  reconnectBackoffMs(attempt) {
+    const exponent = Math.min(attempt, 30);
+    const ceiling = Math.min(
+      this.reconnectMaxDelayMs,
+      this.reconnectDelayMs * 2 ** exponent,
+    );
+    let sample = 0.5;
+    try {
+      const candidate = this.random();
+      if (Number.isFinite(candidate)) sample = Math.min(1, Math.max(0, candidate));
+    } catch {
+      // A broken entropy source must not remove the retry bound.
     }
-    if (response.status >= 500) {
-      throw new Error(`Hub 暂时不可用：HTTP ${response.status}`);
-    }
-    const parsed = await responseBody(response);
-    if (!response.ok) {
-      throw new RemoteProtocolError(
-        response.status,
-        nonEmptyString(parsed?.message)
-          ? parsed.message
-          : `Hub 拒绝请求：HTTP ${response.status}`,
-        nonEmptyString(parsed?.error) ? parsed.error : "protocol_error",
-      );
-    }
-    return { status: response.status, body: parsed };
+    return Math.max(1, Math.floor(ceiling / 2 + (ceiling / 2) * sample));
+  }
+
+  waitBeforeReconnect(attempt, signal) {
+    return abortableDelay(this.reconnectBackoffMs(attempt), signal, this.retryTimerApi);
   }
 
   async sendWithReconnect(path, body, signal) {
+    let attempt = 0;
     while (!signal.aborted) {
       try {
         return await this.fetchOnce(path, body, signal);
@@ -1962,7 +2613,7 @@ export class RemoteRunnerWorker {
           "reconnecting",
           error instanceof Error ? error.message : String(error),
         );
-        await abortableDelay(this.reconnectDelayMs, signal);
+        await this.waitBeforeReconnect(attempt++, signal);
       }
     }
     throw new Error("Remote Runner Worker 已停止");
@@ -2135,10 +2786,123 @@ export class RemoteRunnerWorker {
     await this.postOutcome(entry, delivery, leaseId, signal);
   }
 
+  workerTerminalReserveBytes(requestId) {
+    const error = runnerError({
+      requestId,
+      code: RUNNER_ERROR_CODES.INTERNAL,
+      message: "Remote Runner Worker payload cache 超出限制",
+      retryable: false,
+    });
+    const event = runnerLifecycleEvent(
+      requestId,
+      this.maxEventsPerExecution,
+      "failed",
+      error,
+    );
+    return serializedBytes(error) + serializedBytes(event);
+  }
+
+  removeExecution(requestId, entry) {
+    if (this.executions.get(requestId) !== entry) return false;
+    this.executions.delete(requestId);
+    this.cachedPayloadBytes = Math.max(
+      0,
+      this.cachedPayloadBytes - entry.payloadBytes - entry.reservedBytes,
+    );
+    return true;
+  }
+
+  removeControlExecution(controlId, entry) {
+    if (this.completedControls.get(controlId) !== entry) return false;
+    this.completedControls.delete(controlId);
+    this.cachedPayloadBytes = Math.max(0, this.cachedPayloadBytes - entry.payloadBytes);
+    return true;
+  }
+
+  makeExecutionPayloadCapacity(additionalBytes) {
+    if (this.cachedPayloadBytes + additionalBytes <= this.maxCachedPayloadBytes) {
+      return true;
+    }
+    for (const [requestId, entry] of this.executions) {
+      if (!entry.settled || entry.pins > 0) continue;
+      this.removeExecution(requestId, entry);
+      if (this.cachedPayloadBytes + additionalBytes <= this.maxCachedPayloadBytes) {
+        return true;
+      }
+    }
+    for (const [controlId, entry] of this.completedControls) {
+      if (!entry.settled || entry.pins > 0) continue;
+      this.removeControlExecution(controlId, entry);
+      if (this.cachedPayloadBytes + additionalBytes <= this.maxCachedPayloadBytes) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  cacheControlOutcome(entry) {
+    let value = entry.error ?? entry.result;
+    let payloadBytes = 0;
+    try {
+      payloadBytes = value === null ? 0 : serializedBytes(value);
+    } catch {
+      payloadBytes = this.maxEventBytes + 1;
+    }
+    if (
+      payloadBytes > this.maxEventBytes ||
+      !this.makeExecutionPayloadCapacity(payloadBytes)
+    ) {
+      entry.result = null;
+      entry.error = runnerError({
+        requestId: "unknown",
+        code: RUNNER_ERROR_CODES.SESSION_FAILURE,
+        message: "Remote Runner Worker control payload 超出限制",
+        retryable: false,
+      });
+      value = entry.error;
+      payloadBytes = serializedBytes(value);
+      if (!this.makeExecutionPayloadCapacity(payloadBytes)) {
+        throw new RemoteProtocolError(
+          503,
+          "Remote Runner Worker control cache 容量不足",
+          "cache_capacity",
+        );
+      }
+    }
+    entry.payloadBytes = payloadBytes;
+    this.cachedPayloadBytes += payloadBytes;
+  }
+
+  adjustExecutionPayload(
+    entry,
+    { payloadDelta = 0, reservedBytes = entry.reservedBytes } = {},
+  ) {
+    const nextPayloadBytes = entry.payloadBytes + payloadDelta;
+    const nextAccountedBytes = nextPayloadBytes + reservedBytes;
+    const currentAccountedBytes = entry.payloadBytes + entry.reservedBytes;
+    const additionalBytes = nextAccountedBytes - currentAccountedBytes;
+    if (
+      !Number.isSafeInteger(nextPayloadBytes) ||
+      nextPayloadBytes < 0 ||
+      !Number.isSafeInteger(reservedBytes) ||
+      reservedBytes < 0 ||
+      nextAccountedBytes > this.maxExecutionPayloadBytes
+    ) {
+      return false;
+    }
+    if (additionalBytes > 0 && !this.makeExecutionPayloadCapacity(additionalBytes)) {
+      return false;
+    }
+    entry.payloadBytes = nextPayloadBytes;
+    entry.reservedBytes = reservedBytes;
+    this.cachedPayloadBytes += additionalBytes;
+    return true;
+  }
+
   trimExecutions() {
     if (this.executions.size <= this.maxCompleted) return;
     for (const [requestId, entry] of this.executions) {
-      if (entry.settled) this.executions.delete(requestId);
+      if (entry.settled && entry.pins === 0) this.removeExecution(requestId, entry);
       if (this.executions.size <= this.maxCompleted) break;
     }
   }
@@ -2178,7 +2942,8 @@ export class RemoteRunnerWorker {
   startHeartbeat(work, leaseMs, signal, onOrphaned) {
     const controller = new AbortController();
     const abort = () => controller.abort();
-    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
     const intervalMs = Math.max(1, Math.floor(leaseMs / 3));
     const promise = (async () => {
       while (!controller.signal.aborted) {
@@ -2234,39 +2999,7 @@ export class RemoteRunnerWorker {
 
   async execute(request, entry, delivery, leaseId, signal) {
     let deliveries = Promise.resolve();
-    const onEvent = (event) => {
-      if (entry.overflowed) return;
-      const terminal = event.kind === "completed" || event.kind === "failed";
-      const limit = terminal
-        ? this.maxEventsPerExecution
-        : this.maxEventsPerExecution - 1;
-      if (entry.events.length >= limit) {
-        entry.overflowed = true;
-        entry.error = runnerError({
-          requestId: request.requestId,
-          code: RUNNER_ERROR_CODES.INTERNAL,
-          message: "Remote Runner Worker event cache 超出限制",
-          retryable: false,
-        });
-        const failed = runnerLifecycleEvent(
-          request.requestId,
-          entry.events.length + 1,
-          "failed",
-          entry.error,
-        );
-        entry.events.push(failed);
-        deliveries = deliveries.then(() =>
-          this.transmit(entry, leaseId, () =>
-            this.postEvent(request.requestId, delivery, leaseId, failed, signal),
-          ),
-        );
-        void deliveries.catch(() => {});
-        void Promise.resolve()
-          .then(() => this.runner.cancel(request.requestId))
-          .catch(() => {});
-        return;
-      }
-      entry.events.push(event);
+    const queueEvent = (event) => {
       deliveries = deliveries.then(() =>
         this.transmit(entry, leaseId, () =>
           this.postEvent(request.requestId, delivery, leaseId, event, signal),
@@ -2274,12 +3007,89 @@ export class RemoteRunnerWorker {
       );
       void deliveries.catch(() => {});
     };
+    const cacheEvent = (event) => {
+      const eventBytes = serializedBytes(event);
+      if (eventBytes > this.maxEventBytes) return false;
+      const terminalValue =
+        event.kind === "completed"
+          ? event.result
+          : event.kind === "failed"
+            ? event.error
+            : undefined;
+      const reservedBytes =
+        terminalValue === undefined
+          ? entry.reservedBytes
+          : serializedBytes(terminalValue);
+      if (
+        !this.adjustExecutionPayload(entry, {
+          payloadDelta: eventBytes,
+          reservedBytes,
+        })
+      ) {
+        return false;
+      }
+      entry.events.push(event);
+      queueEvent(event);
+      return true;
+    };
+    const overflow = () => {
+      if (entry.overflowed) return;
+      entry.overflowed = true;
+      entry.result = null;
+      entry.error = runnerError({
+        requestId: request.requestId,
+        code: RUNNER_ERROR_CODES.INTERNAL,
+        message: "Remote Runner Worker payload cache 超出限制",
+        retryable: false,
+      });
+      const failed = runnerLifecycleEvent(
+        request.requestId,
+        entry.events.length + 1,
+        "failed",
+        entry.error,
+      );
+      const failedBytes = serializedBytes(failed);
+      const errorBytes = serializedBytes(entry.error);
+      if (
+        !this.adjustExecutionPayload(entry, {
+          payloadDelta: failedBytes + errorBytes,
+          reservedBytes: 0,
+        })
+      ) {
+        throw new RemoteProtocolError(
+          503,
+          "Remote Runner Worker terminal reserve 不足",
+          "cache_capacity",
+        );
+      }
+      entry.events.push(failed);
+      queueEvent(failed);
+      void Promise.resolve()
+        .then(() => this.runner.cancel(request.requestId))
+        .catch(() => {});
+    };
+    const commitOutcome = (value) =>
+      this.adjustExecutionPayload(entry, {
+        payloadDelta: serializedBytes(value),
+        reservedBytes: 0,
+      });
+    const onEvent = (event) => {
+      if (entry.overflowed) return;
+      const terminal = event.kind === "completed" || event.kind === "failed";
+      const limit = terminal
+        ? this.maxEventsPerExecution
+        : this.maxEventsPerExecution - 1;
+      if (entry.events.length >= limit || !cacheEvent(event)) overflow();
+    };
     try {
       const result = await this.runner.dispatch(request, { onEvent });
-      if (!entry.overflowed) entry.result = result;
+      if (!entry.overflowed) {
+        if (commitOutcome(result)) entry.result = result;
+        else overflow();
+      }
     } catch (error) {
       if (!entry.overflowed) {
-        entry.error =
+        const observedError =
           error instanceof RunnerDispatchError
             ? error.error
             : runnerError({
@@ -2288,39 +3098,40 @@ export class RemoteRunnerWorker {
                 message: error instanceof Error ? error.message : String(error),
                 retryable: false,
               });
-      }
-      if (entry.events.at(-1)?.kind !== "failed") {
-        const failed = runnerLifecycleEvent(
-          request.requestId,
-          entry.events.length + 1,
-          "failed",
-          entry.error,
-        );
-        entry.events.push(failed);
-        deliveries = deliveries.then(() =>
-          this.transmit(entry, leaseId, () =>
-            this.postEvent(request.requestId, delivery, leaseId, failed, signal),
-          ),
-        );
-        void deliveries.catch(() => {});
+        if (entry.events.at(-1)?.kind !== "failed") {
+          onEvent(
+            runnerLifecycleEvent(
+              request.requestId,
+              entry.events.length + 1,
+              "failed",
+              observedError,
+            ),
+          );
+        }
+        if (!entry.overflowed) {
+          if (commitOutcome(observedError)) entry.error = observedError;
+          else overflow();
+        }
       }
     }
-    entry.settled = true;
     await deliveries;
     await this.transmit(entry, leaseId, () =>
       this.postOutcome(entry, delivery, leaseId, signal),
     );
+    entry.settled = true;
     this.trimExecutions();
   }
 
   async handleDispatch(work, leaseMs, signal) {
     const request = work.request;
-    const digest = fingerprint(request);
+    const serializedRequest = fingerprint(request);
+    const digest = sha256(serializedRequest);
     const found = this.executions.get(request.requestId);
     if (found) {
       if (found.fingerprint !== digest) {
         throw new RemoteProtocolError(409, "Hub 对同一 requestId 投递了不同 request");
       }
+      found.pins++;
       const stopHeartbeat = this.startHeartbeat(work, leaseMs, signal, () =>
         this.markOrphaned(found, work.leaseId),
       );
@@ -2331,8 +3142,33 @@ export class RemoteRunnerWorker {
         );
         return;
       } finally {
-        await stopHeartbeat();
+        try {
+          await stopHeartbeat();
+        } finally {
+          found.orphanedDeliveries.delete(work.leaseId);
+          found.pins--;
+          this.trimExecutions();
+        }
       }
+    }
+    const requestBytes = Buffer.byteLength(serializedRequest, "utf8");
+    const reservedBytes = this.workerTerminalReserveBytes(request.requestId);
+    if (
+      requestBytes > this.maxRequestBytes ||
+      requestBytes + reservedBytes > this.maxExecutionPayloadBytes
+    ) {
+      throw new RemoteProtocolError(
+        413,
+        "Hub dispatch request bytes 超出 Worker 限制",
+        "payload_too_large",
+      );
+    }
+    if (!this.makeExecutionPayloadCapacity(requestBytes + reservedBytes)) {
+      throw new RemoteProtocolError(
+        503,
+        "Remote Runner Worker cached payload 容量不足",
+        "cache_capacity",
+      );
     }
     const entry = {
       request,
@@ -2344,8 +3180,12 @@ export class RemoteRunnerWorker {
       overflowed: false,
       orphanedDeliveries: new Set(),
       execution: null,
+      payloadBytes: requestBytes,
+      reservedBytes,
+      pins: 1,
     };
     this.executions.set(request.requestId, entry);
+    this.cachedPayloadBytes += requestBytes + reservedBytes;
     const stopHeartbeat = this.startHeartbeat(work, leaseMs, signal, () =>
       this.markOrphaned(entry, work.leaseId),
     );
@@ -2353,13 +3193,26 @@ export class RemoteRunnerWorker {
       entry.execution = this.execute(request, entry, work.delivery, work.leaseId, signal);
       await entry.execution;
     } finally {
-      await stopHeartbeat();
+      try {
+        await stopHeartbeat();
+      } finally {
+        entry.orphanedDeliveries.delete(work.leaseId);
+        entry.pins--;
+        this.trimExecutions();
+      }
     }
   }
 
   trimCompletedControlExecutions() {
-    while (this.completedControls.size > this.maxCompleted) {
-      this.completedControls.delete(this.completedControls.keys().next().value);
+    let completed = [...this.completedControls.values()].filter(
+      (entry) => entry.settled,
+    ).length;
+    if (completed <= this.maxCompleted) return;
+    for (const [controlId, entry] of this.completedControls) {
+      if (!entry.settled || entry.pins > 0) continue;
+      this.removeControlExecution(controlId, entry);
+      completed--;
+      if (completed <= this.maxCompleted) break;
     }
   }
 
@@ -2383,10 +3236,12 @@ export class RemoteRunnerWorker {
   }
 
   async handleControl(work, leaseMs, signal) {
-    const digest = fingerprint(
-      work.kind === "cancel"
-        ? { kind: work.kind, requestId: work.requestId }
-        : { kind: work.kind, scope: work.scope },
+    const digest = sha256(
+      fingerprint(
+        work.kind === "cancel"
+          ? { kind: work.kind, requestId: work.requestId }
+          : { kind: work.kind, scope: work.scope },
+      ),
     );
     let entry = this.completedControls.get(work.controlId);
     if (entry && entry.fingerprint !== digest) {
@@ -2401,6 +3256,9 @@ export class RemoteRunnerWorker {
         error: null,
         orphanedDeliveries: new Set(),
         execution: null,
+        payloadBytes: 0,
+        settled: false,
+        pins: 0,
       };
       this.completedControls.set(work.controlId, entry);
       entry.execution = (async () => {
@@ -2419,8 +3277,15 @@ export class RemoteRunnerWorker {
             retryable: false,
           });
         }
+        try {
+          this.cacheControlOutcome(entry);
+        } catch (error) {
+          this.removeControlExecution(work.controlId, entry);
+          throw error;
+        }
       })();
     }
+    entry.pins++;
     const stopHeartbeat = this.startHeartbeat(work, leaseMs, signal, () =>
       this.markOrphaned(entry, work.leaseId),
     );
@@ -2429,9 +3294,16 @@ export class RemoteRunnerWorker {
       await this.transmit(entry, work.leaseId, () =>
         this.postControl(entry, work.delivery, work.leaseId, signal),
       );
+      entry.settled = true;
       this.trimCompletedControlExecutions();
     } finally {
-      await stopHeartbeat();
+      try {
+        await stopHeartbeat();
+      } finally {
+        entry.orphanedDeliveries.delete(work.leaseId);
+        entry.pins--;
+        this.trimCompletedControlExecutions();
+      }
     }
   }
 
@@ -2439,7 +3311,10 @@ export class RemoteRunnerWorker {
     if (kind === "dispatch") this.activeDispatches++;
     else this.activeControls++;
     const tracked = Promise.resolve()
-      .then(factory)
+      .then(() => {
+        if (signal.aborted) return undefined;
+        return factory();
+      })
       .catch((error) => {
         if (signal.aborted) return;
         this.fatalError ??= error;
@@ -2469,11 +3344,14 @@ export class RemoteRunnerWorker {
 
   async loop(signal) {
     this.emitState("connecting");
+    let reconnectAttempt = 0;
+    let loopFailure = null;
     try {
       while (!signal.aborted) {
         try {
           const work = await this.poll(signal);
           if (signal.aborted) break;
+          reconnectAttempt = 0;
           this.emitState("connected");
           let acknowledgement;
           if (work) {
@@ -2515,19 +3393,32 @@ export class RemoteRunnerWorker {
             "reconnecting",
             error instanceof Error ? error.message : String(error),
           );
-          await abortableDelay(this.reconnectDelayMs, signal);
+          await this.waitBeforeReconnect(reconnectAttempt++, signal);
         }
       }
-    } finally {
-      // Closing the execution runner must precede waiting on operations: a
-      // blocked adapter can only settle after close/cancel tears it down.
+    } catch (error) {
+      loopFailure = error;
+    }
+
+    // Closing the execution runner must precede waiting on operations: a
+    // blocked adapter can only settle after close/cancel tears it down.
+    let stopFailure = null;
+    try {
       await settleWithin(this.closeRunner(), this.stopTimeoutMs);
+    } catch (error) {
+      stopFailure = error;
+    }
+    try {
       await settleWithin(
         Promise.allSettled([...this.activeOperations]),
         this.stopTimeoutMs,
       );
-      this.emitState("stopped");
+    } catch (error) {
+      stopFailure ??= error;
     }
+    this.emitState("stopped");
+    if (loopFailure) throw loopFailure;
+    if (stopFailure) throw stopFailure;
     if (this.fatalError) throw this.fatalError;
   }
 
@@ -2537,9 +3428,13 @@ export class RemoteRunnerWorker {
       this.stopController?.abort();
       for (const controller of this.requestControllers) controller.abort();
       const closePromise = this.closeRunner();
-      const completion = Promise.allSettled([
+      // A loop failure is reported by wait(); stop() owns teardown failures
+      // only, so an already-observed authentication/protocol error must not be
+      // relabelled as runner-close failure.
+      const loopCleanup = this.loopPromise?.catch(() => {});
+      const completion = Promise.all([
         closePromise,
-        ...(this.loopPromise ? [this.loopPromise] : []),
+        ...(loopCleanup ? [loopCleanup] : []),
       ]);
       await settleWithin(completion, this.stopTimeoutMs);
     })();

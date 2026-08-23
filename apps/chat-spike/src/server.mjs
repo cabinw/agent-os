@@ -39,6 +39,13 @@ import { HUMAN_ID } from "./mcp-tools.mjs";
 import { LocalRunner } from "./runners/local.mjs";
 import { RemotePlacementStore, RemoteRunner } from "./runners/remote.mjs";
 import { SessionStore } from "./runners/session-store.mjs";
+import { RequestBodyError, readHubJsonBody } from "./server-body.mjs";
+import {
+  createServerLifecycle,
+  installShutdownSignalHandlers,
+  shouldPrintGeneratedHumanToken,
+} from "./server-lifecycle.mjs";
+import { createSseClientRegistry } from "./server-sse.mjs";
 import { project } from "./thread.mjs";
 import { ValidationError } from "./validate.mjs";
 
@@ -55,7 +62,6 @@ const REMOTE_STATE_PATH =
 const RUNNER_MODE = process.env.AGENT_OS_RUNNER_MODE ?? "local";
 const PROJECT = "proj_hub";
 const HUB_URL = `http://localhost:${PORT}`;
-
 if (!new Set(["local", "remote"]).has(RUNNER_MODE)) {
   throw new Error(
     `AGENT_OS_RUNNER_MODE must be "local" or "remote", received ${JSON.stringify(RUNNER_MODE)}`,
@@ -131,11 +137,11 @@ let origins = allowedOrigins({
 });
 
 const log = new EventLog(LOG_PATH);
-const clients = new Set();
+const sseClients = createSseClientRegistry();
 
 function broadcast(type, data) {
   const frame = `data: ${JSON.stringify({ type, ...data })}\n\n`;
-  for (const res of clients) res.write(frame);
+  sseClients.broadcast(frame);
 }
 
 // The composition root selects one shared Runner contract. Remote mode owns no
@@ -182,12 +188,33 @@ for (const a of ROSTER) {
 
 const server = createServer((req, res) => {
   handleRequest(req, res).catch((error) => {
-    if (res.headersSent) return res.destroy(error);
+    if (res.headersSent) return res.destroy();
+    if (req.aborted || res.destroyed) return undefined;
     applySecurityHeaders(res);
-    res.writeHead(500, { "content-type": "application/json" });
-    return res.end(JSON.stringify({ error: "internal server error" }));
+    const knownInputError = error instanceof RequestBodyError;
+    if (knownInputError && error.closeConnection) {
+      res.setHeader("connection", "close");
+      res.once("finish", () => req.destroy());
+    }
+    res.writeHead(knownInputError ? error.status : 500, {
+      "content-type": "application/json",
+    });
+    return res.end(
+      JSON.stringify({
+        error: knownInputError ? error.message : "internal server error",
+      }),
+    );
   });
 });
+
+function isLoopbackRequest(req) {
+  const address = req.socket.remoteAddress ?? "";
+  return (
+    address === "::1" ||
+    /^127(?:\.\d{1,3}){3}$/.test(address) ||
+    /^::ffff:127(?:\.\d{1,3}){3}$/i.test(address)
+  );
+}
 
 async function handleRequest(req, res) {
   // The Host header is attacker-controlled. Only the path is needed here, so a
@@ -197,6 +224,20 @@ async function handleRequest(req, res) {
     res.writeHead(code, { "content-type": "application/json" });
     res.end(JSON.stringify(body));
   };
+  const closeAfterResponse = () => {
+    res.setHeader("connection", "close");
+    res.once("finish", () => req.destroy());
+    req.resume();
+  };
+  const rejectAndClose = (code, body) => {
+    closeAfterResponse();
+    return json(code, body);
+  };
+
+  if (lifecycle.stopping) {
+    applySecurityHeaders(res);
+    return rejectAndClose(503, { error: "service unavailable" });
+  }
 
   // Runner transport has an independent host principal. It is deliberately
   // mounted before human/agent auth, and only for this versioned namespace.
@@ -209,11 +250,34 @@ async function handleRequest(req, res) {
     return undefined;
   }
 
+  // These deliberately tiny probes are reachable only over the Hub's loopback
+  // socket. They expose no principal, host identity, counts or configuration
+  // and never touch the event log.
+  if (
+    req.method === "GET" &&
+    isLoopbackRequest(req) &&
+    (url.pathname === "/health/live" || url.pathname === "/health/ready")
+  ) {
+    applySecurityHeaders(res);
+    res.setHeader("cache-control", "no-store");
+    closeAfterResponse();
+    if (url.pathname === "/health/live") return json(200, { status: "ok" });
+
+    let ready = false;
+    try {
+      ready = (await runner.health())?.ready === true;
+    } catch {
+      // Readiness is fail-closed and its response never reflects internal errors.
+    }
+    return json(ready ? 200 : 503, { status: ready ? "ready" : "not_ready" });
+  }
+
   // Public, inert bootstrap only. It contains no project state, roster, token
   // or capability data. The fragment credential is handled entirely in the
   // browser and is never part of this request.
   if (req.method === "GET" && url.pathname === "/") {
     applySecurityHeaders(res);
+    closeAfterResponse();
     const [source, reducerSource, htmlSource] = await Promise.all([
       readFile(join(PUBLIC, "index.html"), "utf8"),
       readFile(join(HERE, "thread.mjs"), "utf8"),
@@ -239,22 +303,23 @@ async function handleRequest(req, res) {
   if (!principal) {
     applySecurityHeaders(res);
     res.setHeader("www-authenticate", 'Bearer realm="agent-os"');
-    return json(401, { error: "bearer token required" });
+    return rejectAndClose(401, { error: "bearer token required" });
   }
 
   const cors = requestOrigin(req, origins);
   applySecurityHeaders(res, cors.origin);
-  if (!cors.ok) return json(403, { error: "cross-origin request denied" });
+  if (!cors.ok) return rejectAndClose(403, { error: "cross-origin request denied" });
 
   if (req.method === "OPTIONS") {
     res.setHeader("access-control-allow-headers", "authorization, content-type");
     res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    closeAfterResponse();
     return res.writeHead(204).end();
   }
 
   const requireKind = (kind) => {
     if (principal.kind === kind) return true;
-    json(403, { error: `${kind} credential required` });
+    rejectAndClose(403, { error: `${kind} credential required` });
     return false;
   };
 
@@ -262,9 +327,8 @@ async function handleRequest(req, res) {
     if (RUNNER_MODE === "local" || (await runner.health()).ready) return true;
     // Reject before reading or emitting anything: an offline Worker cannot
     // leave a message/task recorded as if execution had started.
-    req.resume();
     res.setHeader("retry-after", "1");
-    json(503, { error: "remote runner unavailable" });
+    rejectAndClose(503, { error: "remote runner unavailable" });
     return false;
   };
 
@@ -272,6 +336,7 @@ async function handleRequest(req, res) {
   // one module, two consumers.
   if (req.method === "GET" && url.pathname === "/src/thread.mjs") {
     if (!requireKind("human")) return undefined;
+    closeAfterResponse();
     const js = await readFile(join(HERE, "thread.mjs"), "utf8");
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
     return res.end(js);
@@ -279,6 +344,7 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && url.pathname === "/src/html.mjs") {
     if (!requireKind("human")) return undefined;
+    closeAfterResponse();
     const js = await readFile(join(HERE, "html.mjs"), "utf8");
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
     return res.end(js);
@@ -286,37 +352,32 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && url.pathname === "/events") {
     if (!requireKind("human")) return undefined;
-    res.writeHead(200, {
-      "content-type": "text/event-stream",
-      "cache-control": "no-cache",
-      connection: "keep-alive",
-    });
-    // The whole thread, rebuilt from seq 0 on every connect. No cache to go stale.
-    res.write(
-      `data: ${JSON.stringify({
-        type: "hello",
-        thread: project(log.replay()),
-        agents: hub.roster(),
-        tasks: hub.tasks(),
-        providers: describeAdapters(),
-        budget: hub.budget,
-        human: HUMAN_ID,
-        logged: log.size,
-      })}\n\n`,
+    const admission = sseClients.admit(
+      res,
+      () =>
+        `data: ${JSON.stringify({
+          type: "hello",
+          thread: project(log.replay()),
+          agents: hub.roster(),
+          tasks: hub.tasks(),
+          providers: describeAdapters(),
+          budget: hub.budget,
+          human: HUMAN_ID,
+          logged: log.size,
+        })}\n\n`,
     );
-    clients.add(res);
-    const ping = setInterval(() => res.write(": ping\n\n"), 15_000);
-    req.on("close", () => {
-      clearInterval(ping);
-      clients.delete(res);
-    });
+    if (!admission.accepted) {
+      res.setHeader("cache-control", "no-store");
+      res.setHeader("retry-after", "1");
+      return rejectAndClose(503, { error: "event stream unavailable" });
+    }
     return undefined;
   }
 
   if (req.method === "POST" && url.pathname === "/say") {
     if (!requireKind("human")) return undefined;
     if (!(await requireRunnerReady())) return undefined;
-    const body = await readBody(req);
+    const body = await readHubJsonBody(req);
     const text = String(body?.text ?? "").trim();
     const to = String(body?.to ?? "");
     if (!text) return json(400, { error: "empty" });
@@ -329,12 +390,13 @@ async function handleRequest(req, res) {
   // exactly these two routes, and holds no state of its own.
   if (req.method === "GET" && url.pathname === "/mcp/tools") {
     if (!requireKind("agent")) return undefined;
+    closeAfterResponse();
     return json(200, { tools: hub.tools.list() });
   }
 
   if (req.method === "POST" && url.pathname === "/mcp/call") {
     if (!requireKind("agent")) return undefined;
-    const body = await readBody(req);
+    const body = await readHubJsonBody(req);
     try {
       if (body?.name === "register_agent" && body?.arguments?.id !== principal.id) {
         throw new ValidationError(
@@ -359,7 +421,7 @@ async function handleRequest(req, res) {
    */
   if (req.method === "POST" && url.pathname === "/accept") {
     if (!requireKind("human")) return undefined;
-    const body = await readBody(req);
+    const body = await readHubJsonBody(req);
     try {
       hub.accept(String(body?.task ?? ""), body?.ok !== false);
       return json(200, { ok: true });
@@ -371,7 +433,7 @@ async function handleRequest(req, res) {
   if (req.method === "POST" && url.pathname === "/task") {
     if (!requireKind("human")) return undefined;
     if (!(await requireRunnerReady())) return undefined;
-    const body = await readBody(req);
+    const body = await readHubJsonBody(req);
     try {
       const made = await hub.tools.call("create_task", {
         title: String(body?.title ?? ""),
@@ -387,7 +449,7 @@ async function handleRequest(req, res) {
 
   if (req.method === "POST" && url.pathname === "/reset") {
     if (!requireKind("human")) return undefined;
-    const body = await readBody(req);
+    const body = await readHubJsonBody(req);
     const agentId = String(body?.agent ?? "");
     const entry = hub.agents.get(agentId);
     if (!entry) return json(400, { error: "未知 agent" });
@@ -399,24 +461,14 @@ async function handleRequest(req, res) {
     return json(200, { ok: true });
   }
 
-  return json(404, { error: "not found" });
+  return rejectAndClose(404, { error: "not found" });
 }
 
-function readBody(req) {
-  return new Promise((resolveBody) => {
-    let raw = "";
-    req.on("data", (c) => {
-      raw += c;
-    });
-    req.on("end", () => {
-      try {
-        resolveBody(JSON.parse(raw || "{}"));
-      } catch {
-        resolveBody({});
-      }
-    });
-  });
-}
+const lifecycle = createServerLifecycle({
+  server,
+  closeRunner: () => hub.close(),
+  closeClients: () => sseClients.closeAll(),
+});
 
 server.listen(PORT, HOST, () => {
   const address = server.address();
@@ -427,7 +479,14 @@ server.listen(PORT, HOST, () => {
   const callbackHost = ["0.0.0.0", "::"].includes(HOST) ? "127.0.0.1" : HOST;
   hub.url = `http://${callbackHost}:${listeningPort}`;
   console.log(`agent hub  →  http://${HOST}:${listeningPort}`);
-  if (RUNNER_MODE === "local" && !process.env.AGENT_OS_HUMAN_TOKEN) {
+  if (
+    shouldPrintGeneratedHumanToken({
+      runnerMode: RUNNER_MODE,
+      configuredHumanToken: process.env.AGENT_OS_HUMAN_TOKEN,
+      nodeEnv: process.env.NODE_ENV,
+      isTty: process.stdout.isTTY === true,
+    })
+  ) {
     console.log(`human token →  ${credentials.humanToken}`);
   }
   console.log(`日志       →  ${LOG_PATH}（已有 ${log.size} 条，seq ${log.seq}）`);
@@ -440,28 +499,4 @@ server.listen(PORT, HOST, () => {
   console.log(`回环预算   →  ${hub.budget} 跳`);
 });
 
-let shutdownPromise = null;
-function shutdown() {
-  if (shutdownPromise) return shutdownPromise;
-  shutdownPromise = (async () => {
-    await hub.close();
-    for (const response of clients) response.end();
-    clients.clear();
-    await new Promise((resolveClose, rejectClose) => {
-      server.close((error) => (error ? rejectClose(error) : resolveClose()));
-      server.closeIdleConnections?.();
-    });
-  })();
-  return shutdownPromise;
-}
-
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.once(signal, () => {
-    void shutdown().catch((error) => {
-      console.error(
-        `agent hub shutdown failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      process.exitCode = 1;
-    });
-  });
-}
+installShutdownSignalHandlers({ shutdown: lifecycle.shutdown });
