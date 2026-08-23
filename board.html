@@ -230,10 +230,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 6,
-  "updatedAt": "2026-08-23 19:45 CST",
+  "revision": 7,
+  "updatedAt": "2026-08-23 19:46 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "REPO-01",
+  "currentTaskId": "GATE-01",
   "verification": {"testsPassed":65,"testsTotal":65,"filesPassed":5,"filesTotal":5,"gatePassed":3,"gateTotal":4,"lintErrors":19,"checkedAt":"2026-08-23 17:41 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":0,"eventSchemaTotal":29,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1"],
@@ -300,8 +300,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"RM-5.3","scope":"roadmap","phase":"Phase 5","title":"自主任务路由","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-5.2"],"acceptance":"Runtime 可基于事件与能力调整分配。","source":"todo.html#p5","summary":"减少 Supervisor 对每次分配的介入。"},
     {"id":"RM-5.4","scope":"roadmap","phase":"Phase 5","title":"Agent 性能分析","status":"created","progress":0,"priority":"P2","owner":"—","dependsOn":["RM-5.3"],"acceptance":"按能力维度的历史结果可反哺路由。","source":"todo.html#p5","summary":"只有基础数据可信后才有意义。"},
 
-    {"id":"REPO-01","scope":"route","phase":"Repository","title":"恢复原 GitHub 仓库与提交基线","status":"running","progress":90,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"origin 指向原 GitHub 仓库；修改按任务进入 codex 分支和单一职责 commit；分支已推送且可独立审查、回退。","source":"git remote -v","summary":"新 SSH 仓库方案已取消；原 GitHub origin、本地 codex 分支和首个原子提交均已就绪，正在推送。"},
-    {"id":"GATE-01","scope":"route","phase":"Gate","title":"恢复完整 pnpm verify","status":"assigned","progress":10,"priority":"P0","owner":"Codex team","dependsOn":["REPO-01"],"blockedBy":["PROB-VERIFY"],"acceptance":"corepack pnpm verify 一次完整通过；记录真实测试数。","source":"next.html#options","summary":"功能开发已按要求暂停；仓库基线完成后恢复。"},
+    {"id":"REPO-01","scope":"route","phase":"Repository","title":"恢复原 GitHub 仓库与提交基线","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"origin 指向原 GitHub 仓库；修改按任务进入 codex 分支和单一职责 commit；分支已推送且可独立审查、回退。","source":"git remote -v","summary":"原 GitHub origin 已恢复；codex/project-control 的原子提交已推送并建立 tracking，main 未被改写。"},
+    {"id":"GATE-01","scope":"route","phase":"Gate","title":"恢复完整 pnpm verify","status":"running","progress":10,"priority":"P0","owner":"Codex team","dependsOn":["REPO-01"],"blockedBy":["PROB-VERIFY"],"acceptance":"corepack pnpm verify 一次完整通过；记录真实测试数。","source":"next.html#options","summary":"仓库基线已完成，质量门禁任务恢复执行。"},
     {"id":"HUB-SEC-01","scope":"route","phase":"Security","title":"封住 Hub 访问和身份边界","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["GATE-01"],"blockedBy":["PROB-AUTH","PROB-IDENTITY"],"acceptance":"显式 bind；每条 HTTP/SSE 路由需要 bearer token；caller 与 human accept 均由服务器身份决定。","source":"next.html#options","summary":"先消除正在使用的 Hub 的高风险暴露。"},
     {"id":"EVIDENCE-01","scope":"route","phase":"Evidence","title":"让实验与真实 Hub 走同一路径","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["GATE-01"],"blockedBy":["PROB-CONTEXT","PROB-REGRESSION"],"acceptance":"1200 条上下文经真实路径仍完整召回；伪造因果、重启和重指派均有回归测试。","source":"next.html#options","summary":"修正当前证据偏差和运行时回归缺口。"},
     {"id":"C-LOCAL-01","scope":"route","phase":"Local","title":"本地 Agent 调用完整闭环","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["HUB-SEC-01","EVIDENCE-01"],"blockedBy":[],"acceptance":"Hub → Local Runner → Adapter → 真实 CLI → Events / Review 跑通；失败和重启有测试。","source":"next.html#options","summary":"先把本机作为第一个 Runner，确定完整调用语义。"},
@@ -330,6 +330,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层零依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-23 19:46","kind":"completed","entity":"REPO-01","title":"原 GitHub 仓库提交基线完成","detail":"原 GitHub 已恢复为 origin；codex/project-control 分支和 b870a26 原子提交已推送并建立 tracking，main 保持不变。"},
     {"at":"2026-08-23 19:45","kind":"decision","entity":"REPO-01","title":"继续使用原 GitHub 仓库","detail":"按用户决定移除新 SSH origin，并将 https://github.com/cabinw/agent-os.git 恢复为 origin；后续按任务提交到 codex 分支。"},
     {"at":"2026-08-23 19:44","kind":"verified","entity":"REPO-01","title":"建立本地原子提交基线","detail":"已创建 codex/project-control 分支；next.html 与 board.html 作为单一职责提交落库，未混入功能代码。"},
     {"at":"2026-08-23 19:43","kind":"problem","entity":"REPO-01","title":"插入仓库建立任务并暂停功能开发","detail":"旧 GitHub origin 已保留为 upstream，新 SSH 仓库已设为 origin 且连通；远端为空，完整历史推送等待明确授权。"},
