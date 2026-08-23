@@ -728,10 +728,6 @@ export class Hub {
   }
 
   async close() {
-    try {
-      await this.runner.close();
-    } catch {
-      // Closing is best-effort during process shutdown.
-    }
+    await this.runner.close();
   }
 }

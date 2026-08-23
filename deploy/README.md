@@ -15,8 +15,8 @@ Worker. Protocol and ownership semantics remain canonical in
 - The Hub listens on loopback. Only an HTTPS reverse proxy is public.
 - Cross-host Worker traffic uses a trusted HTTPS origin. Public HTTP, disabled
   certificate verification and IP/SAN mismatch exceptions are forbidden.
-- Human, Runner and per-Agent bearer values are distinct, at least 32
-  non-whitespace characters and loaded only from restricted configuration.
+- Human, Runner and per-Agent bearer values are distinct, 32–4096 characters
+  from `[A-Za-z0-9_-]` and loaded only from restricted configuration.
 - The Hub and each Worker are single writers for their own state roots.
 - Logs, command output, evidence and backups contain no bearer, credential map,
   vendor authentication material or raw vendor stderr.
@@ -38,12 +38,12 @@ reverse proxy ----> 127.0.0.1:4173 ----> Server Hub
 
 ## Read-only field baseline
 
-Inventory date: 2026-08-23. Host identifiers, addresses, certificate names and
+Inventory date: 2026-08-24. Host identifiers, addresses, certificate names and
 credentials are deliberately omitted.
 
 | Role | Baseline | Deployment consequence |
 | --- | --- | --- |
-| Ubuntu Hub host | Ubuntu 22.04.5 LTS, x86_64, systemd 249, ext4, about 41 GiB free | systemd is available; Node, Corepack and pnpm are absent and must be installed from a pinned source |
+| Ubuntu Hub host | Ubuntu 22.04.5 LTS, x86_64, systemd 249, ext4, about 41 GiB free; Node 24.19.0, Corepack 0.35.0 and pnpm 11.17.0 | Node was installed in a root-owned versioned directory and exposed at `/usr/bin/node` only after the upstream clearsigned checksum manifest and pinned release key were verified; `node-v24.19.0-linux-x64.tar.xz` SHA-256 is `14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647`; no Hub service or proxy was started |
 | HTTPS edge | Nginx 1.18 is active on existing ports 80/443; Certbot renewal is active | use an independent virtual host; never replace existing sites |
 | TLS / DNS | A valid certificate estate exists, but no dedicated Agent OS name is approved; strict HTTPS to the host address fails SAN validation | a dedicated FQDN and matching trusted certificate are a field dependency |
 | Windows Worker host | Windows 11 Home build 26200, x64, NTFS, about 311 GiB total / 200 GiB free | use native Task Scheduler and explicit NTFS ACLs; do not rely on POSIX modes |
@@ -61,14 +61,17 @@ must not add a public listener or a new public port.
 | --- | --- | --- |
 | Public Hub | reverse proxy `:443` | TLS only; dedicated FQDN and valid chain |
 | Hub process | `127.0.0.1:4173` | never bind `0.0.0.0`; never expose in a security group |
+| isolated Hub candidate | `127.0.0.1:14173` | clean candidate state only; never referenced by the proxy |
 | Worker transport | outbound public Hub `:443` | no inbound Worker port |
 | SSH administration | existing host policy | operational access only; unrelated to Runner transport |
 
-The proxy must preserve `Authorization`, reject invalid Host/Origin combinations
-and never log bearer headers. Disable response buffering for `/events` and
-long-poll Runner responses. Proxy read timeouts must exceed the Runner poll
-window. Health routes, once implemented, remain loopback-only and are not
-published by the virtual host.
+The proxy preserves `Authorization`, rejects invalid Host/Origin combinations
+and rejects every query string. Access logging is disabled for this virtual
+host; the error log is `crit` only. Response buffering is disabled for
+`/events` and Runner long polls. Proxy read timeouts exceed the poll window.
+Both health routes are loopback-only: their exact public locations return
+`404`. The scoped connection/request zones in
+`agent-os-hub-limits.conf.example` affect no other virtual host.
 
 ## Identities and directories
 
@@ -76,18 +79,34 @@ published by the virtual host.
 
 | Purpose | Contract |
 | --- | --- |
-| service account | `agent-os`, system account, no login shell, non-root |
+| service account | `agent-os`, system account, no login shell, numeric UID/GID both non-zero |
+| candidate account | `agent-os-candidate`, distinct locked system account and distinct numeric UID/GID; isolates `/proc/*/environ` from the live Hub UID |
+| privileged admin kit | `/usr/libexec/agent-os/hub`; immutable, root-owned, delivered separately from app releases |
 | releases | `/opt/agent-os/releases/<revision>`; immutable and root-owned |
 | active release | `/opt/agent-os/current`; switched atomically while stopped |
+| prior release | `/opt/agent-os/previous`; changed only after a signed-off activation |
+| failed releases | `/opt/agent-os/quarantine`; never the default rollback target |
 | secret configuration | `/etc/agent-os/hub.env`; root-owned, `0600` |
 | state root | `/var/lib/agent-os/hub`; `agent-os`-owned, `0700` |
+| candidate state | `/var/lib/agent-os/hub-candidates/<revision>`; isolated from live state |
 | event log | `/var/lib/agent-os/hub/events.jsonl` |
 | placement | `/var/lib/agent-os/hub/remote-placement.json` |
 | request replay | `/var/lib/agent-os/hub/remote-placement.json.requests/` |
 | logs | systemd journal; persistent journal policy belongs to the host |
+| deployment lock | `/run/agent-os/hub-deploy.lock`; root-owned global `flock` |
+| maintenance | `/run/agent-os/hub-maintenance`; blocks human, Agent and Runner ingress during promotion |
+| hard maintenance | `/run/agent-os/hub-maintenance-hard`; blocks every proxied namespace after incomplete recovery |
 
-The unit must set `UMask=0077` and grant write access only to the state root.
-The release and configuration trees are read-only to the service.
+The units set `UMask=0077`, empty capability sets, bounded memory/tasks/files,
+`LimitCORE=0` and a CPU quota. The release and configuration trees are
+read-only. The candidate runs under the distinct `agent-os-candidate` UID with
+`ProtectProc=invisible`, cannot read live state or `/etc/agent-os/hub.env`,
+receives a root-only generated env with one-time candidate bearer values rather
+than production Runner/Human/Agent credentials, and can write only its clean
+candidate root. Both deployment accounts must be locked, non-login and have no
+supplementary groups under the same identity gate. Each numeric UID must map to
+exactly one passwd entry; UID/GID zero, a duplicate passwd UID or a shared live
+and candidate UID/GID fails closed before layout publication.
 
 ### Windows Worker
 
@@ -120,19 +139,23 @@ out of deployed secret directories.
 | Variable | Value / rule |
 | --- | --- |
 | `HOST` | exactly `127.0.0.1` |
-| `PORT` | `4173` unless an explicit loopback-only conflict exists |
+| `PORT` | exactly `4173` for the audited unit and proxy sample |
 | `LOG_PATH` | event-log path under the Hub state root |
 | `AGENT_OS_REMOTE_STATE_PATH` | placement path under the Hub state root |
 | `AGENT_OS_RUNNER_MODE` | `remote` |
 | `AGENT_OS_RUNNER_ID` | stable host identity, equal on Hub and Worker |
-| `AGENT_OS_RUNNER_TOKEN` | dedicated Runner secret |
-| `AGENT_OS_HUMAN_TOKEN` | dedicated human secret |
-| `AGENT_OS_AGENT_TOKENS` | explicit JSON map of unique per-Agent secrets |
+| `AGENT_OS_RUNNER_TOKEN` | dedicated Runner secret; 32–4096 base64url characters |
+| `AGENT_OS_HUMAN_TOKEN` | dedicated human secret; 32–4096 base64url characters |
+| `AGENT_OS_AGENT_TOKENS` | single-quoted canonical compact JSON map of unique base64url per-Agent secrets |
 | `AGENT_OS_ALLOWED_ORIGINS` | exact public `https://<fqdn>` origin |
 | `HOP_BUDGET` | finite positive integer; default `6` |
 
 Remote mode fails closed when its ID or credentials are absent. It must also
 fail before listening when paths, port, origin or token separation are invalid.
+The token map is one outer single-quoted value in the systemd environment file:
+systemd removes those outer quotes and preserves the JSON double quotes. Naked
+JSON is rejected because `EnvironmentFile` parsing would interpret its inner
+quotes before injecting the value.
 
 ### Worker
 
@@ -181,23 +204,184 @@ failed.
 
 ## Health and lifecycle
 
-Current code has no HTTP liveness/readiness endpoint. `GET /` proves only that
-the inert bootstrap shell is reachable; it does not prove Worker readiness.
-SVR-02 must add non-mutating, minimal loopback probes:
+The Hub exposes two non-mutating probes only to a direct loopback client. The
+Nginx sample exact-matches both paths and returns `404` instead of proxying them:
 
 | Probe | Success | Failure |
 | --- | --- | --- |
-| liveness | Hub event loop and HTTP server respond | non-zero check; service restart may follow |
-| readiness | configuration valid and authenticated Worker recently healthy | `503`; no task/message/event mutation |
+| `GET /health/live` | exact `200 {"status":"ok"}` | non-exact status/body or wrong process fails |
+| `GET /health/ready` | exact `200 {"status":"ready"}` after an authenticated Worker is healthy | exact `503 {"status":"not_ready"}` while no Worker is available |
 
-Installation must validate configuration before activation. Stop must reject
-new traffic first, then drain/cancel Runner work, close HTTP connections and
-exit within a fixed deadline. A timed-out stop fails visibly; it does not report
-success after swallowing `runner.close` errors.
+`live` means the configured systemd unit is active, has a non-zero `MainPID`,
+owns the exact loopback listener and returns the exact JSON body. It does not
+mean the Hub can dispatch. Initial install and clean candidate preflight gate on
+`live`; otherwise the absence of the first Worker creates a bootstrapping
+deadlock. `ready` is a separate post-start operations gate.
 
-Upgrade uses an immutable verified release, a pre-upgrade state snapshot and a
-health-gated activation. Failure switches back to the previous release while
-leaving state untouched. State recovery is a separate, explicit operation.
+Installation validates the env and safely extracts the complete immutable
+release before publishing the env, production/candidate units, two disabled
+Nginx examples, env example or pointers. Every publication, daemon-reload,
+start, live-gate and enable boundary removes its partial commit on failure;
+retrying the same revision is safe only when its stored artifact hash matches.
+A failure before start/enable does not invoke stop/disable and cannot create a
+spurious hard-maintenance state merely because an absent unit rejects those
+operations. Stop rejects new public traffic first, then drains/cancels Runner
+work, closes HTTP connections and exits within a fixed deadline. A timed-out
+stop fails visibly.
+
+Upgrade first boots a clean-state candidate on `14173` with one-time bearer
+values. This proves only that the app can start; it does not validate live
+JSONL replay or a migration. The promotion state machine then enables
+maintenance for every proxied namespace, stops and proves the writer inactive,
+double-hashes state, runs the snapshot hook, verifies the source hash again,
+switches code and gates on exact liveness. Only a fully signed-off activation
+updates `previous`, removes maintenance and lets the outbound Worker reconnect.
+
+On any commit-phase failure, the live unit is stopped before compensation. If
+the stopped state hash is unchanged, a release newly added to the active pool
+by that operation is quarantined, both pointers are restored exactly, and old
+code must pass start, liveness and enable gates before maintenance is removed.
+An already signed-off release (including the recorded `previous`) is retained
+in place after a failed re-activation rather than misclassified as a new bad
+candidate. If state changed, hashing failed or commit recovery cannot be signed
+off, the live service is stopped and disabled and hard maintenance remains.
+
+A candidate-stop failure occurs before promotion or live-state access. In that
+case the previously signed-off live Hub stays running and enabled, while normal
+plus hard maintenance block new public ingress; the candidate unit, one-time
+env, state and release are retained for explicit process cleanup. No new deploy
+operation may clear either fail-closed state. An audited recovery command is an
+SVR-03 blocker; manual sentinel deletion without proving the candidate inactive
+or restoring changed state is forbidden.
+
+### Hub staging commands
+
+There are two trust domains:
+
+1. The administrator kit is delivered independently into a root-owned,
+   non-group/world-writable directory. `bootstrap-admin.sh` installs it once at
+   `/usr/libexec/agent-os/hub`. An app artifact can neither supply nor update
+   these privileged helpers, units or proxy templates.
+2. The application artifact contains only an allowlisted root manifest and
+   `apps/chat-spike`. The audited extractor rejects traversal, links, special
+   files, extended headers, duplicate files and expansion limits. No `deploy/`
+   member is valid.
+
+Run the packager without root from the repository source root shown below. The
+script canonicalizes `--source` even when a caller starts it from another
+working directory; it never uses the caller's cwd as package-manager context.
+The production toolchain is fixed to `/usr/bin/node` 24.19.0 and
+`/usr/bin/corepack` 0.35.0, the same Node entry used by both audited systemd
+units. Production rejects alternate executable overrides. Both fixed entries
+must resolve to executable regular files that are root-owned, are not
+group/world writable, and have only root-owned non-writable ancestors. Corepack
+is invoked through the fixed Node entry, so caller cwd and PATH cannot shadow
+either executable. The repository declaration and the resolved Corepack pnpm
+runtime must both be exactly `pnpm@11.17.0`, otherwise the diagnostic identifies
+the expected source root and the build fails closed. A cold-host
+production-closure smoke
+requires direct access to the pinned public npm registry; registry or DNS
+failure fails the smoke and never relaxes the version or frozen-lockfile gate.
+The packager rejects inherited Node/Corepack injection variables and runs
+Corepack/pnpm under `env -i` with a safe PATH, built-in integrity keys, fixed
+registry, `/dev/null` npm configs and fresh private Corepack/XDG/pnpm caches.
+It therefore never reuses a caller's pnpm executable or package store. The
+packager then creates a minimal temporary workspace and performs a
+production-only frozen-lockfile install with the hoisted linker, copy import
+mode and lifecycle scripts disabled. It removes pnpm workspace metadata and
+`.bin`, rejects every remaining link/special file, then proves the real
+`@modelcontextprotocol/sdk/server` package export and its `zod` transitive
+dependency import from the final app location. Root install never executes that
+application code; it performs structural verification only. Before root
+install, move the archive and checksum into a restricted staging directory and
+make each a single-link, root-owned regular file that is not group/world
+writable. The root installer rejects any other input.
+
+```bash
+SOURCE_ROOT=/absolute/path/to/agent-os-source
+cd "$SOURCE_ROOT"
+/usr/bin/env -i \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  "$SOURCE_ROOT/deploy/hub/bin/package-release.sh" \
+    --source "$SOURCE_ROOT" \
+    --output /secure/staging/agent-os-<revision>.tar.gz
+
+# From a separately delivered, root-owned admin-kit source:
+sudo /root/agent-os-admin-kit/bootstrap-admin.sh
+
+sudo /usr/libexec/agent-os/hub/bin/install.sh \
+  --archive /secure/staging/agent-os-<revision>.tar.gz \
+  --sha256 <trusted-sha256> \
+  --revision <revision> \
+  --env-file /secure/staging/hub.env
+
+sudo /usr/libexec/agent-os/hub/bin/health-check.sh --live
+sudo /usr/libexec/agent-os/hub/bin/health-check.sh --ready
+```
+
+The bootstrap must be invoked by its canonical absolute path from a root-owned,
+non-group/world-writable, symlink-free directory chain. Its self-contained
+preflight verifies that path plus `bin/lib.sh` before sourcing library code; it
+then verifies the complete admin source and never overwrites an installed kit.
+The public install, upgrade, rollback and validator entries likewise reject any
+path outside the fixed admin kit before executing the shared entry guard or
+`lib.sh`. The guard validates the test marker or production directory chain and
+the immediate shell/Node execution closure. Privileged Node helpers reject
+inherited Node, TLS and OpenSSL configuration/module/engine variables before Node
+starts; system tool overrides exist only inside a validated non-root test root.
+Ownership and a supplied SHA-256 prove local integrity only; they do not
+authenticate the publisher. Signed admin-kit and
+application release manifests plus an audited publisher-key policy are still a
+production blocker. Admin-kit upgrade is a separate packaging/change-control
+workflow. `install.sh` creates or validates locked non-login service identities
+with no supplementary groups. It leaves both Nginx files as disabled
+`.example` files. Enabling them still depends on the approved FQDN, matching
+certificate, `nginx -t` and a real query/log leakage check.
+
+Lock acquisition may create or validate only `/run/agent-os` and its root-only
+single-link lock file before checking the normal/hard maintenance sentinels.
+No configuration, release, pointer, unit, proxy or state-layout mutation occurs
+until that serialized fail-closed check succeeds.
+
+Production upgrade accepts only the fixed snapshot hook
+`/usr/libexec/agent-os/hub/pre-upgrade-snapshot`; a CLI override exists only in
+the isolated non-root test-root harness. The hook and every ancestor must be
+canonical, root-owned and non-writable, and the executable must be a
+single-link regular file. Upgrade copies it with no-follow checks to a private
+root-owned runtime file, revalidates that copy and executes only the copy as
+`HOOK <state-root> <new-snapshot-directory>` after systemd has stopped and
+proved the single writer inactive. A non-zero exit, empty destination or
+source-state hash change enters compensation. SVR-03 supplies and audits the
+fixed hook implementation.
+
+```bash
+sudo /usr/libexec/agent-os/hub/bin/upgrade.sh \
+  --archive /secure/staging/agent-os-<next-revision>.tar.gz \
+  --sha256 <trusted-sha256> \
+  --revision <next-revision>
+
+sudo /usr/libexec/agent-os/hub/bin/rollback.sh
+```
+
+Neither command restores state. A hard-maintenance sentinel is an explicit stop
+condition, not an invitation to rerun deploy. `deploy/hub/verify.sh` runs the
+clean-Ubuntu non-root static/security/lifecycle gate with isolated roots and
+fault-injected systemd, listener and HTTP probes. Its exact production
+toolchain contract intentionally fails before tests on macOS or a generic CI
+image; SVR-06 supplies the separate cross-platform static entry. Run this
+executable directly under a minimal
+environment so its `/bin/bash -p` interpreter, fixed system PATH and audited
+absolute Node/Corepack paths apply before any gate setup. Running it through an
+ambient `bash` is not an equivalent trust-chain check.
+
+```bash
+SOURCE_ROOT=/absolute/path/to/agent-os-source
+cd "$SOURCE_ROOT"
+/usr/bin/env -i \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  LANG=C.UTF-8 \
+  "$SOURCE_ROOT/deploy/hub/verify.sh"
+```
 
 ## Logging and capacity
 
@@ -207,6 +391,11 @@ leaving state untouched. State recovery is a separate, explicit operation.
   bytes. A valid Runner credential is not a license for unbounded memory use.
 - Use exponential reconnect backoff with jitter and a ceiling; fixed hot retry
   is not an operations policy.
+- The Hub admits at most 64 SSE clients. An initial hello/replay larger than
+  256 KiB returns `503`; any later `write(false)` disconnects that slow client.
+  EventLog startup still reads and projects the complete JSONL history without
+  pagination or streaming recovery, so these caps do not make storage
+  production-safe.
 - Rotate Windows logs and cap journald by host policy. Alert before state or log
   volumes exhaust free space.
 - Backup, restore and smoke evidence records commands, exit codes and hashes,
@@ -216,13 +405,18 @@ leaving state untouched. State recovery is a separate, explicit operation.
 
 | Item | State |
 | --- | --- |
-| Dedicated Agent OS FQDN and matching trusted certificate | field dependency; cross-host smoke blocked until supplied |
-| Ubuntu Node >=22 and repository-pinned Corepack/pnpm | not installed |
-| Hub health endpoints and health-check script | not implemented |
-| bounded body parsing, shutdown deadline and propagated close failure | not implemented |
-| reconnect backoff and cumulative transport cache bounds | not implemented |
-| systemd unit, proxy sample, install/upgrade/rollback scripts | not implemented |
+| Dedicated Agent OS FQDN and matching trusted certificate | field dependency; placeholder origin was rejected before publication, leaving no env/unit/current/listener; Hub activation and cross-host smoke remain blocked until supplied |
+| Ubuntu exact Node version/SHA and repository-pinned Corepack/pnpm | field gate passed: pinned Linux x64 archive SHA and signature chain verified; the gate enforces `/usr/bin/node` 24.19.0, `/usr/bin/corepack` 0.35.0 and pnpm 11.17.0, and revalidates their root-owned non-writable paths before use |
+| clean Linux production dependency closure | cold-cache field gate passes with pnpm 11.17.0, zero reused packages, final SDK/Zod imports, no links/special files and no admin tree; rerun after every frozen artifact change |
+| authenticated release/admin-kit publisher and signature verification | not implemented; root ownership and checksums do not prove provenance |
+| Hub health endpoints and health-check script | implemented; focused local gate passes |
+| bounded body parsing, shutdown deadline and propagated close failure | implemented; focused local runtime gate passes |
+| reconnect backoff, jitter and bounded Runner transport/body caches | implemented; focused runtime gate passes |
+| SSE admission, replay-byte and slow-client bounds | implemented; EventLog full-history startup projection remains a staging blocker |
+| systemd units, fixed admin kit, safe app extractor, proxy sample and lifecycle scripts | non-root fault matrix and real root-owned admin bootstrap pass; service activation waits on the approved FQDN/certificate |
+| Nginx query/log leakage and real upstream failure exercise | static policy passes; real enabled-vhost test waits on the dedicated FQDN/certificate |
 | staging backup/restore and capacity/rotation scripts | not implemented |
+| audited hard-maintenance state restore | blocked on SVR-03; deploy refuses to clear the sentinel |
 | production event-store durability | blocked on RM-1.1b; outside this workflow |
 | Windows atomic replacement on repeated persistence | requires real NTFS reproduction and fix |
 | Windows account-only ACL for state and bearer mounts | requires implementation and effective-ACL proof |

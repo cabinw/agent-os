@@ -1,0 +1,56 @@
+[Unit]
+Description=Agent OS isolated Hub candidate %i
+After=network.target
+
+[Service]
+Type=simple
+User=agent-os-candidate
+Group=agent-os-candidate
+WorkingDirectory=/opt/agent-os/releases/%i/apps/chat-spike
+Environment=NODE_ENV=production
+EnvironmentFile=/run/agent-os/hub-candidates/%i.env
+ExecStartPre=+/usr/libexec/agent-os/hub/bin/validate-config.sh --candidate %i /run/agent-os/hub-candidates/%i.env
+ExecStart=/usr/bin/node /opt/agent-os/releases/%i/apps/chat-spike/src/server.mjs
+Restart=no
+TimeoutStartSec=30s
+TimeoutStopSec=45s
+KillSignal=SIGTERM
+KillMode=mixed
+FinalKillSignal=SIGKILL
+SendSIGKILL=yes
+UMask=0077
+MemoryHigh=384M
+MemoryMax=512M
+TasksMax=64
+LimitNOFILE=4096
+LimitCORE=0
+CPUQuota=150%
+OOMPolicy=stop
+
+ReadWritePaths=/var/lib/agent-os/hub-candidates/%i
+InaccessiblePaths=/var/lib/agent-os/hub /etc/agent-os/hub.env
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProtectSystem=strict
+ProcSubset=pid
+RemoveIPC=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=agent-os-hub-candidate-%i
