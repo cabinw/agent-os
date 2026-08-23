@@ -30,15 +30,15 @@ Alongside the code: Markdown specs under `docs/`, high-fidelity renders under `u
 
 Stack: TypeScript + Tauri 2 + SQLite. Deployment is Server Hub plus outbound
 Runners ([ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md));
-ADR-007's single-machine scope is superseded. Gates / auth and the Local Runner
-vertical slice are complete; current order is shared contract → Remote Runner → formal Event Core
-([roadmap](docs/development/roadmap.md)).
+ADR-007's single-machine scope is superseded. Gates / auth, the Local Runner
+vertical slice and the shared Runner contract are complete; current order is
+Remote Runner → formal Event Core ([roadmap](docs/development/roadmap.md)).
 
-The Local Runner has strict request / result / event / error shapes, workspace
-containment and persistent `(user, project, agent)` sessions. The Hub supports
-Runner injection and has vertical-slice regression coverage. The default
-composition still permits a direct-adapter fallback; make Runner injection
-mandatory while finishing the shared contract so the Hub becomes dispatch-only.
+The Local Runner has strict request / result / event / error shapes, durable
+request-id idempotency, cancellation / health / close semantics, workspace
+containment and persistent `(user, project, agent)` sessions. Runner injection
+is mandatory: the Hub has no direct-adapter, working-copy or vendor execution
+path.
 
 ## What Agent OS is
 

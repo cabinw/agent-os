@@ -14,9 +14,10 @@ executes, and accumulates memory that outlives any single session.
 Architecture plus an executable chat / Hub spike. The spike contains the event
 log, MCP trust boundary, Hub runtime and four vendor adapters; formal
 `packages/*` still contain contracts and foundational types. Hub hardening is
-complete, and the Hub runtime has a tested injectable Local Runner vertical
-slice. Next is finishing the shared contract and making Runner injection
-mandatory in the composition root, then Remote Runner → formal Event Core.
+complete. The shared Runner contract now covers durable request-id idempotency,
+events, sessions, cancellation, health, retry classification and close; Runner
+injection is mandatory and the Hub has no vendor execution fallback. The active
+step is Remote Runner, followed by formal Event Core.
 
 ## Where to start
 

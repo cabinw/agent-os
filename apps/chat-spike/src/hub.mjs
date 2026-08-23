@@ -24,13 +24,27 @@
  */
 
 import { makeEvent } from "./events.mjs";
-import { mountMcp, participates } from "./mcp-mount.mjs";
+import { participates } from "./mcp-mount.mjs";
 import { HUMAN_ID, createToolRouter } from "./mcp-tools.mjs";
+import { RUNNER_INTERFACE_METHODS } from "./runners/contract.mjs";
 import { TRANSITIONS, project } from "./thread.mjs";
 import { ValidationError } from "./validate.mjs";
 
 /** How many agent→agent hops one human message may cause before it is stopped. */
 export const DEFAULT_BUDGET = 6;
+
+function requireRunner(runner) {
+  if (!runner || typeof runner !== "object") {
+    throw new TypeError("Hub.runner 必须实现共享 Runner 接口");
+  }
+  const missing = RUNNER_INTERFACE_METHODS.filter(
+    (method) => typeof runner[method] !== "function",
+  );
+  if (missing.length > 0) {
+    throw new TypeError(`Hub.runner 缺少共享接口方法：${missing.join(", ")}`);
+  }
+  return runner;
+}
 
 export class Hub {
   /**
@@ -38,39 +52,21 @@ export class Hub {
    * @param {import("./log.mjs").EventLog} opts.log
    * @param {string} opts.projectId
    * @param {(type: string, data: object) => void} opts.broadcast
-   * @param {(id: string) => any} opts.getAdapter   adapter class by provider id
-   * @param {string} opts.workspace                 per-agent directories live here
-   * @param {string} opts.url                       where the MCP bridge calls back
+   * @param {(id: string) => any} opts.getAdapter   provider catalog lookup only
    * @param {number} [opts.budget]
-   * @param {(id: string) => string|null} [opts.tokenForAgent]
-   * @param {{dispatch: Function, hasSession?: Function, resetSession?: Function,
-   *          close?: Function}} [opts.runner] shared execution-plane contract
+   * @param {object} opts.runner                    complete shared execution contract
    * @param {string} [opts.userId] authenticated owner of Runner sessions
    */
-  constructor({
-    log,
-    projectId,
-    broadcast,
-    getAdapter,
-    workspace,
-    url,
-    budget,
-    tokenForAgent,
-    runner,
-    userId,
-  }) {
+  constructor({ log, projectId, broadcast, getAdapter, budget, runner, userId }) {
     this.log = log;
     this.projectId = projectId;
     this.broadcast = broadcast;
     this.getAdapter = getAdapter;
-    this.workspace = workspace;
-    this.url = url;
     this.budget = budget ?? DEFAULT_BUDGET;
-    this.tokenForAgent = tokenForAgent ?? (() => null);
-    this.runner = runner ?? null;
+    this.runner = requireRunner(runner);
     this.userId = userId ?? HUMAN_ID;
 
-    /** @type {Map<string, {id, label, adapter, queue, busy, integration}>} */
+    /** @type {Map<string, {id, label, adapterId, queue, busy, integration}>} */
     this.agents = new Map();
     /** Causal index for depth. Rebuilt on boot so a restart keeps its budgets. */
     this.byId = new Map();
@@ -134,15 +130,14 @@ export class Hub {
 
   /** Registration is idempotent: re-registering reconnects, per mcp-protocol.md. */
   register(id, { capabilities = [], role = "worker" } = {}) {
-    const Cls = this.getAdapter(id);
-    if (!Cls) throw new Error(`未知 provider：${id}`);
+    const catalogEntry = this.getAdapter(id);
+    if (!catalogEntry) throw new Error(`未知 provider：${id}`);
     if (this.agents.has(id)) return this.agents.get(id);
 
     const entry = {
       id,
-      label: Cls.label,
-      Cls,
-      adapter: null,
+      label: catalogEntry.label,
+      adapterId: catalogEntry.id ?? id,
       queue: Promise.resolve(),
       busy: false,
       role,
@@ -153,39 +148,18 @@ export class Hub {
       task: null,
       /** Whether `agent.registered` has been written for it. */
       announced: this.announcedIds.has(id),
-      integration: { ...Cls.capabilities, participates: participates(id) },
+      integration: { ...catalogEntry.capabilities, participates: participates(id) },
     };
     this.agents.set(id, entry);
 
     this.tools.call("register_agent", {
       id,
-      name: Cls.label,
+      name: catalogEntry.label,
       provider: id,
       role,
       capabilities,
     });
     return entry;
-  }
-
-  adapterFor(entry) {
-    if (entry.adapter) return entry.adapter;
-    const dir = `${this.workspace}/${entry.id}`;
-    // Every agent gets its own directory because two of the three mount
-    // mechanisms are files in the working directory — a shared cwd would make
-    // every agent present the same identity to the bridge.
-    const mcp = mountMcp(entry.id, {
-      dir,
-      url: this.url,
-      token: this.tokenForAgent(entry.id),
-    });
-    entry.adapter = new entry.Cls({
-      cwd: dir,
-      mcp,
-      onEvent: (e) => {
-        this.broadcastExecutionEvent(entry, e);
-      },
-    });
-    return entry.adapter;
   }
 
   roster() {
@@ -196,14 +170,11 @@ export class Hub {
       capabilities: a.capabilities,
       integration: a.integration,
       busy: a.busy,
-      hasSession:
-        this.runner?.hasSession?.({
-          user: this.userId,
-          project: this.projectId,
-          agent: a.id,
-        }) ??
-        a.adapter?.hasSession ??
-        false,
+      hasSession: this.runner.hasSession({
+        user: this.userId,
+        project: this.projectId,
+        agent: a.id,
+      }),
     }));
   }
 
@@ -376,9 +347,8 @@ export class Hub {
     }
   }
 
-  /** Run one prompt through the shared Runner, with the old direct path as fallback. */
+  /** Run one prompt through the shared Runner — the Hub has no execution path of its own. */
   execute(entry, cause, prompt) {
-    if (!this.runner) return this.adapterFor(entry).send(prompt);
     if (!cause?.id) {
       throw new ValidationError("Runner dispatch 缺少 runtime-owned cause id");
     }
@@ -388,7 +358,7 @@ export class Hub {
         user: this.userId,
         project: this.projectId,
         agent: entry.id,
-        adapter: entry.Cls.id ?? entry.id,
+        adapter: entry.adapterId,
         workspace: entry.id,
         prompt,
         ...(entry.task ? { taskId: entry.task } : {}),
@@ -740,19 +710,18 @@ export class Hub {
   async resetSession(agentId) {
     const entry = this.agents.get(agentId);
     if (!entry) throw new ValidationError(`未知 agent "${agentId}"`);
-    if (this.runner?.resetSession) {
-      await this.runner.resetSession({
-        user: this.userId,
-        project: this.projectId,
-        agent: agentId,
-      });
-      return;
-    }
-    entry.adapter?.resetSession();
+    await this.runner.resetSession({
+      user: this.userId,
+      project: this.projectId,
+      agent: agentId,
+    });
   }
 
   async close() {
-    for (const a of this.agents.values()) await a.adapter?.close().catch(() => {});
-    await this.runner?.close?.().catch(() => {});
+    try {
+      await this.runner.close();
+    } catch {
+      // Closing is best-effort during process shutdown.
+    }
   }
 }

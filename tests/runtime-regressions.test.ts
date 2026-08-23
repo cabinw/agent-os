@@ -22,6 +22,13 @@ type SendResult = {
   fresh: boolean;
 };
 
+type DispatchRequest = {
+  requestId: string;
+  agent: string;
+  adapter: string;
+  prompt: string;
+};
+
 function fakeAdapter(onSend: (prompt: string) => Promise<string> = async () => "ok") {
   const prompts: string[] = [];
   class FakeAdapter {
@@ -34,6 +41,10 @@ function fakeAdapter(onSend: (prompt: string) => Promise<string> = async () => "
       usage: false,
     };
     hasSession = false;
+
+    resetSession() {
+      this.hasSession = false;
+    }
 
     async send(prompt: string): Promise<SendResult> {
       prompts.push(prompt);
@@ -51,19 +62,60 @@ function fakeAdapter(onSend: (prompt: string) => Promise<string> = async () => "
   return { FakeAdapter, prompts };
 }
 
+class TrustedFakeRunner {
+  readonly adapter: ReturnType<typeof fakeAdapter>;
+  readonly instances = new Map<
+    string,
+    InstanceType<ReturnType<typeof fakeAdapter>["FakeAdapter"]>
+  >();
+
+  constructor(adapter: ReturnType<typeof fakeAdapter>) {
+    this.adapter = adapter;
+  }
+
+  async dispatch(request: DispatchRequest) {
+    let instance = this.instances.get(request.agent);
+    if (!instance) {
+      instance = new this.adapter.FakeAdapter();
+      this.instances.set(request.agent, instance);
+    }
+    return instance.send(request.prompt);
+  }
+
+  hasSession(scope: { agent: string }) {
+    return this.instances.get(scope.agent)?.hasSession ?? false;
+  }
+
+  resetSession(scope: { agent: string }) {
+    this.instances.get(scope.agent)?.resetSession();
+  }
+
+  async cancel(requestId: string) {
+    return { requestId, outcome: "not_found" };
+  }
+
+  health() {
+    return { ready: true, hostId: "trusted-fake", inflight: 0, queued: 0 };
+  }
+
+  async close() {
+    await Promise.all([...this.instances.values()].map((instance) => instance.close()));
+  }
+}
+
 function makeHub(adapter: ReturnType<typeof fakeAdapter>, existingLogPath?: string) {
   const dir = existingLogPath
     ? join(existingLogPath, "..")
     : mkdtempSync(join(tmpdir(), "agentos-regression-"));
   if (!existingLogPath) dirs.push(dir);
   const log = new EventLog(existingLogPath ?? join(dir, "events.jsonl"));
+  const runner = new TrustedFakeRunner(adapter);
   const hub = new Hub({
     log,
     projectId: "proj_regression",
     broadcast: () => {},
     getAdapter: (id: string) => (id === "alpha" ? adapter.FakeAdapter : null),
-    workspace: join(dir, "workspace"),
-    url: "http://127.0.0.1:0",
+    runner,
   });
   hub.register("alpha", { capabilities: ["coding"] });
   return { hub, log };

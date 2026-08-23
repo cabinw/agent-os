@@ -1,9 +1,9 @@
 /**
  * Transport-neutral Runner contract.
  *
- * Local and Remote Runners exchange these four shapes only: dispatch request,
- * normalized event, result and error. Vendor-specific values stop at the
- * adapter boundary.
+ * Local and Remote Runners use the same execution shapes: dispatch request,
+ * normalized event, result and error. Control methods add strict cancel and
+ * health results. Vendor-specific values stop at the adapter boundary.
  */
 
 export const RUNNER_EVENT_KINDS = Object.freeze([
@@ -16,15 +16,50 @@ export const RUNNER_EVENT_KINDS = Object.freeze([
   "failed",
 ]);
 
+/**
+ * Minimal transport-neutral surface every Runner implementation exposes.
+ * RemoteRunner must implement this same surface; only its transport differs.
+ */
+export const RUNNER_INTERFACE_METHODS = Object.freeze([
+  "dispatch",
+  "cancel",
+  "health",
+  "hasSession",
+  "resetSession",
+  "close",
+]);
+
+export const RUNNER_CANCEL_OUTCOMES = Object.freeze({
+  CANCELLED: "cancelled",
+  NOT_FOUND: "not_found",
+  ALREADY_TERMINAL: "already_terminal",
+});
+
 export const RUNNER_ERROR_CODES = Object.freeze({
   INVALID_REQUEST: "INVALID_REQUEST",
   WORKSPACE_NOT_ALLOWED: "WORKSPACE_NOT_ALLOWED",
   WORKSPACE_NOT_FOUND: "WORKSPACE_NOT_FOUND",
   ADAPTER_NOT_FOUND: "ADAPTER_NOT_FOUND",
   ADAPTER_FAILURE: "ADAPTER_FAILURE",
+  CANCELLED: "CANCELLED",
+  TIMEOUT: "TIMEOUT",
+  UNAVAILABLE: "UNAVAILABLE",
   SESSION_FAILURE: "SESSION_FAILURE",
   INTERNAL: "INTERNAL",
 });
+
+export const RUNNER_RETRYABLE_ERROR_CODES = Object.freeze([
+  RUNNER_ERROR_CODES.TIMEOUT,
+  RUNNER_ERROR_CODES.UNAVAILABLE,
+]);
+
+/**
+ * A Runner never retries an adapter call itself. Re-dispatching the same
+ * requestId replays its one durable terminal result, including failures. The
+ * Hub may retry only with a new requestId linked through causedBy. CANCELLED
+ * and ordinary ADAPTER_FAILURE are final; TIMEOUT and UNAVAILABLE explicitly
+ * permit that higher-level retry.
+ */
 
 const REQUEST_FIELDS = new Set([
   "requestId",
@@ -233,6 +268,6 @@ export function normalizeRunnerError(error, requestId, fallbackCode) {
     requestId,
     code: fallbackCode ?? RUNNER_ERROR_CODES.INTERNAL,
     message: error instanceof Error ? error.message : String(error),
-    retryable: fallbackCode === RUNNER_ERROR_CODES.ADAPTER_FAILURE,
+    retryable: RUNNER_RETRYABLE_ERROR_CODES.includes(fallbackCode),
   });
 }

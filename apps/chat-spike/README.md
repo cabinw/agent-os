@@ -31,9 +31,8 @@ either way.
 
 The default server composition still shares one process, but an injected
 Local Runner now crosses the measured boundary: Hub dispatch on one side,
-Runner execution on the other. The next refactor makes that path mandatory and
-removes the direct-adapter fallback. Project files and vendor logins stay with
-the Runner.
+Runner execution on the other. That path is now mandatory and the direct-adapter
+fallback is gone. Project files and vendor logins stay with the Runner.
 
 ## Run it
 
@@ -230,7 +229,8 @@ co-located orchestration and `log.mjs` are scaffolding.
 3. **Done:** the Hub supports injected Local Runner dispatch; normalized
    streaming, task review, failure and queue recovery have vertical-slice
    coverage.
-4. **Next:** freeze cancellation, retry and liveness tests, make Runner injection
-   mandatory in the server composition root, then remove the direct fallback.
-5. Add an outbound Remote Runner connection and rerun the same acceptance task.
+4. **Done:** freeze cancellation, retry and liveness tests; persist request-id
+   idempotency; require Runner injection and remove the direct fallback.
+5. **Active:** add an outbound Remote Runner connection and rerun the same
+   acceptance task.
 6. Move the proven envelope and contracts into formal packages.

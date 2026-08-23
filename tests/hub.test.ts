@@ -7,6 +7,8 @@ import { Hub } from "../apps/chat-spike/src/hub.mjs";
 // @ts-expect-error
 import { EventLog } from "../apps/chat-spike/src/log.mjs";
 // @ts-expect-error
+import { RUNNER_INTERFACE_METHODS } from "../apps/chat-spike/src/runners/contract.mjs";
+// @ts-expect-error
 import { project } from "../apps/chat-spike/src/thread.mjs";
 
 const dirs: string[] = [];
@@ -48,8 +50,75 @@ interface TestHub {
     profile: { id: string; role?: string; capabilities?: string[] },
   ) => void;
   roster: () => Array<{ hasSession: boolean }>;
+  resetSession: (agent: string) => Promise<void>;
   say: (content: string, to: string) => void;
   tasks: () => Record<string, { executor: string | null; status: string }>;
+}
+
+type FakeAdapterClass = new (options: { mcp?: unknown }) => {
+  hasSession: boolean;
+  resetSession: () => void;
+  send: (prompt: string) => Promise<{ text: string; ms: number; fresh: boolean }>;
+  close: () => Promise<void>;
+};
+
+type RunnerRequest = {
+  requestId: string;
+  user: string;
+  project: string;
+  agent: string;
+  adapter: string;
+  workspace: string;
+  prompt: string;
+};
+
+/**
+ * Trusted test double for the execution plane. Hub tests exercise routing and
+ * policy; this boundary owns every fake adapter instance just as LocalRunner
+ * owns real vendor adapters in production.
+ */
+class TrustedFakeRunner {
+  readonly definitions: Record<string, { Fake: FakeAdapterClass }>;
+  readonly instances = new Map<string, InstanceType<FakeAdapterClass>>();
+  readonly dispatches: RunnerRequest[] = [];
+  readonly resets: Array<{ user: string; project: string; agent: string }> = [];
+
+  constructor(definitions: Record<string, { Fake: unknown }>) {
+    this.definitions = definitions as Record<string, { Fake: FakeAdapterClass }>;
+  }
+
+  async dispatch(request: RunnerRequest) {
+    this.dispatches.push(request);
+    let instance = this.instances.get(request.agent);
+    if (!instance) {
+      const Adapter = this.definitions[request.adapter]?.Fake;
+      if (!Adapter) throw new Error(`FakeRunner 找不到 adapter ${request.adapter}`);
+      instance = new Adapter({});
+      this.instances.set(request.agent, instance);
+    }
+    return instance.send(request.prompt);
+  }
+
+  hasSession(scope: { agent: string }) {
+    return this.instances.get(scope.agent)?.hasSession ?? false;
+  }
+
+  async resetSession(scope: { user: string; project: string; agent: string }) {
+    this.resets.push(scope);
+    this.instances.get(scope.agent)?.resetSession();
+  }
+
+  async cancel(requestId: string) {
+    return { requestId, outcome: "not_found" };
+  }
+
+  health() {
+    return { ready: true, hostId: "trusted-fake", inflight: 0, queued: 0 };
+  }
+
+  async close() {
+    await Promise.all([...this.instances.values()].map((adapter) => adapter.close()));
+  }
 }
 
 /** Give adapter callbacks access to a hub that is constructed after them. */
@@ -114,18 +183,18 @@ function makeHub(
   dirs.push(dir);
   const log = new EventLog(join(dir, "events.jsonl")) as TestEventLog;
   const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+  const runner = new TrustedFakeRunner(adapters);
   const hub = new Hub({
     log,
     projectId: "proj_test",
     broadcast: (type: string, data: Record<string, unknown>) =>
       events.push({ type, data }),
     getAdapter: (id: string) => adapters[id]?.Fake,
-    workspace: join(dir, "ws"),
-    url: "http://localhost:0",
     budget,
+    runner,
   }) as TestHub;
   for (const a of roster) hub.register(a.id, a);
-  return { hub, log, events };
+  return { hub, log, events, runner };
 }
 
 /** Turns are queued, so a test has to wait for the chain to settle. */
@@ -142,6 +211,94 @@ function messages(log: TestEventLog) {
     .filter((e) => e.type === "message.sent")
     .map((e) => `${e.payload.from}→${e.payload.to}: ${e.payload.content}`);
 }
+
+describe("Hub Runner 边界", () => {
+  const baseOptions = () => ({
+    log: { replay: () => [] },
+    projectId: "proj_runner_boundary",
+    broadcast: () => {},
+    getAdapter: () => null,
+  });
+
+  it("缺少 Runner 或任一共享接口方法都会在构造时失败", () => {
+    expect(() => new Hub(baseOptions())).toThrow(/Hub\.runner/);
+
+    const complete = new TrustedFakeRunner({});
+    const missing = RUNNER_INTERFACE_METHODS.at(-1) as string;
+    const incomplete = new Proxy(complete, {
+      get(target, property, receiver) {
+        if (property === missing) return undefined;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    expect(() => new Hub({ ...baseOptions(), runner: incomplete })).toThrow(missing);
+  });
+
+  it("execute 和 reset 只调用 Runner，Hub 不实例化或保存 vendor adapter", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "agentos-hub-runner-only-"));
+    dirs.push(dir);
+    const dispatches: RunnerRequest[] = [];
+    const resets: Array<{ user: string; project: string; agent: string }> = [];
+    const methods = Object.fromEntries(
+      RUNNER_INTERFACE_METHODS.map((method: string) => [method, async () => undefined]),
+    ) as Record<string, (...args: never[]) => unknown>;
+    methods.dispatch = async (request: RunnerRequest) => {
+      dispatches.push(request);
+      return { text: "runner-only", ms: 1, fresh: true };
+    };
+    methods.hasSession = () => false;
+    methods.resetSession = async (scope: {
+      user: string;
+      project: string;
+      agent: string;
+    }) => {
+      resets.push(scope);
+    };
+    methods.health = () => ({
+      ready: true,
+      hostId: "runner-only",
+      inflight: 0,
+      queued: 0,
+    });
+
+    class CatalogOnlyAdapter {
+      static id = "alpha";
+      static label = "Alpha";
+      static capabilities = {};
+      constructor() {
+        throw new Error("Hub 不得实例化 catalog adapter");
+      }
+    }
+
+    const hub = new Hub({
+      log: new EventLog(join(dir, "events.jsonl")),
+      projectId: "proj_runner_only",
+      broadcast: () => {},
+      getAdapter: (id: string) => (id === "alpha" ? CatalogOnlyAdapter : null),
+      runner: methods,
+      userId: "owner",
+    }) as TestHub;
+    hub.register("alpha");
+    hub.say("必须走 Runner", "alpha");
+    await settle(hub);
+    await hub.resetSession("alpha");
+
+    expect(dispatches).toHaveLength(1);
+    expect(dispatches[0]).toMatchObject({
+      user: "owner",
+      project: "proj_runner_only",
+      agent: "alpha",
+      adapter: "alpha",
+      workspace: "alpha",
+    });
+    expect(resets).toEqual([
+      { user: "owner", project: "proj_runner_only", agent: "alpha" },
+    ]);
+    expect(hub).not.toHaveProperty("adapterFor");
+    expect(hub).not.toHaveProperty("workspace");
+    expect(hub.agents.get("alpha")).not.toHaveProperty("adapter");
+  });
+});
 
 describe("A.1 适配器池", () => {
   it("多个 agent 各自持有会话，互不影响", async () => {

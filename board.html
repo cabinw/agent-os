@@ -230,11 +230,11 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 14,
-  "updatedAt": "2026-08-23 20:16 CST",
+  "revision": 16,
+  "updatedAt": "2026-08-23 20:47 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "RUNNER-CONTRACT-01",
-  "verification": {"testsPassed":90,"testsTotal":90,"filesPassed":9,"filesTotal":9,"gatePassed":4,"gateTotal":4,"lintErrors":0,"checkedAt":"2026-08-23 20:08 CST"},
+  "currentTaskId": "C-REMOTE-01",
+  "verification": {"testsPassed":117,"testsTotal":117,"filesPassed":11,"filesTotal":11,"gatePassed":4,"gateTotal":4,"lintErrors":0,"checkedAt":"2026-08-23 20:47 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":0,"eventSchemaTotal":29,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1"],
   "roadmapPhases": [
@@ -308,8 +308,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"C-LOCAL-01","scope":"route","phase":"Local","title":"本地 Agent 调用完整闭环","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["HUB-SEC-01","EVIDENCE-01"],"blockedBy":[],"acceptance":"Hub → Local Runner → Adapter → 真实 CLI → Events / Review 跑通；失败和重启有测试。","source":"tests/hub-local-runner.test.ts","summary":"生产 Hub 已注入 LocalRunner；say、task review、失败恢复均经真实 Node CLI 子进程纵向验证。"},
     {"id":"SESSION-01","scope":"route","phase":"Local","title":"持久化本地 Agent session","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["C-LOCAL-01"],"blockedBy":[],"acceptance":"session 以 (user, project, agent) 关联，重启后可继续或从日志正确重建。","source":"tests/local-runner.test.ts","summary":"SessionStore 以三元组隔离，原子落盘 opaque vendor session；同 host/adapter/workspace 的 Runner 重启可恢复。"},
     {"id":"ADR-008","scope":"route","phase":"Contract","title":"固化 Local / Remote Runner 共享契约","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["C-LOCAL-01"],"blockedBy":[],"acceptance":"Supersede ADR-007 的单机范围；明确拓扑、身份、存储、session、connect-out 与错误语义。","source":"docs/decisions/ADR-008-server-hub-local-first-runners.md","summary":"ADR-008 已 accepted；Hub / Runner 拓扑、principal、HostPlacement、session、working copy 与实现顺序已同步到全部 canonical 文档和页面。"},
-    {"id":"RUNNER-CONTRACT-01","scope":"route","phase":"Contract","title":"Runner contract tests","status":"running","progress":70,"priority":"P0","owner":"Codex team","dependsOn":["C-LOCAL-01","SESSION-01","ADR-008"],"blockedBy":[],"acceptance":"Local 与 Remote 共用 request、event stream、result、session 和 error contract；本地行为成为契约测试。","source":"tests/helpers/runner-contract-suite.ts","summary":"可复用 contract suite 与 Local factory 已通过 13/13；待 Remote factory 运行同一套用例后完成。"},
-    {"id":"C-REMOTE-01","scope":"route","phase":"Remote","title":"启动远程 Agent 调用开发","status":"created","progress":0,"priority":"P1","owner":"未安排","dependsOn":["RUNNER-CONTRACT-01","HUB-SEC-01"],"blockedBy":[],"acceptance":"认证的出站 Runner 可重连、幂等交付并恢复 session；同一任务核心事件与 Local 一致。","source":"next.html#options","summary":"复用本地契约，只替换 transport。"}
+    {"id":"RUNNER-CONTRACT-01","scope":"route","phase":"Contract","title":"Runner contract tests","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["C-LOCAL-01","SESSION-01","ADR-008"],"blockedBy":[],"acceptance":"Local 与 Remote 共用 request、event stream、result、session、cancel、health 和 error contract；本地行为成为契约测试。","source":"tests/helpers/runner-contract-suite.ts","summary":"共享接口已固定；0600 原子 request ledger、真实取消、health / close、稳定错误和三维 session 均有机器约束，Hub 只能经 Runner dispatch。"},
+    {"id":"C-REMOTE-01","scope":"route","phase":"Remote","title":"启动远程 Agent 调用开发","status":"running","progress":90,"priority":"P1","owner":"Codex team","dependsOn":["RUNNER-CONTRACT-01","HUB-SEC-01"],"blockedBy":[],"acceptance":"认证的出站 Runner 可重连、幂等交付并恢复 session；同一任务核心事件与 Local 一致。","source":"tests/remote-runner.test.ts","summary":"出站 HTTP transport、host-bound credential、重连、重复 delivery / sequence 去重、session 恢复、cancel / health / close 与真实 CLI 对等已通过 28 项；正在做生产组合根审计。"}
   ],
   "problems": [
     {"id":"PROB-BOOTSTRAP","status":"resolved","severity":"high","title":"认证后的浏览器启动流程已恢复","detail":"GET / 仅返回无数据 inert shell；human token 从 password input 或 URL fragment 进入内存，fragment 在首个 fetch 前清除。query、cookie、localStorage 均未使用。","next":"Tauri 阶段由原生 credential storage 注入，不改变 API/SSE 的 Bearer principal。","affects":["HUB-BOOT-01","C-LOCAL-01"],"source":"tests/hub-security.test.ts"},
@@ -326,6 +326,9 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"PROB-STORE","status":"open","severity":"high","title":"Spike JSONL 仍不支持事务、多写者和幂等重试","detail":"崩溃尾恢复已修复，但 seq 分配仍是单进程内存计数；同一 dispatch 重试可能重复落事件，无法承担正式 Hub 存储。","next":"RM-1.2 以 SQLite/WAL、事务 seq 和 idempotency token 完整替换。","affects":["RM-1.2","C-REMOTE-01"],"source":"apps/chat-spike/src/log.mjs"},
     {"id":"PROB-DOC","status":"resolved","severity":"medium","title":"文档状态、计数与 Runner 拓扑已同步","detail":"README、HANDOFF、CLAUDE、canonical docs、doc/next/todo 页面已统一到 12 个 MCP 工具、无 hosted CI、Server Hub 与 Local-first Runner 路线；固定旧测试数已移除。","next":"功能改动继续在同一提交更新关联文档和看板，不再复制第二份规范。","affects":["ADR-008","GATE-01"],"source":"docs/development/roadmap.md"},
     {"id":"PROB-SUPPLY","status":"open","severity":"medium","title":"依赖审计仍有 1 critical / 3 high 等告警","detail":"Vitest、Vite、nanoid 与生产链 fast-uri 均有已知 advisory；当前配置未发现可利用数据流，但版本需要升级或 override。","next":"固定 packageManager / Node，并在独立任务中升级后复跑 verify 与 audit。","affects":["GATE-01"],"source":"pnpm-lock.yaml"},
+    {"id":"PROB-RUNNER-IDEMP","status":"resolved","severity":"high","title":"Runner requestId 已具备跨重启 at-most-once 语义","detail":"0600 原子 request ledger 持久化 SHA-256 fingerprint、规范事件与终态，不保存 prompt；completed / failed 可重放，崩溃遗留 queued / running 明确恢复为 UNAVAILABLE。","next":"正式 Event Store 的写入幂等由 RM-1.2 独立实现，不与 Runner request ledger 混用。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"apps/chat-spike/src/runners/request-store.mjs"},
+    {"id":"PROB-RUNNER-LIFE","status":"resolved","severity":"high","title":"共享 Runner 生命周期与错误语义已冻结","detail":"Local / Remote 共用 dispatch、cancel、health、hasSession、resetSession、close；CANCELLED、TIMEOUT、UNAVAILABLE 与 ADAPTER_FAILURE 的 retry 分类和竞态由同一 contract suite 验证。","next":"新增 transport 只能实现这份契约，不得引入 provider-specific 分支。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"tests/helpers/runner-contract-suite.ts"},
+    {"id":"PROB-HUB-FALLBACK","status":"resolved","severity":"critical","title":"Hub 已无绕过 Runner 的执行路径","detail":"Hub 构造现在强制完整 Runner，direct-adapter、working-copy、MCP mount 与 vendor CLI fallback 已移除；无完整 Runner 时 fail closed。","next":"server 组合根只负责选择并注入 Local 或 Remote Runner。","affects":["RUNNER-CONTRACT-01"],"source":"apps/chat-spike/src/hub.mjs"},
 
     {"id":"FIX-CAUSE","status":"resolved","severity":"high","title":"省略 replyTo 可脱离因果链","detail":"首次真机运行发现 Agent 可省略 replyTo 使深度归零。runtime 现会在调用方未提供时补 causedBy。","next":"保留回归测试并继续验证显式伪造 replyTo。","affects":["HUB-B.2"],"source":"apps/chat-spike/FINDINGS.md"},
     {"id":"FIX-REGISTER","status":"resolved","severity":"medium","title":"重复注册污染永久事件日志","detail":"Agent 中途重复 register 曾追加第二条 agent.registered。实现已改为重复注册幂等。","next":"重启后重新注册仍需回归覆盖。","affects":["HUB-A.1"],"source":"apps/chat-spike/FINDINGS.md"},
@@ -333,6 +336,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层零依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-23 20:47","kind":"verified","entity":"RUNNER-CONTRACT-01","title":"共享 Runner 契约完整门禁通过","detail":"排除尚待独立提交的 Remote transport 后，TypeScript、Biome、layer gate 及 11 个测试文件 117/117 全绿。"},
+    {"at":"2026-08-23 20:47","kind":"completed","entity":"RUNNER-CONTRACT-01","title":"持久契约与唯一执行面完成","detail":"request ledger、cancel / health / close、稳定错误、三维 session 与 Hub 强制 Runner 已完成；三个对抗审查问题全部关闭。"},
+    {"at":"2026-08-23 20:26","kind":"problem","entity":"RUNNER-CONTRACT-01","title":"对抗审查发现三类契约缺口","detail":"首轮 13 项虽通过，但持久幂等、cancel/health/close 与三维 session 尚未被机器约束；任务保持 running，不提前完成。"},
+    {"at":"2026-08-23 20:26","kind":"verified","entity":"C-REMOTE-01","title":"Remote Runner 首轮真实 transport 通过","detail":"Local/Remote 真实 CLI 对等、错 token、断线重连、重复 delivery/sequence 去重与 Worker 重启 session 恢复均已覆盖；首轮全量 verify 为 122/122。"},
     {"at":"2026-08-23 20:16","kind":"completed","entity":"ADR-008","title":"Server Hub + Local-first Runner 决策完成","detail":"ADR-008 accepted 并 supersede ADR-007 的单机范围；控制面、执行面、principal、HostPlacement、session 和 working-copy 边界已统一。"},
     {"at":"2026-08-23 20:16","kind":"verified","entity":"PROB-DOC","title":"全局文档与页面一致性验证通过","detail":"40 个 Markdown 文件与 doc/todo/next 三页本地链接有效；页面无 console error 或横向溢出，旧状态和旧计数扫描无有效冲突。"},
     {"at":"2026-08-23 20:09","kind":"completed","entity":"C-LOCAL-01","title":"Hub → Local Runner → 真实 CLI 纵向闭环完成","detail":"生产 server 使用 LocalRunner；消息、任务 review、规范错误与失败后队列恢复共 3 项真实子进程测试通过。"},

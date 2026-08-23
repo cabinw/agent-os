@@ -1,6 +1,11 @@
 const [prompt, resume = ""] = process.argv.slice(2);
 
-if (prompt.endsWith("__FAIL__")) {
+if (prompt.endsWith("__BLOCK__")) {
+  process.stdout.write(
+    `${JSON.stringify({ type: "progress", label: `pid:${process.pid}` })}\n`,
+  );
+  setInterval(() => {}, 60_000);
+} else if (prompt.endsWith("__FAIL__")) {
   process.stderr.write("fixture failed\n");
   process.exitCode = 7;
 } else {

@@ -69,9 +69,9 @@ export class ClaudeAdapter extends SubprocessAdapter {
     }
   }
 
-  async send(prompt) {
+  async send(prompt, options) {
     this.#final = null;
-    const r = await super.send(prompt);
+    const r = await super.send(prompt, options);
     return { ...r, text: (this.#final ?? r.text).trim() };
   }
 }

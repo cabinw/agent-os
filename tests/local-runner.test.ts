@@ -77,6 +77,12 @@ class FixtureAdapter extends SubprocessAdapter {
   }
 }
 
+class TimeoutFixtureAdapter extends FixtureAdapter {
+  static id = "timeout-fixture";
+  static label = "Timeout fixture CLI";
+  static timeoutMs = 100;
+}
+
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -160,13 +166,13 @@ describe("C-LOCAL-01 · Local Runner", () => {
     expect(caught?.error).toMatchObject({
       requestId: "run-fail",
       code: RUNNER_ERROR_CODES.ADAPTER_FAILURE,
-      retryable: true,
+      retryable: false,
     });
     expect(caught?.message).toContain("退出码 7");
     expect(events.map((event) => event.kind)).toEqual(["started", "failed"]);
     expect(events.at(-1)?.error).toMatchObject({
       code: RUNNER_ERROR_CODES.ADAPTER_FAILURE,
-      retryable: true,
+      retryable: false,
     });
     await runner.close();
   });
@@ -191,6 +197,81 @@ describe("C-LOCAL-01 · Local Runner", () => {
       expect(events.map((event) => event.kind)).toEqual(["failed"]);
     }
     await runner.close();
+  });
+
+  it("cancel 会杀死真实 CLI 子进程并只留下 CANCELLED terminal", async () => {
+    const runner = makeRunner(fixtureEnvironment());
+    const events: RunnerEvent[] = [];
+    let seenPid: (pid: number) => void = () => {};
+    const pidSeen = new Promise<number>((resolve) => {
+      seenPid = resolve;
+    });
+    const running = runner.dispatch(request("run-cancel", "__BLOCK__"), {
+      onEvent: (event: RunnerEvent) => {
+        events.push(event);
+        if (event.kind === "progress" && event.label?.startsWith("pid:")) {
+          seenPid(Number(event.label.slice(4)));
+        }
+      },
+    });
+    const rejected = running.catch((error: unknown) => error);
+    const pid = await pidSeen;
+
+    await expect(runner.cancel("run-cancel")).resolves.toEqual({
+      requestId: "run-cancel",
+      outcome: "cancelled",
+    });
+    await expect(rejected).resolves.toMatchObject({
+      error: {
+        code: RUNNER_ERROR_CODES.CANCELLED,
+        retryable: false,
+      },
+    });
+    expect(events.map((event) => event.kind)).toEqual(["started", "progress", "failed"]);
+    expect(events.filter((event) => event.kind === "failed")).toHaveLength(1);
+    expect(() => process.kill(pid, 0)).toThrow(
+      expect.objectContaining({ code: "ESRCH" }),
+    );
+    await runner.close();
+  });
+
+  it("真实 CLI 超时归一化为可重试 TIMEOUT 并回收子进程", async () => {
+    const target = fixtureEnvironment();
+    const runner = new LocalRunner({
+      workspaceRoot: target.workspaceRoot,
+      sessionStore: new SessionStore(target.sessionPath),
+      getAdapter: (id: string) =>
+        id === TimeoutFixtureAdapter.id ? TimeoutFixtureAdapter : null,
+      hostId: "test-host",
+    });
+    let seenPid: (pid: number) => void = () => {};
+    const pidSeen = new Promise<number>((resolve) => {
+      seenPid = resolve;
+    });
+    const value = {
+      ...request("run-timeout", "__BLOCK__"),
+      adapter: TimeoutFixtureAdapter.id,
+    };
+    const execution = runner.dispatch(value, {
+      onEvent: (event: RunnerEvent) => {
+        if (event.kind === "progress" && event.label?.startsWith("pid:")) {
+          seenPid(Number(event.label.slice(4)));
+        }
+      },
+    });
+    const pid = await pidSeen;
+
+    await expect(execution).rejects.toMatchObject({
+      error: {
+        requestId: value.requestId,
+        code: RUNNER_ERROR_CODES.TIMEOUT,
+        retryable: true,
+      },
+    });
+    await runner.close();
+    expect(() => process.kill(pid, 0)).toThrow(
+      expect.objectContaining({ code: "ESRCH" }),
+    );
   });
 });
 

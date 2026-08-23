@@ -48,6 +48,7 @@ const WORKSPACE = process.env.AGENT_CWD ?? resolve(HERE, "../workspace");
 const LOG_PATH = process.env.LOG_PATH ?? resolve(HERE, "../data/events.jsonl");
 const SESSION_PATH = process.env.SESSION_PATH ?? join(dirname(LOG_PATH), "sessions.json");
 const PROJECT = "proj_hub";
+const HUB_URL = `http://localhost:${PORT}`;
 
 /** Claude Code is the default coordinator: measured to participate, and holding
  *  one vendor fixed keeps "how a coordinator behaves" from being a moving part. */
@@ -85,8 +86,8 @@ function broadcast(type, data) {
   for (const res of clients) res.write(frame);
 }
 
-// This process is the first Local Runner. The closure is invoked only after
-// `hub` exists, so every adapter receives the final bound callback URL.
+// This process is the first Local Runner. It owns adapter construction,
+// working-copy placement and MCP mounting; the Hub only dispatches requests.
 const runner = new LocalRunner({
   workspaceRoot: WORKSPACE,
   sessionStore: new SessionStore(SESSION_PATH),
@@ -95,7 +96,7 @@ const runner = new LocalRunner({
   mcpFor: (request, workspace) =>
     mountMcp(request.adapter, {
       dir: workspace,
-      url: hub.url,
+      url: HUB_URL,
       token: credentials.tokenForAgent(request.agent),
     }),
 });
@@ -105,10 +106,7 @@ const hub = new Hub({
   projectId: PROJECT,
   broadcast,
   getAdapter,
-  workspace: WORKSPACE,
-  url: `http://localhost:${PORT}`,
   budget: Number(process.env.HOP_BUDGET ?? 6),
-  tokenForAgent: (id) => credentials.tokenForAgent(id),
   runner,
   userId: HUMAN_ID,
 });

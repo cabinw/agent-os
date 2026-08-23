@@ -181,9 +181,9 @@ Local Runner foundation ✓
        ↓
 Local Runner end-to-end ✓
        ↓
-Shared Runner contract ← next
+Shared Runner contract ✓
        ↓
-Remote Runner transport
+Remote Runner transport ← active
        ↓
 Phase 1.1 Event Core
 ```
@@ -199,9 +199,10 @@ regression coverage.
 **LF · Local Runner foundation — complete.** `src/runners/contract.mjs` defines
 strict request, normalized event / result / error shapes. `LocalRunner` calls a
 real subprocess through the adapter boundary, rejects `..` and symlink workspace
-escapes, serializes work per logical session and restores an atomic `0600`
-session snapshot after restart. Four focused tests cover success / stream,
-failure, containment and `(user, project, agent)` isolation.
+escapes, serializes work per logical session and restores atomic `0600` session
+and request-ledger snapshots after restart. Real-process tests cover success,
+streaming, failure, timeout, cancellation, containment and three-dimensional
+session isolation.
 
 **L · Local Runner end to end — complete as an injectable vertical slice.** When
 a Runner is injected, Hub dispatch supplies runtime-owned
@@ -210,17 +211,16 @@ through the existing tool callback. Tests drive a real subprocess through Hub �
 Local Runner → adapter, carry a task to review, normalize failure and prove the
 per-agent queue recovers.
 
-**C · Finish the shared contract — next.** Keep adapter result
-`{text, sessionId, ms, fresh}` plus its event stream. Specify cancellation,
-retry, errors and liveness. Persist logical ownership at
-`(user, project, agent)`: the Hub records the host; that Runner keeps the opaque
-vendor handle, adapter and canonical workspace.
-Make Runner injection mandatory in the server composition root and remove the
-Hub's temporary direct-adapter fallback: without a Runner it must fail closed,
-not execute. *Done when:* contract tests do not know whether the transport is
-local or remote and the Hub has no vendor execution path.
+**C · Shared Runner contract — complete.** Local and Remote expose
+`dispatch / cancel / health / hasSession / resetSession / close`. One reusable
+suite fixes request, event, result, cancellation, retry classification, session,
+liveness and shutdown semantics. A `0600` request ledger stores a SHA-256
+fingerprint plus normalized observations and terminal value: completed and
+failed requests replay across restart; a crash during queued/running becomes
+explicit `UNAVAILABLE` and never silently executes twice. Runner injection is
+mandatory and the Hub has no adapter, working-copy or vendor execution path.
 
-**R · Remote Runner.** Add authentication, serialization, reconnect and
+**R · Remote Runner — active.** Add authentication, serialization, reconnect and
 backpressure to an outbound Runner connection. Workstations expose no inbound
 port. Capability is registered for `(agent, host)`.
 *Done when:* the unchanged Local acceptance task runs remotely and produces the

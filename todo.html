@@ -440,11 +440,11 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
     <span class="done-when"><b>已验证：</b>真实子进程走 Hub → Local Runner → adapter；stream 回写、任务到 review、failure 归一化与同 agent 队列恢复 3/3</span>
   </label></li>
 
-  <li><input type="checkbox" id="t-h-c"><label for="t-h-c" class="tb">
+  <li><input type="checkbox" id="t-h-c" checked><label for="t-h-c" class="tb">
     <span class="tt"><span class="tid">RC</span>冻结 Local / Remote 共享契约</span>
     <span class="td">统一 dispatch、<code>{text, sessionId, ms, fresh}</code>、event stream、取消、重试、错误和 liveness。逻辑 session 键固定为 <code>(user, project, agent)</code>，能力固定为 <code>(agent, host)</code>。server composition root 强制注入 Runner，并删除 direct-adapter fallback；无 Runner 必须 fail closed。</span>
-    <span class="tm"><span class="tag crit">关键路径</span><span class="tag dep">依赖 L</span></span>
-    <span class="done-when"><b>完成判据：</b>contract tests 不知道 transport 是 local 还是 remote</span>
+    <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">已完成</span></span>
+    <span class="done-when"><b>已验证：</b>18 项共享契约覆盖持久幂等、三维 session、cancel / health / close；Hub 无 direct fallback</span>
   </label></li>
 
   <li><input type="checkbox" id="t-h-r"><label for="t-h-r" class="tb">

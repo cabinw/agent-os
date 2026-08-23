@@ -158,8 +158,6 @@ function makeSystem({ reportTasks = false } = {}) {
     projectId: "proj_runner",
     broadcast: (type: string, data: Broadcast["data"]) => broadcasts.push({ type, data }),
     getAdapter: (id: string) => (id === "claude" ? HubCliFixtureAdapter : null),
-    workspace: workspaceRoot,
-    url: "http://127.0.0.1:0",
     runner,
     userId: "user-local",
   }) as TestHub;
@@ -242,7 +240,7 @@ describe("Hub → Local Runner vertical slice", () => {
       data: expect.objectContaining({
         agent: "claude",
         code: RUNNER_ERROR_CODES.ADAPTER_FAILURE,
-        retryable: true,
+        retryable: false,
       }),
     });
     expect(

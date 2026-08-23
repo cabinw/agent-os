@@ -227,7 +227,7 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
 
       <div class="alert">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3.5v.5M10.3 4.3 2.8 17.2A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.8L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <div><strong>拓扑已经收敛，下一步落实唯一执行面</strong><p><a href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008</a> 已取代 <a href="docs/decisions/ADR-007-implementation-stack.md">ADR-007</a> 的单机范围：Server Hub 只 dispatch，Local / Remote Runner 共用契约。当前应让 Runner 成为服务组合根的必经路径并移除 direct-adapter fallback，再开发 Remote Runner。</p></div>
+        <div><strong>唯一执行面已落实，当前进入 Remote transport</strong><p><a href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008</a> 已取代 <a href="docs/decisions/ADR-007-implementation-stack.md">ADR-007</a> 的单机范围：Server Hub 只 dispatch，Local / Remote Runner 共用契约。Runner 已成为服务组合根的必经路径，direct-adapter fallback 已移除；当前只替换 transport 开发 Remote Runner。</p></div>
       </div>
 
       <div class="kpis" aria-label="当前状态">
@@ -308,8 +308,8 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
 
           <article class="work-card" data-tone="info">
             <div class="work-top"><div><div class="work-id">ADR-008</div><h3>落实 Local / Remote Runner 共享契约</h3></div><a class="source-link" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">正式决策 →</a></div>
-            <p>拓扑、身份、host capability、session placement 与共享请求／事件／结果契约已经定案；下一步让 Runner 成为服务组合根的唯一执行面。</p>
-            <div class="tags"><span class="tag ok">决策已完成</span><span class="tag info">实现继续</span><span class="tag">先于 Remote</span></div>
+            <p>拓扑、身份、host capability、session placement 与共享请求／事件／结果契约已经定案；Runner 已成为服务组合根的唯一执行面。</p>
+            <div class="tags"><span class="tag ok">决策已完成</span><span class="tag ok">契约已完成</span><span class="tag">先于 Remote</span></div>
             <div class="done-when"><b>完成判据：</b>仓库中只有一个 Runner contract；本地与远程调用的差异被限制在 transport 和网络失败恢复。</div>
           </article>
 

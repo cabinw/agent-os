@@ -29,8 +29,9 @@ export class CodexAdapter extends Adapter {
   };
 
   #client = null;
+  #pendingClient = null;
 
-  async #connect() {
+  async #connect(signal) {
     if (this.#client) return;
 
     const transport = new StdioClientTransport({
@@ -43,6 +44,11 @@ export class CodexAdapter extends Adapter {
       { name: "agent-os-chat-spike", version: "0.0.0" },
       { capabilities: {} },
     );
+    this.#pendingClient = client;
+    const abort = () => {
+      void client.close().catch(() => {});
+    };
+    signal?.addEventListener("abort", abort, { once: true });
 
     // `codex/event` is a vendor notification, not an MCP standard method, so it
     // lands on the fallback handler rather than a typed one.
@@ -71,12 +77,25 @@ export class CodexAdapter extends Adapter {
       this.onEvent({ kind: "progress", label: msg.type });
     };
 
-    await client.connect(transport);
-    this.#client = client;
+    try {
+      await client.connect(transport);
+      if (signal?.aborted) {
+        throw signal.reason instanceof Error
+          ? signal.reason
+          : new Error("Codex 连接已取消");
+      }
+      this.#client = client;
+    } catch (error) {
+      await client.close().catch(() => {});
+      throw error;
+    } finally {
+      signal?.removeEventListener("abort", abort);
+      if (this.#pendingClient === client) this.#pendingClient = null;
+    }
   }
 
-  async send(prompt) {
-    await this.#connect();
+  async send(prompt, { signal } = {}) {
+    await this.#connect(signal);
 
     const fresh = !this.hasSession;
     const started = Date.now();
@@ -101,6 +120,7 @@ export class CodexAdapter extends Adapter {
       timeout: CALL_TIMEOUT_MS,
       maxTotalTimeout: CALL_TIMEOUT_MS,
       resetTimeoutOnProgress: true,
+      signal,
     });
 
     const structured = res?.structuredContent ?? {};
@@ -119,7 +139,13 @@ export class CodexAdapter extends Adapter {
   }
 
   async close() {
-    await this.#client?.close().catch(() => {});
+    const clients = new Set([this.#client, this.#pendingClient].filter(Boolean));
     this.#client = null;
+    this.#pendingClient = null;
+    await Promise.all([...clients].map((client) => client.close().catch(() => {})));
+  }
+
+  async cancel() {
+    await this.close();
   }
 }

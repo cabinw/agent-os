@@ -31,6 +31,9 @@ import { makeEvent } from "../src/events.mjs";
 import { newBearerToken } from "../src/http-security.mjs";
 import { Hub } from "../src/hub.mjs";
 import { EventLog } from "../src/log.mjs";
+import { mountMcp } from "../src/mcp-mount.mjs";
+import { LocalRunner } from "../src/runners/local.mjs";
+import { SessionStore } from "../src/runners/session-store.mjs";
 
 /**
  * Facts are arbitrary on purpose — a model cannot infer "7734" or "青铜麋鹿"
@@ -80,18 +83,29 @@ function harness(providerId, Cls) {
   // Experiment-only transport credential: process-local, never written to the
   // event log. The MCP mount stores it in its 0600 per-agent config.
   const token = newBearerToken();
+  const workspaceRoot = join(dir, "workspace");
+  const runner = new LocalRunner({
+    workspaceRoot,
+    sessionStore: new SessionStore(join(dir, "sessions.json")),
+    getAdapter: (id) => (id === providerId ? Cls : null),
+    hostId: "context-rebuild",
+    mcpFor: (request, workspace) =>
+      mountMcp(request.adapter, {
+        dir: workspace,
+        url: "http://127.0.0.1:0",
+        token,
+      }),
+  });
   const hub = new Hub({
     log,
     projectId: PROJECT,
     broadcast: () => {},
     getAdapter: (id) => (id === providerId ? Cls : null),
-    workspace: join(dir, "workspace"),
-    url: "http://127.0.0.1:0",
-    tokenForAgent: (id) => (id === providerId ? token : null),
+    runner,
   });
   hub.register(providerId);
 
-  return { log, hub, emit: (event) => hub.emit(event) };
+  return { log, hub, runner, emit: (event) => hub.emit(event) };
 }
 
 /**
@@ -139,19 +153,12 @@ async function run(providerId, mode, padding = 0) {
   const Cls = getAdapter(providerId);
   if (!Cls) throw new Error(`未知 provider：${providerId}`);
 
-  const { log, hub, emit } = harness(providerId, Cls);
+  const { log, hub, runner, emit } = harness(providerId, Cls);
   const tools = hub.tools;
 
   // Usage is the axis the first two experiments missed: recall held and latency
   // stayed flat, so what a rebuild actually costs is what it is billed.
   let usage = null;
-  const entry = hub.agents.get(providerId);
-  const adapter = hub.adapterFor(entry);
-  const priorOnEvent = adapter.onEvent;
-  adapter.onEvent = (e) => {
-    priorOnEvent(e);
-    if (e.kind === "usage") usage = e;
-  };
   const turns = [];
   let hits = 0;
   let tokens = 0;
@@ -179,7 +186,7 @@ async function run(providerId, mode, padding = 0) {
     let prompt = step.say;
     if (mode === "rebuild") {
       // The whole point: the vendor keeps nothing, the log supplies everything.
-      adapter.resetSession();
+      await runner.resetSession({ user: HUMAN, project: PROJECT, agent: providerId });
       // This is the actual Hub runtime path used by a woken local agent, not a
       // second experiment-only implementation of get_context.
       const ctx = await tools.call("get_context", {});
@@ -188,7 +195,23 @@ async function run(providerId, mode, padding = 0) {
 
     usage = null;
     const started = Date.now();
-    const reply = await adapter.send(prompt);
+    const reply = await runner.dispatch(
+      {
+        requestId: asked.id,
+        user: HUMAN,
+        project: PROJECT,
+        agent: providerId,
+        adapter: providerId,
+        workspace: providerId,
+        prompt,
+        causedBy: asked.id,
+      },
+      {
+        onEvent: (event) => {
+          if (event.kind === "usage") usage = event;
+        },
+      },
+    );
     const ms = Date.now() - started;
     tokens += usage?.total ?? 0;
     costUsd += usage?.costUsd ?? 0;

@@ -5,7 +5,7 @@
  *
  * Every adapter normalises a vendor into:
  *
- *   send(prompt) → { text, sessionId, ms, fresh }
+ *   send(prompt, { signal }) → { text, sessionId, ms, fresh }
  *   onEvent(evt) where evt.kind ∈ delta | thought | progress | usage
  *
  * and declares what it can actually do. Capabilities are declared, not assumed:
@@ -14,6 +14,15 @@
  */
 
 import { spawn } from "node:child_process";
+import {
+  RUNNER_ERROR_CODES,
+  RunnerDispatchError,
+  runnerError,
+} from "../runners/contract.mjs";
+
+function abortReason(signal, fallback = "Adapter 已取消") {
+  return signal?.reason instanceof Error ? signal.reason : new Error(fallback);
+}
 
 /**
  * @typedef {object} Capabilities
@@ -83,10 +92,17 @@ export class Adapter {
     this._sessionId = sessionId;
   }
 
-  /** @returns {Promise<{text: string, sessionId: string|null, ms: number, fresh: boolean}>} */
-  async send(_prompt) {
+  /**
+   * @param {string} _prompt
+   * @param {{signal?: AbortSignal}} [_options]
+   * @returns {Promise<{text: string, sessionId: string|null, ms: number, fresh: boolean}>}
+   */
+  async send(_prompt, _options = {}) {
     throw new Error("not implemented");
   }
+
+  /** Stop the active vendor operation. Subclasses with resources override it. */
+  async cancel(_reason) {}
 
   async close() {}
 }
@@ -112,7 +128,11 @@ export class SubprocessAdapter extends Adapter {
     return undefined;
   }
 
-  async send(prompt) {
+  _activeCancel = null;
+  _activeClose = Promise.resolve();
+
+  async send(prompt, { signal } = {}) {
+    if (signal?.aborted) throw abortReason(signal);
     const fresh = !this.hasSession;
     const started = Date.now();
     const built = this.buildCommand(prompt, this._sessionId);
@@ -129,20 +149,58 @@ export class SubprocessAdapter extends Adapter {
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, ...(this.mcp?.env ?? {}) },
       });
+      let closeResolve = () => {};
+      const childClosed = new Promise((closed) => {
+        closeResolve = closed;
+      });
+      this._activeClose = childClosed;
 
+      let settled = false;
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        child.stdout.off("data", onStdout);
+        child.stderr.off("data", onStderr);
+        if (this._activeCancel === cancelChild) this._activeCancel = null;
+      };
+      const succeed = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const fail = (error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const cancelChild = (reason) => {
+        try {
+          child.kill("SIGKILL");
+        } finally {
+          fail(reason instanceof Error ? reason : new Error("Adapter 已取消"));
+        }
+      };
+      const onAbort = () => cancelChild(abortReason(signal));
+
+      const timeoutMs = this.constructor.timeoutMs;
       const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        reject(
-          new Error(
-            `${this.constructor.label} 超时（${SubprocessAdapter.timeoutMs / 1000}s）`,
-          ),
+        const error = new RunnerDispatchError(
+          runnerError({
+            requestId: "unknown",
+            code: RUNNER_ERROR_CODES.TIMEOUT,
+            message: `${this.constructor.label} 超时（${timeoutMs / 1000}s）`,
+            retryable: true,
+          }),
         );
-      }, SubprocessAdapter.timeoutMs);
+        cancelChild(error);
+      }, timeoutMs);
 
       let buf = "";
       let stderr = "";
 
-      child.stdout.on("data", (d) => {
+      const onStdout = (d) => {
         buf += d.toString();
         for (let i = buf.indexOf("\n"); i >= 0; i = buf.indexOf("\n")) {
           const line = buf.slice(0, i).trim();
@@ -158,21 +216,26 @@ export class SubprocessAdapter extends Adapter {
           if (partial?.text) collected.text += partial.text;
           if (partial?.sessionId) collected.sessionId = partial.sessionId;
         }
-      });
+      };
 
-      child.stderr.on("data", (d) => {
+      const onStderr = (d) => {
         stderr += d.toString();
-      });
+      };
+
+      child.stdout.on("data", onStdout);
+      child.stderr.on("data", onStderr);
+      this._activeCancel = cancelChild;
+      signal?.addEventListener("abort", onAbort, { once: true });
 
       child.on("error", (e) => {
-        clearTimeout(timer);
-        reject(e);
+        closeResolve();
+        fail(e);
       });
 
       child.on("close", (code) => {
-        clearTimeout(timer);
-        if (code === 0) return resolve();
-        reject(
+        closeResolve();
+        if (code === 0) return succeed();
+        fail(
           new Error(
             `${this.constructor.label} 退出码 ${code}${stderr ? `：${stderr.trim().slice(0, 200)}` : ""}`,
           ),
@@ -188,5 +251,11 @@ export class SubprocessAdapter extends Adapter {
       ms: Date.now() - started,
       fresh,
     };
+  }
+
+  async cancel(reason) {
+    const childClosed = this._activeClose;
+    this._activeCancel?.(reason);
+    await childClosed;
   }
 }
