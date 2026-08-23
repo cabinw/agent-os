@@ -12,14 +12,19 @@ executes, and accumulates memory that outlives any single session.
 ## Status
 
 Architecture plus an executable chat / Hub spike. The spike contains the event
-log, MCP trust boundary, Hub runtime and four vendor adapters; formal
-`packages/*` still contain contracts and foundational types. Hub hardening is
-complete. The shared Runner contract now covers durable request-id idempotency,
+log, MCP trust boundary, Hub runtime and four vendor adapters; formal Phase 1
+implementation has begun in `packages/event-core`. Hub hardening is
+active: the runtime trust boundary is complete while the Ubuntu deployment and
+upgrade transaction are being hardened. The shared Runner contract covers durable request-id idempotency,
 events, sessions, cancellation, health, retry classification and close; Runner
 injection is mandatory and the Hub has no vendor execution fallback. The active
-Remote path now runs through the production Server Hub / outbound Worker
-composition with durable placement, fenced leases, restart replay and isolated
-credentials. The active step is formal Event Core.
+Remote code path now runs through the Server Hub / outbound Worker production
+composition root with durable placement, fenced leases, restart replay and
+isolated credentials. It remains staging-only rather than production-ready
+until the deployment and durable-store gates are complete. The versioned strict
+Event Core contract (`RM-1.1a`) is complete;
+the active operational step is `SVR-02`, followed by the formal SQLite event
+store (`RM-1.1b`).
 
 ## Where to start
 
@@ -28,6 +33,7 @@ credentials. The active step is formal Event Core.
 | Understand the idea | [docs/vision.md](docs/vision.md) |
 | Understand the system | [docs/architecture/overview.md](docs/architecture/overview.md) |
 | Understand Hub / Runner deployment | [ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md) |
+| Understand permanent event compatibility | [ADR-009](docs/decisions/ADR-009-versioned-strict-event-contract.md) |
 | Integrate an agent | [docs/protocol/mcp-protocol.md](docs/protocol/mcp-protocol.md) |
 | Build the UI | [docs/product/navigation.md](docs/product/navigation.md), [docs/design/design-language.md](docs/design/design-language.md) |
 | Know what to build next | [docs/development/roadmap.md](docs/development/roadmap.md) |
@@ -36,7 +42,8 @@ credentials. The active step is formal Event Core.
 A full walkthrough — architecture plus a user-facing guide with high-fidelity
 interface designs — is in [doc.html](doc.html). Open it in a browser.
 
-Run the current implementation and its full gate from
+Run the full repository gate from the repository root with
+`corepack pnpm verify`. Hub / Runner usage is documented in
 [apps/chat-spike](apps/chat-spike/README.md).
 
 ## Core principles

@@ -7,7 +7,7 @@
  * Sibling of memory-core: the two must not import each other
  * (docs/architecture/packages.md).
  *
- * Contract to implement (Phase 1.5–1.7, 1.13):
+ * Contract to implement (Phase 1.2a–1.2c, 1.5b):
  *   transition(task, event)  → ADR-002 matrix; illegal transitions rejected
  *   dependsOn readiness      → cycles rejected at creation
  *   route(requires)          → reads `capabilities` only, never `provider`

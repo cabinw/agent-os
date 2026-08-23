@@ -4,7 +4,7 @@
  * The lowest layer permitted to name a vendor. Everything below this line
  * routes on `capabilities` only (ADR-004); adapters live here and nowhere else.
  *
- * Contract to implement (Phase 1.11):
+ * Contract to implement (Phase 1.4a):
  *   register / receiveTask / reportProgress / reportResult / sendEvent
  *
  * An agent that already speaks MCP needs no adapter at all — it calls the MCP

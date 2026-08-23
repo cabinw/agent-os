@@ -1,7 +1,7 @@
 /**
  * Spike storage: an append-only JSONL file.
  *
- * **This is the throwaway part.** Phase 1.2 replaces it with SQLite + WAL,
+ * **This is the throwaway part.** Phase 1.1b replaces it with SQLite + WAL,
  * proper transactional seq allocation, idempotency tokens, and snapshots
  * (docs/development/roadmap.md). What survives is everything built on top of
  * it, because nothing above this file knows how events are stored.

@@ -3,17 +3,18 @@
 Updated 2026-08-23 for an agent picking this up cold. Read this before
 `CLAUDE.md`.
 
-## Read this first: the code is not where you will look for it
+## Read this first: Spike evidence and the formal kernel coexist
 
 Run `corepack pnpm verify` before trusting the working tree. The gate is build,
-Biome, the architectural layer checker and the full Vitest suite; the command's
-reported test count is authoritative.
+compile-time contract probes, Biome, the architectural layer checker and the
+full Vitest suite; the command's reported test count is authoritative.
 
 But the directory layout is misleading:
 
 ```
-packages/*        formal contracts and types; the Phase 1 kernel has not started
-apps/chat-spike/  the executable event log, Hub, MCP boundary and vendor adapters
+packages/event-core/  implemented Phase 1.1a versioned event contract
+packages/*            remaining formal contracts and foundational types
+apps/chat-spike/      executable event log, Hub, MCP boundary and vendor adapters
 ```
 
 Someone reading `packages/` first will conclude the project is an empty skeleton.
@@ -29,7 +30,7 @@ Supervisor decomposes it into tasks, agents from any vendor execute over MCP,
 every state change is an event, and events reduce into task state, UI views and
 durable project knowledge.
 
-`CLAUDE.md` holds the working rules and `docs/README.md` indexes 36 documents. Do not
+`CLAUDE.md` holds the working rules and `docs/README.md` indexes 37 documents. Do not
 re-derive architecture from the code; the specs are canonical and were rewritten
 to remove conflicts.
 
@@ -39,10 +40,11 @@ to remove conflicts.
 | --- | --- |
 | `apps/chat-spike/` | The implementation. Event log, MCP tools, hub runtime, four vendor adapters, one experiment |
 | `apps/chat-spike/FINDINGS.md` | The measurements. Several specs were decided here |
-| `packages/*` | Formal contracts and types. The Phase 1 kernel starts here after the Runner track |
-| `docs/` | 36 documents, including 8 ADRs. Canonical |
+| `packages/event-core/` | Implemented Phase 1.1a strict, versioned event contract |
+| `packages/*` | Remaining formal contracts and foundational types |
+| `docs/` | 37 documents, including 9 ADRs. Canonical |
 | `doc.html` / `todo.html` | Generated walkthrough and implementation plan |
-| `tests/` | Gate, Hub, MCP, event-log, workspace and layering regression suites |
+| `tests/` | Event schema/id/type-contract, Hub, MCP, event-log, workspace and layering regression suites |
 
 The spike is where every architectural claim was actually tested. Treat
 `apps/chat-spike/FINDINGS.md` as evidence, not notes — the numbers in it decided
@@ -57,13 +59,13 @@ manual.
 corepack pnpm verify
 ```
 
-That runs `tsc --build`, Biome, `check:layers`, and Vitest. `check:layers`
+That runs `tsc --build`, compile-time contract probes, Biome, `check:layers`,
+and Vitest. `check:layers`
 mechanically enforces four rules, including that **no event type may be emitted
 unless it exists in `docs/protocol/event-catalog.md`**. Its parser and failure
 paths have regression tests; do not replace it with a permissive grep.
 
-The suite is changing during the Runner extraction. Use the final
-`pnpm verify` output rather than a copied test count.
+Use the final `pnpm verify` output rather than a copied test count.
 
 ## Hub authentication that is now load-bearing
 
@@ -185,7 +187,11 @@ Shared Runner contract ✓
        ↓
 Remote Runner transport ✓
        ↓
-Phase 1.1 Event Core ← active
+Phase 1.1a Event Contract ✓
+       ↓
+Server deployment track ← active
+       ↓
+Phase 1.1b SQLite Event Store
 ```
 
 **G · Gates and Hub trust boundary — complete.** Every data, control,
@@ -227,10 +233,14 @@ backpressure, durable placement / request replay, cancellation and Hub restart
 reconciliation are tested. Vendor children receive only their scoped agent
 credential, never the Runner, human or full agent-token map.
 
-**A · Phase 1.1 Event Core — active.** Move the proven envelope into
-`packages/event-core`: Zod schemas for all catalog types, ULID and strict unknown
-field rejection.
-*Done when:* an unknown `type` or extra field is rejected at parse time.
+**A · Phase 1.1a Event Contract — complete.** ADR-009 fixes a required
+`schemaVersion`, EventInput / EventDraft / StoredEvent, permanent replay and 29
+strict payloads. `packages/event-core` now contains the ULID generator and v1
+version-first parsers, binds every event to its canonical subject and returns
+deeply frozen protocol values. The type contract prevents callers from claiming
+an unrelated parsed type; the complete gate passes 323 / 323 tests.
+*Verified:* unknown version/type, extra fields, illegal cross-field references,
+sub-millisecond future observations and mutation attempts all fail closed.
 
 The deployment decision is canonical in
 `docs/decisions/ADR-008-server-hub-local-first-runners.md`: the Hub owns project
@@ -246,12 +256,10 @@ cross-host file boundary. ADR-007's single-machine scope is superseded.
   only the event types above were pulled forward.
 - Do not add an approval or task-status tool to the MCP surface.
 - Do not "fix" `apps/chat-spike/src/log.mjs`'s JSONL storage. It is knowingly
-  throwaway; Phase 1.2 replaces it with SQLite.
+  throwaway; Phase 1.1b replaces it with SQLite.
 
 ## Open questions the owner has not settled
 
 - Cross-project knowledge (one project's approach reused in another). Confirmed as
   a real need, deliberately deferred — it is derivable from multiple logs and needs
   no envelope change.
-- Whether a Windows machine joins as a runner. The adapters currently assume POSIX
-  spawn semantics.

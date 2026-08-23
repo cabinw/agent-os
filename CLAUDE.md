@@ -13,26 +13,28 @@ pnpm is provided by corepack (`corepack pnpm …`); there is no global install.
 | `pnpm test` | Vitest. `pnpm test -- tests/layering.test.ts` for one file |
 | `pnpm check` / `check:fix` | Biome lint + format |
 | `pnpm check:layers` | Layering guard — see below |
-| `pnpm verify` | build + check + check:layers + test. Run before every commit. |
+| `pnpm verify` | build + type-contract check + Biome + check:layers + tests. Run before every commit. |
 
 **There is no CI by decision.** `pnpm verify` is the only gate, and it is manual — run it. `check:layers` enforces four rules mechanically: no vendor names below `agent-sdk` (ADR-004), dependency direction, `task-engine` ⇄ `memory-core` isolation, and no event type absent from the catalog. It also runs inside `pnpm test`, so the suite cannot go green while a layering rule is broken.
 
-**Picking this up cold?** Read [HANDOFF.md](HANDOFF.md) first — the working code
-is in `apps/chat-spike/`, not in `packages/`.
+**Picking this up cold?** Read [HANDOFF.md](HANDOFF.md) first. The executable
+Hub / Runner is in `apps/chat-spike/`; formal Event Core work is in `packages/`.
 
 ## Repository status
 
-The executable implementation is in `apps/chat-spike/`: event log, MCP boundary,
-Hub runtime and four vendor adapters. `packages/*/src/index.ts` still hold formal
-contracts and foundational types, not the Phase 1 kernel.
+The executable Hub / Runner implementation is in `apps/chat-spike/`. Formal
+Phase 1 implementation has begun in `packages/event-core`; the other packages
+still hold contracts and foundational types.
 
 Alongside the code: Markdown specs under `docs/`, high-fidelity renders under `ui/`, a generated walkthrough at `doc.html`, an implementation plan at `todo.html`.
 
 Stack: TypeScript + Tauri 2 + SQLite. Deployment is Server Hub plus outbound
 Runners ([ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md));
 ADR-007's single-machine scope is superseded. Gates / auth, Local Runner, the
-shared contract and the production Remote Runner path are complete; formal
-Event Core is now active ([roadmap](docs/development/roadmap.md)).
+shared contract and the production-mode Remote Runner path are complete; formal
+Event Core contract (`RM-1.1a`) is complete. The active operational track is
+the Server Hub deployment, and the next formal kernel item is the SQLite event
+store (`RM-1.1b`; [roadmap](docs/development/roadmap.md)).
 
 The Local Runner has strict request / result / event / error shapes, durable
 request-id idempotency, cancellation / health / close semantics, workspace
@@ -59,6 +61,7 @@ The specs were rewritten to remove conflicts. When anything disagrees, these win
 | --- | --- |
 | Task states | [ADR-002](docs/decisions/ADR-002-task-lifecycle.md) |
 | Event names and payloads | [event-catalog.md](docs/protocol/event-catalog.md) |
+| Event envelope and versioning | [ADR-009](docs/decisions/ADR-009-versioned-strict-event-contract.md) / [event-core.md](docs/architecture/event-core.md) |
 | MCP tools | [mcp-protocol.md](docs/protocol/mcp-protocol.md) (v0.3) |
 | Navigation | [navigation.md](docs/product/navigation.md) / [ADR-003](docs/decisions/ADR-003-navigation-information-architecture.md) |
 | Visual style | [design-language.md](docs/design/design-language.md) |
@@ -100,13 +103,17 @@ apps/macos / apps/hub → mcp-server → { agent-sdk, task-engine, memory-core }
 apps/runner → agent-sdk → event-core types
 ```
 
-`event-core` is the bottom of the stack and depends on nothing — it exports `registerReducer` and the domain packages register into it, never the reverse. `task-engine` and `memory-core` are siblings and must not import each other. Enforced by `pnpm check:layers`.
+`event-core` is the bottom of the stack and has zero internal workspace
+dependencies. It currently exports the versioned event contract; reducer
+registration lands in RM-1.1c. Domain packages register into it, never the
+reverse. `task-engine` and `memory-core` are siblings and must not import each
+other. Enforced by `pnpm check:layers`.
 
 Build order is `event-core → task-engine → mcp-server → agent-sdk → memory-core` — a UI written before the reducers exist will invent state.
 
 | Package | Owns |
 | --- | --- |
-| `event-core` | The log, ordering, snapshots, replay, reducer registration |
+| `event-core` | Versioned strict event contract, log, ordering, snapshots, replay, reducer registration |
 | `task-engine` | Legal transitions, dependencies, capability routing |
 | `memory-core` | Knowledge items, links, superseding |
 | `agent-sdk` | Adapter surface; the lowest layer allowed to name a vendor |

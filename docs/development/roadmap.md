@@ -16,7 +16,9 @@ order; Remote Runner work does not start until Local Runner semantics pass.
 | L | done | Add injectable Hub → Local Runner vertical slice | A real subprocess crosses Hub → Runner → adapter, records its reply and recovers after failure |
 | C | done | Finish the shared Runner contract; remove direct-adapter fallback | Session, event stream, cancellation, retry, error and liveness cases have transport-neutral tests; Hub requires a Runner |
 | R | done | Remote Runner transport | The Local acceptance task runs unchanged; the normalized event sequence matches |
-| 1.1 | active | Formal Event Core | The proven envelope and contracts move into `packages/` |
+| 1.1a | done | Versioned strict Event Contract | The v1 envelope, 29 payloads, ULID, subject rules and type contract live in `packages/event-core` |
+| SVR | active | Server Hub deployment and Windows Worker validation | Trusted deployment, recovery and real cross-host evidence pass without weakening HTTPS or identity boundaries |
+| 1.1b | next | SQLite Event Store | Transactional sequence allocation and idempotent append replace the throwaway JSONL truth source |
 
 The Hub is the server control plane and dispatches only. Project working copies,
 vendor credentials and adapters stay on Runners. See
@@ -33,6 +35,17 @@ Goal: prove the runtime loop end to end, headless. No UI.
 | 1.3 MCP Server | All v0.3 tools, validated at the boundary | An external agent completes a task with no bespoke code |
 | 1.4 Agent SDK | Shared Runner contract; register, dispatch, report; one adapter | Local and Remote transports execute the same task type identically |
 | 1.5 Demo | Supervisor → task → agent → events → status | The scenario below runs from a script |
+
+Live execution uses nested work-item ids without redefining the public
+milestones:
+
+| Milestone | Work items |
+| --- | --- |
+| 1.1 Event Core | `1.1a` envelope/schema/ULID · `1.1b` SQLite store · `1.1c` bus/replay/reducers · `1.1d` snapshots |
+| 1.2 Task Engine | `1.2a` lifecycle matrix · `1.2b` dependency graph · `1.2c` capability routing |
+| 1.3 MCP Server | `1.3a` 12 strict tools · `1.3b` authorization boundary · `1.3c` approval gate |
+| 1.4 Agent SDK | `1.4a` SDK and first formal adapter |
+| 1.5 Demo | `1.5a` Supervisor · `1.5b` thread reducer · `1.5c` end-to-end script |
 
 Demo scenario: a supervisor creates a task, Agent OS routes it by capability, the
 executing agent reports progress and a result, and project status updates — all

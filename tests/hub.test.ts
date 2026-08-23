@@ -614,7 +614,7 @@ describe("B.3 按能力找人", () => {
 });
 
 /**
- * C — tasks. The point is not the state machine (Phase 1.5 owns that) but the
+ * C — tasks. The point is not the state machine (Phase 1.2a owns that) but the
  * boundary: a task scopes a thread, and no argument an agent can send reaches
  * `completed`.
  */

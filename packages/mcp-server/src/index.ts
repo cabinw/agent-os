@@ -4,11 +4,11 @@
  * The whole trust boundary lives here. Validation, authorization, and the v0.3
  * tools. Holds no state of its own.
  *
- * Contract to implement (Phase 1.8–1.10):
+ * Contract to implement (Phase 1.3a–1.3c):
  *   the 12 tools in docs/protocol/mcp-protocol.md, validated with a strict
  *   schema — unknown fields are *rejected*, not ignored.
  *
- * Three things an agent can never do, enforced here (Phase 1.9):
+ * Three things an agent can never do, enforced here (Phase 1.3b–1.3c):
  *   1. write an event directly
  *   2. set a task's status
  *   3. approve anything — including another agent's request

@@ -241,7 +241,7 @@ Two rules it enforces, both testable:
 Live-only signals — token deltas, reasoning, progress — bypass the log by
 design. They are previews; the logged `message.sent` is the fact.
 
-`log.mjs` is the throwaway part: Phase 1.2 replaces JSONL with SQLite + WAL,
+`log.mjs` is the throwaway part: Phase 1.1b replaces JSONL with SQLite + WAL,
 transactional seq allocation, idempotency tokens and snapshots. Nothing above it
 knows how events are stored.
 
@@ -269,6 +269,11 @@ co-located orchestration and `log.mjs` are scaffolding.
    coverage.
 4. **Done:** freeze cancellation, retry and liveness tests; persist request-id
    idempotency; require Runner injection and remove the direct fallback.
-5. **Done:** outbound Remote Runner production composition reruns the same
+5. **Done:** outbound Remote Runner production-mode composition reruns the same
    acceptance task through the Hub, authenticated transport and Worker entry.
-6. Move the proven envelope and contracts into formal packages.
+6. **Done:** move the versioned strict Event Contract into
+   `packages/event-core` (`RM-1.1a`).
+7. **Active:** harden and validate Server Hub deployment, recovery and the
+   Windows Worker path (`SVR-02` through `SVR-06`).
+8. **Next:** replace the throwaway JSONL truth source with the SQLite Event
+   Store (`RM-1.1b`).

@@ -58,8 +58,9 @@ authentication, reconnect, duplicate delivery, timeout and cancellation.
 ## Repository gate
 
 There is no hosted CI. `corepack pnpm verify` is the manual release and commit
-gate: build, Biome, architectural layer checks and the full Vitest suite. Do not
-copy a test count into this strategy; the command output is authoritative.
+gate: build, compile-time type-contract probes, Biome, architectural layer
+checks and the full Vitest suite. Do not copy a test count into this strategy;
+the command output is authoritative.
 
 ## Replay as a test
 

@@ -150,7 +150,7 @@ td code{white-space:nowrap}
 <div class="hero">
   <div class="eyebrow">从规格到代码</div>
   <h1>实施 TODO</h1>
-  <p class="lede" style="margin-top:12px;max-width:680px">当前状态：docs 下 36 份文档（含 8 条 ADR）。可执行的 chat / Hub spike 已包含事件日志、MCP 边界、Hub runtime 和四家适配器；正式 <code>packages/*</code> 仍是契约。当前路线是 <b>质量门禁与认证 → Local Runner → 共享契约 → Remote Runner → Event Core</b>。</p>
+  <p class="lede" style="margin-top:12px;max-width:680px">当前状态：Local / Remote Runner 与 RM-1.1a Event Contract 已完成，9 条 ADR 已固定关键边界；Server Hub 部署与 Windows 联调正在执行，完成后进入 RM-1.1b SQLite Event Store。正式内核路线仍是 <b>Event Core → Task Engine → MCP Server → Agent SDK → Demo</b>。</p>
 
   <div class="progress-wrap">
     <div class="progress-top">
@@ -274,7 +274,7 @@ td code{white-space:nowrap}
 │   ├── src-tauri/             Rust：窗口、tray、菜单栏挂件
 │   └── src/                   React：七个界面
 ├── packages/                                              ✓
-│   ├── event-core/            内核 —— 零依赖，不含 DOM lib   ✓
+│   ├── event-core/            内核 —— 零内部依赖，不含 DOM lib ✓
 │   ├── task-engine/           生命周期、依赖、能力路由、会话  ✓
 │   ├── memory-core/           知识抽取                      ✓
 │   ├── agent-sdk/             适配器（唯一允许出现厂商名的层）✓
@@ -288,7 +288,7 @@ td code{white-space:nowrap}
 <div class="note"><p><b>依赖方向（写 tsconfig 时修正过一次）：</b><code>A ──▶ B</code> 读作 A imports B。</p>
 <pre style="margin:10px 0 0"><code>apps/hub ──▶ mcp-server ──▶ { agent-sdk, task-engine, memory-core } ──▶ event-core
 apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
-<p style="margin-top:8px"><code>event-core</code> 在<b>最底层且零依赖</b>——它导出 <code>registerReducer</code>，是别人注册进来，不是反过来。原规格图把它画在中间，等于说内核依赖领域层；已修正并加了箭头图例。</p></div>
+<p style="margin-top:8px"><code>event-core</code> 在<b>最底层且零内部 workspace 依赖</b>——当前导出版本化事件契约，RM-1.1c 再加入 <code>registerReducer</code>；领域包注册进来，不是内核反向依赖领域包。纯 schema / storage 运行库不反转内部依赖方向。原规格图把它画在中间，等于说内核依赖领域层；已修正并加了箭头图例。</p></div>
 </section>
 
 <!-- ===================== 关键判断 ===================== -->
@@ -331,19 +331,19 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 </div>
 <p class="phase-goal">roadmap 里没有这一阶段，但没有它 Phase 1 无处落脚。<b>实际用时约半天</b>，已并入 <a href="https://github.com/cabinw/agent-os/pull/2">PR #2</a>。</p>
 
-<div class="note"><b>做的时候发现一个规格 bug。</b><code>packages.md</code> 的依赖图把 <code>event-core</code> 画在中间、领域包画在下面，配上「Strictly downward」等于说内核依赖领域层——而同一份文档要求它「在裸运行时里可测」、又导出 <code>registerReducer</code>（是别人注册进来）。已修正为 event-core 在最底层零依赖，并给箭头加了图例。<b>这种 bug 只有在写 tsconfig 的 references 时才会暴露</b>，纯文档阶段两种读法都说得通。</div>
+<div class="note"><b>做的时候发现一个规格 bug。</b><code>packages.md</code> 的依赖图把 <code>event-core</code> 画在中间、领域包画在下面，配上「Strictly downward」等于说内核依赖领域层——而同一份文档要求它「在裸运行时里可测」、未来还要导出 <code>registerReducer</code>（是别人注册进来）。已修正为 event-core 在最底层且零内部 workspace 依赖，并给箭头加了图例。<b>这种 bug 只有在写 tsconfig 的 references 时才会暴露</b>，纯文档阶段两种读法都说得通。</div>
 
 <ul class="tasks" data-phase="p0">
   <li><input type="checkbox" id="t-0-1" checked><label for="t-0-1" class="tb">
     <span class="tt"><span class="tid">0.1</span>pnpm workspace + 五个空包骨架</span>
-    <span class="td">依赖方向用 TS project references 编码。<code>event-core</code> 的 <code>references</code> 是空数组、<code>dependencies</code> 字段不存在——零依赖机械可验。<code>tsconfig.base.json</code> 的 <code>lib</code> <b>刻意不含 DOM</b>：packages 里碰 <code>window</code> 直接类型报错，把「内核不得假设 UI 存在」变成编译期约束。</span>
+    <span class="td">依赖方向用 TS project references 编码。<code>event-core</code> 的 <code>references</code> 是空数组，且 <code>dependencies</code> 不得包含任何 <code>@agent-os/*</code>——零内部依赖机械可验；纯 schema / storage 运行库允许直接声明。<code>tsconfig.base.json</code> 的 <code>lib</code> <b>刻意不含 DOM</b>：packages 里碰 <code>window</code> 直接类型报错，把「内核不得假设 UI 存在」变成编译期约束。</span>
     <span class="tm"><span class="tag crit">关键路径</span><span class="tag sz">半天</span></span>
     <span class="done-when"><b>已验证：</b><code>tsc --build</code> 通过，五个包各产出 <code>dist/index.d.ts</code></span>
   </label></li>
 
   <li><input type="checkbox" id="t-0-2" checked><label for="t-0-2" class="tb">
     <span class="tt"><span class="tid">0.2</span>Vitest + Biome</span>
-    <span class="td"><code>workspace.test.ts</code> 断言 event-core 零依赖、兄弟包互不引用、<code>package.json</code> 的 deps 与 tsconfig 的 references 一致、base config 不含 DOM。Biome 需开 <code>json.parser.allowComments</code>——tsconfig 是 JSONC。全仓实时计数以 <code>pnpm verify</code> 输出为准。</span>
+    <span class="td"><code>workspace.test.ts</code> 断言 event-core 零内部 workspace 依赖、兄弟包互不引用、<code>package.json</code> 的内部 deps 与 tsconfig 的 references 一致、base config 不含 DOM。Biome 需开 <code>json.parser.allowComments</code>——tsconfig 是 JSONC。全仓实时计数以 <code>pnpm verify</code> 输出为准。</span>
     <span class="tm"><span class="tag sz">2 小时</span></span>
     <span class="done-when"><b>已验证：</b>workspace、Hub、MCP、事件日志与分层套件全部进入统一 gate</span>
   </label></li>
@@ -357,7 +357,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-0-4" checked><label for="t-0-4" class="tb">
     <span class="tt"><span class="tid">0.4</span>更新 CLAUDE.md 的「无构建命令」段落</span>
-    <span class="td">换成真实命令表，并写明<b>没有 hosted CI、<code>pnpm verify</code> 是手动关口</b>。仓库状态区分 executable spike 与尚未开始的正式 package kernel，免得未来的 agent 去错目录。</span>
+    <span class="td">换成真实命令表，并写明<b>没有 hosted CI、<code>pnpm verify</code> 是手动关口</b>。仓库状态区分 executable spike 与正式 package kernel 的实际完成阶段，免得未来的 agent 去错目录。</span>
     <span class="tm"><span class="tag sz">10 分钟</span></span>
   </label></li>
 </ul>
@@ -379,9 +379,9 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 <ul class="tasks" data-phase="hub">
   <li><input type="checkbox" id="t-h-1" checked><label for="t-h-1" class="tb">
     <span class="tt"><span class="tid">A.1</span>适配器池：多个 agent 同时在线</span>
-    <span class="td">现在 spike 是 <code>let adapter = null</code>，切换时关掉上一个。改成每个 agent 一条独立会话、一条独立队列。<b>这会提前引爆一个 Phase 1.2 的问题：并发 append 下 seq 还单不单调</b>——JSONL + 内存计数器扛不住真并发。早点撞上比在 1.2 撞上便宜。</span>
+    <span class="td">现在 spike 是 <code>let adapter = null</code>，切换时关掉上一个。改成每个 agent 一条独立会话、一条独立队列。<b>这会提前引爆一个 Phase 1.1b 的问题：并发 append 下 seq 还单不单调</b>——JSONL + 内存计数器扛不住真并发。早点撞上比在 1.1b 撞上便宜。</span>
     <span class="tm"><span class="tag pkg">chat-spike</span><span class="tag crit">关键路径</span><span class="tag sz">1 天</span></span>
-    <span class="done-when"><b>已验证：</b>并发写入下 seq 单调无洞（测试断言全序列等于 1..n）。JSONL + 内存计数器<b>在单进程内够用</b>——Phase 1.2 的事务分配仍然要做，但不是被这里逼出来的</span>
+    <span class="done-when"><b>已验证：</b>并发写入下 seq 单调无洞（测试断言全序列等于 1..n）。JSONL + 内存计数器<b>在单进程内够用</b>——Phase 1.1b 的事务分配仍然要做，但不是被这里逼出来的</span>
   </label></li>
 
   <li><input type="checkbox" id="t-h-2" checked><label for="t-h-2" class="tb">
@@ -467,102 +467,102 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 <section id="p1">
 <div class="phase-hd">
   <h3>Phase 1 — 核心循环（无 UI）</h3>
-  <span class="badge">Runner 后进入</span>
+  <span class="badge">Event Contract 已完成 · Server track 执行中</span>
   <span class="phase-count" data-count="p1"></span>
 </div>
-<p class="phase-goal">目标：把 Runner track 证明过的边界移进正式 packages，headless 跑通完整运行循环。<b>刻意不做任何界面</b>。骨架已有契约和基础类型；Remote Runner 验收通过后从 1.1 接着写。</p>
+<p class="phase-goal">目标：把 Runner track 证明过的边界移进正式 packages，headless 跑通完整运行循环。<b>刻意不做任何界面</b>。公开里程碑仍是 1.1–1.5，下面用 a/b/c 子项表达可独立提交的工作。</p>
 
 <ul class="tasks" data-phase="p1">
-  <li><input type="checkbox" id="t-1-1"><label for="t-1-1" class="tb">
-    <span class="tt"><span class="tid">1.1</span>事件信封类型 + Zod schema + ULID</span>
-    <span class="td">按 <code>event-core.md</code> 的信封：<code>id / type / seq / project / actor / subject / at / causedBy / payload</code>。事件目录里的 <b>29</b> 个类型各写一个 payload schema，用 discriminated union 收口。</span>
+  <li><input type="checkbox" id="t-1-1" checked><label for="t-1-1" class="tb">
+    <span class="tt"><span class="tid">1.1a</span>事件信封类型 + Zod schema + ULID</span>
+    <span class="td">按 <code>event-core.md</code> 的版本化信封：<code>schemaVersion / id / type / seq / project / actor / subject / at / causedBy / payload</code>。事件目录里的 <b>29</b> 个类型各写 strict payload schema，用 discriminated union 收口。</span>
     <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag sz">2 天</span></span>
-    <span class="done-when"><b>完成判据：</b>未知 <code>type</code> 或多余字段在解析时被拒绝</span>
+    <span class="done-when"><b>已验证：</b>version-first、29 类 strict payload、subject 绑定、深冻结与安全 parser 类型通过 323 / 323 全仓测试</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-2"><label for="t-1-2" class="tb">
-    <span class="tt"><span class="tid">1.2</span>SQLite 事件存储：append-only + 幂等</span>
+    <span class="tt"><span class="tid">1.1b</span>SQLite 事件存储：append-only + 幂等</span>
     <span class="td"><code>seq</code> 在事务内分配保证项目内单调。client token 做唯一索引——重试返回原事件而不是插入新的。持久化成功后才向生产者确认。</span>
-    <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.1</span><span class="tag sz">3 天</span></span>
+    <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.1a</span><span class="tag sz">3 天</span></span>
     <span class="done-when"><b>完成判据：</b>并发 append 不产生重复 seq；同一 token 重试两次只落一条</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-3"><label for="t-1-3" class="tb">
-    <span class="tt"><span class="tid">1.3</span>事件总线 + 重放 + reducer 注册</span>
+    <span class="tt"><span class="tid">1.1c</span>事件总线 + 重放 + reducer 注册</span>
     <span class="td"><code>append / subscribe / replay / registerReducer</code>。reducer 是纯函数 <code>(state, event) =&gt; state</code>，<b>必须同步</b>——异步会毁掉重放的确定性。</span>
-    <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.2</span><span class="tag sz">2 天</span></span>
-    <span class="done-when"><b>完成判据：</b>从 seq 0 重放整条日志，得到与增量归约完全一致的状态</span>
+    <span class="tm"><span class="tag pkg">event-core</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.1b</span><span class="tag sz">2 天</span></span>
+    <span class="done-when"><b>完成判据：</b>从首条事件重放整条日志，得到与增量归约完全一致的状态</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-4"><label for="t-1-4" class="tb">
-    <span class="tt"><span class="tid">1.4</span>快照与恢复</span>
+    <span class="tt"><span class="tid">1.1d</span>快照与恢复</span>
     <span class="td">每 N 条事件写一次状态快照；启动时加载最新快照 + 重放尾部。快照是缓存，删掉必须不丢数据。</span>
-    <span class="tm"><span class="tag pkg">event-core</span><span class="tag dep">依赖 1.3</span><span class="tag sz">2 天</span></span>
+    <span class="tm"><span class="tag pkg">event-core</span><span class="tag dep">依赖 1.1c</span><span class="tag sz">2 天</span></span>
     <span class="done-when"><b>完成判据：</b>删除所有快照后重启，状态不变</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-5"><label for="t-1-5" class="tb">
-    <span class="tt"><span class="tid">1.5</span>任务状态转移矩阵 + 穷举测试</span>
+    <span class="tt"><span class="tid">1.2a</span>任务状态转移矩阵 + 穷举测试</span>
     <span class="td">ADR-002 的八个状态。<b>先写测试再写实现</b>：8 状态 × 10 事件全表覆盖，非法转移必须被拒绝而不是被纠正。</span>
-    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.3</span><span class="tag sz">2 天</span></span>
+    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.1c</span><span class="tag sz">2 天</span></span>
     <span class="done-when"><b>完成判据：</b>80 个格子全覆盖；<code>progress: 100</code> 不引发任何转移</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-6"><label for="t-1-6" class="tb">
-    <span class="tt"><span class="tid">1.6</span>依赖图 + 环检测 + 就绪重算</span>
+    <span class="tt"><span class="tid">1.2b</span>依赖图 + 环检测 + 就绪重算</span>
     <span class="td">有未满足 <code>dependsOn</code> 的任务不能离开 <code>created</code>。依赖完成时重算就绪集。创建时拒绝成环。</span>
-    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag dep">依赖 1.5</span><span class="tag sz">2 天</span></span>
+    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag dep">依赖 1.2a</span><span class="tag sz">2 天</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-7"><label for="t-1-7" class="tb">
-    <span class="tt"><span class="tid">1.7</span>能力路由 + 智能体注册表</span>
+    <span class="tt"><span class="tid">1.2c</span>能力路由 + 智能体注册表</span>
     <span class="td">只读 <code>capabilities</code>，按（能力匹配度、当前负载、历史结果）排序。饱和的智能体退出匹配。<b>无人具备某能力时任务显式浮出</b>，不静默滞留。</span>
-    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.5</span><span class="tag sz">3 天</span></span>
+    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.2a</span><span class="tag sz">3 天</span></span>
     <span class="done-when"><b>完成判据：</b>代码里搜不到任何 provider 字符串；换厂商只是换一次注册</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-8"><label for="t-1-8" class="tb">
-    <span class="tt"><span class="tid">1.8</span>MCP Server：12 个工具 + strict 校验</span>
-    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。<br><b>spike 已跑通其中三个</b>（<code>register_agent / get_context / send_message</code>），Claude Code 零适配器接入验证过——<code>apps/chat-spike/src/mcp-tools.mjs</code> 的形状可以直接搬。</span>
-    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.7</span><span class="tag sz">4 天</span></span>
+    <span class="tt"><span class="tid">1.3a</span>MCP Server：12 个工具 + strict 校验</span>
+    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。Spike 已实现其中 7 个并验证过真实 Agent 边界；正式实现以 v0.3 canonical schema 为准。</span>
+    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.2c</span><span class="tag sz">4 天</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-9"><label for="t-1-9" class="tb">
-    <span class="tt"><span class="tid">1.9</span>授权边界：智能体不能做的三件事</span>
+    <span class="tt"><span class="tid">1.3b</span>授权边界：智能体不能做的三件事</span>
     <span class="td">不能直接写事件、不能设置任务状态、不能批准任何请求（包括别的智能体的）。这三条要有独立测试——它们是信任边界的全部内容。<br><b>spike 的做法值得沿用：靠「没有这个字段 / 没有这个工具」实现，而不是靠检查</b>，测试断言的是表面上不存在。再加一条不能结构化的：<code>from</code> 必须等于调用方身份，否则一个 agent 能冒充另一个。<b>拒绝理由要写成人话</b>——实测中真实 agent 会把可读的拒绝<b>报告</b>出来，而 <code>400</code> 换来的是重试循环。</span>
-    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.8</span><span class="tag sz">2 天</span></span>
+    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.3a</span><span class="tag sz">2 天</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-10"><label for="t-1-10" class="tb">
-    <span class="tt"><span class="tid">1.10</span>审批闸门接口（占位实现）</span>
+    <span class="tt"><span class="tid">1.3c</span>审批闸门接口（占位实现）</span>
     <span class="td">Phase 3 才做 UI，但<b>现在就要留好能阻塞调用方的接口</b>。此阶段用 CLI 提示代替界面。超时发 <code>approval.expired</code>，绝不自动放行。</span>
-    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.9</span><span class="tag sz">2 天</span></span>
+    <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.3b</span><span class="tag sz">2 天</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-11"><label for="t-1-11" class="tb">
-    <span class="tt"><span class="tid">1.11</span>Agent SDK + 第一个适配器</span>
+    <span class="tt"><span class="tid">1.4a</span>Agent SDK + 第一个适配器</span>
     <span class="td"><code>register / receiveTask / reportProgress / reportResult / sendEvent</code>。另外验证一个<b>已经会说 MCP 的智能体零适配器直连</b>——这是 ADR-001 的验收点。</span>
-    <span class="tm"><span class="tag pkg">agent-sdk</span><span class="tag dep">依赖 1.8</span><span class="tag sz">3 天</span></span>
+    <span class="tm"><span class="tag pkg">agent-sdk</span><span class="tag dep">依赖 1.3a</span><span class="tag sz">3 天</span></span>
     <span class="done-when"><b>完成判据：</b>两个不同厂商的智能体执行同一类任务，核心代码零改动</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-12"><label for="t-1-12" class="tb">
-    <span class="tt"><span class="tid">1.12</span>Supervisor：目标拆解成任务图</span>
+    <span class="tt"><span class="tid">1.5a</span>Supervisor：目标拆解成任务图</span>
     <span class="td"><code>claude-opus-5</code> + adaptive thinking + <code>effort: "high"</code>，用 structured outputs 约束成任务图 schema（带 <code>requires</code> 能力和 <code>dependsOn</code>）。<b>拆解时选中某方案就要写一条决策进记忆</b>。</span>
-    <span class="tm"><span class="tag pkg">supervisor</span><span class="tag dep">依赖 1.7</span><span class="tag sz">4 天</span></span>
+    <span class="tm"><span class="tag pkg">supervisor</span><span class="tag dep">依赖 1.2c</span><span class="tag sz">4 天</span></span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-13t"><label for="t-1-13t" class="tb">
-    <span class="tt"><span class="tid">1.13</span>会话 reducer：按任务分组 + 生命周期织入</span>
+    <span class="tt"><span class="tid">1.5b</span>会话 reducer：按任务分组 + 生命周期织入</span>
     <span class="td">消息按 <code>task</code> 归入会话，无 task 的落项目会话；把该任务的 <code>task.*</code> / <code>approval.*</code> / <code>knowledge.created</code> 按 seq 织进同一条流。连续 <code>progress</code> 段识别为可折叠区间。<b>放在 task-engine</b>——会话是任务投影的延伸，不值得为它开新包。</span>
-    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag dep">依赖 1.3 · 1.5</span><span class="tag sz">3 天</span></span>
+    <span class="tm"><span class="tag pkg">task-engine</span><span class="tag dep">依赖 1.1c · 1.2a</span><span class="tag sz">3 天</span></span>
     <span class="done-when"><b>完成判据：</b>重放整条日志得到的会话内容与增量归约一致；界面尚不存在也能测</span>
   </label></li>
 
   <li><input type="checkbox" id="t-1-13"><label for="t-1-13" class="tb">
-    <span class="tt"><span class="tid">1.14</span>端到端 demo 脚本</span>
+    <span class="tt"><span class="tid">1.5c</span>端到端 demo 脚本</span>
     <span class="td">目标 → 拆解 → 按能力路由 → 执行 → 进度 → 结果 → 验收 → 状态更新。<b>断言写在事件日志上</b>，不是截图。</span>
-    <span class="tm"><span class="tag crit">Phase 1 验收</span><span class="tag dep">依赖 1.1–1.12</span><span class="tag sz">2 天</span></span>
+    <span class="tm"><span class="tag crit">Phase 1 验收</span><span class="tag dep">依赖 1.5a · 1.4a</span><span class="tag sz">2 天</span></span>
   </label></li>
 </ul>
 </section>
@@ -758,8 +758,8 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 <tr style="opacity:.65"><td><b>1</b> ✓</td><td><s>G —— Hub principal、能力路由认证、安全响应头、严格分层 gate</s></td><td><s><code>pnpm verify</code> 全绿</s></td></tr>
 <tr style="opacity:.65"><td><b>2</b> ✓</td><td><s>LF —— strict contract、真实子进程、workspace containment、持久 session</s></td><td><s>Local Runner 4/4</s></td></tr>
 <tr style="opacity:.65"><td><b>3</b> ✓</td><td><s>L —— Hub dispatch 接入 Local Runner</s></td><td><s>纵向切片 3/3</s></td></tr>
-<tr><td><b>4</b></td><td>RC —— cancel / retry / liveness contract，删除 direct fallback</td><td>共享契约固定，Hub 只派发</td></tr>
-<tr><td><b>5</b></td><td>同一任务跑 Local 与 Remote</td><td><b>normalized event sequence 一致 → 才进入 1.1</b></td></tr>
+<tr style="opacity:.65"><td><b>4</b> ✓</td><td><s>RC —— cancel / retry / liveness contract，删除 direct fallback</s></td><td><s>共享契约固定，Hub 只派发</s></td></tr>
+<tr style="opacity:.65"><td><b>5</b> ✓</td><td><s>同一任务跑 Local 与 Remote</s></td><td><s>normalized event sequence 一致</s></td></tr>
 </table>
 
 <div class="note"><b>Remote 不是第二套调用实现。</b>第 5 天只允许替换 transport；如果为远程路径修改 dispatch、session key、事件或错误语义，说明 RC 尚未冻结，应回到 Local contract 修正。</div>
@@ -767,11 +767,12 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 <h3>命令</h3>
 <p>pnpm 由 corepack 提供，没有全局安装。嫌每次敲 <code>corepack</code> 麻烦可以 <code>corepack enable</code>（会写全局 shim）。</p>
 <pre><code>corepack pnpm install       # allowBuilds 白名单只放行了 Biome 和 esbuild
-corepack pnpm verify        # build + lint + check:layers + test —— 提交前跑这个
+corepack pnpm verify        # build + type contract + lint + layers + test —— 提交前跑这个
 corepack pnpm test -- tests/layering.test.ts   # 单文件
 
-# verify 里的四步也可以单跑
+# verify 里的五步也可以单跑
 corepack pnpm build
+corepack pnpm check:types
 corepack pnpm check         # check:fix 自动修
 corepack pnpm check:layers
 corepack pnpm test</code></pre>
