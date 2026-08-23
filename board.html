@@ -62,7 +62,7 @@ h2{font-size:21px;line-height:1.3;letter-spacing:-.025em;margin:3px 0 0;font-wei
 .current-layout{display:grid;grid-template-columns:minmax(280px,.75fr) minmax(0,1.25fr);gap:11px}.current-card,.todo-panel{border:1px solid var(--border);background:var(--surface);border-radius:13px;box-shadow:var(--shadow)}
 .current-card{padding:19px;background:linear-gradient(150deg,var(--accent-soft),var(--surface))}.empty-icon{width:38px;height:38px;border-radius:11px;background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 23%,var(--border));display:grid;place-items:center;color:var(--accent);font-size:19px}
 .current-card h3{font-size:17px;margin:13px 0 6px}.current-card p{color:var(--muted);font-size:12px;margin:0}.current-hint{border-top:1px solid color-mix(in srgb,var(--accent) 16%,var(--border));margin-top:15px;padding-top:12px;font-size:11px;color:var(--muted)}
-.score-list{margin-top:14px;padding:11px;border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--surface) 84%,transparent)}.score-head,.score-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.score-head{padding-bottom:7px;border-bottom:1px solid var(--border);font-size:10.5px}.score-head span,.score-row strong{font:650 10px var(--mono);font-variant-numeric:tabular-nums}.score-row{padding-top:7px;color:var(--muted);font-size:10.5px}.score-row strong{color:var(--warn)}.score-row.complete strong{color:var(--ok)}
+.score-list{margin-top:14px;padding:11px;border:1px solid color-mix(in srgb,var(--accent) 18%,var(--border));border-radius:10px;background:color-mix(in srgb,var(--surface) 84%,transparent)}.score-list.checkpoint{border-color:color-mix(in srgb,var(--warn) 28%,var(--border))}.score-head,.score-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.score-head{padding-bottom:7px;border-bottom:1px solid var(--border);font-size:10.5px}.score-head span,.score-row strong{font:650 10px var(--mono);font-variant-numeric:tabular-nums}.score-row{padding-top:7px;color:var(--muted);font-size:10.5px}.score-row strong{color:var(--warn)}.score-row.complete strong{color:var(--ok)}.score-row.running strong{color:var(--info)}.score-row.pending strong{color:var(--muted)}
 .todo-panel{padding:8px 17px}.todo-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}.todo-row:last-child{border-bottom:0}
 .todo-num{width:25px;height:25px;border-radius:8px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font:650 10px var(--mono)}.todo-row b{font-size:12px}.todo-row small{display:block;color:var(--muted);font-size:10.5px;margin-top:1px}.todo-state{font-size:9.5px;color:var(--faint);white-space:nowrap}
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:11px;flex-wrap:wrap}.search{display:flex;align-items:center;gap:8px;min-width:min(340px,100%);border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:7px 10px;color:var(--muted)}
@@ -136,7 +136,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
         <div class="overall-copy">
           <div class="eyebrow">Overall progress</div>
           <h1 id="overall-title">项目总体进度</h1>
-          <p>按看板中全部去重 Task 的 <code>progress</code> 加权计算；同一个 Roadmap Task 即使也在当前路线中只计一次。实验、门禁和工具覆盖保留为独立指标。</p>
+          <p>按看板中全部去重 Task 的 <code>progress</code> 加权计算；只有冻结且验收通过的证据进入总体分。开发中的实时变化在“实施检查点”单独显示，不提前冒领完成度。</p>
           <div class="overall-bar" aria-hidden="true"><span id="overall-bar"></span></div>
           <div class="overall-bar-meta"><span id="overall-fraction"></span><span>按 Task 实际进度实时加权</span></div>
         </div>
@@ -231,8 +231,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 67,
-  "updatedAt": "2026-08-24 02:46 CST",
+  "revision": 68,
+  "updatedAt": "2026-08-24 02:49 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-03",
   "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-24 02:46 CST"},
@@ -261,7 +261,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
     {"id":"SVR-01","scope":"route","phase":"Server","title":"Ubuntu / Windows 基线与部署契约","status":"completed","progress":100,"priority":"P0","owner":"服务器工程师","dependsOn":["C-REMOTE-01"],"blockedBy":[],"acceptance":"脱敏记录两端版本、端口、TLS、服务、目录和 ACL；不做远端变更，不以公网 HTTP 代替 HTTPS。","source":{"label":"server branch · deploy/README.md @ 3454ca0","href":"https://github.com/cabinw/agent-os/commit/3454ca0"},"summary":"提交 3454ca0 已推送：两端只读盘点、staging 拓扑、身份/目录、生命周期、耐久性边界和全部上线阻塞已由主任务审查通过。"},
     {"id":"SVR-02","scope":"route","phase":"Server","title":"Ubuntu Hub 可部署单元","status":"blocked","progress":93,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":["PROB-HUB-DEPLOY-TRUST","PROB-HUB-ACTIVATION"],"acceptance":"非 root Hub 只监听 loopback，经 HTTPS 代理暴露；systemd、受限 env、health、升级与回滚在 staging 验证。","source":{"label":"server branch · 658cd6c","href":"https://github.com/cabinw/agent-os/commit/658cd6cb97af03b3f341a3bba270e28c17e73dcc"},"summary":"提交 658cd6c 已推送且 commit tree 精确等于冻结 2a1bdf…；本地/独立/Ubuntu/安装验收全绿。剩余 7 分仅是依赖 FQDN/证书的 HTTPS 激活、真实 start/restart/health。","progressBasis":[{"label":"Runtime、认证与资源边界","earned":25,"total":25},{"label":"Portable artifact 与 admin trust","earned":15,"total":15},{"label":"systemd / env / health / HTTPS proxy","earned":12,"total":15},{"label":"安装、升级、回滚与维护事务","earned":25,"total":25},{"label":"Ubuntu staging 与交付","earned":16,"total":20}]},
-    {"id":"SVR-03","scope":"route","phase":"Server","title":"持久状态、备份恢复与运维安全","status":"running","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-02"],"blockedBy":["PROB-HUB-RECOVERY"],"acceptance":"placement/request/session 状态完成备份→破坏副本→恢复演练；日志轮转和容量检查不泄漏凭据。","source":"apps/chat-spike/README.md","summary":"76 项专项回归全绿；metadata、recover-old transaction 绑定和同盘容量峰值已补。当前冻结 P0 是损坏 live state 的 forensic 保留恢复，以及 upgrade/rollback 旧 block 安全转入 restore；Ubuntu 整链通过前暂不计分。"},
+    {"id":"SVR-03","scope":"route","phase":"Server","title":"持久状态、备份恢复与运维安全","status":"running","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-02"],"blockedBy":["PROB-HUB-RECOVERY"],"acceptance":"placement/request/session 状态完成备份→破坏副本→恢复演练；日志轮转和容量检查不泄漏凭据。","source":"apps/chat-spike/README.md","summary":"76 项专项回归全绿；metadata、recover-old transaction 绑定和同盘容量峰值已补。当前冻结 P0 是损坏 live state 的 forensic 保留恢复，以及 upgrade/rollback 旧 block 安全转入 restore；Ubuntu 整链通过前暂不计分。","checkpoints":[{"label":"五组组件回归 76/76","status":"done"},{"label":"candidate effective 配置代码门禁","status":"done"},{"label":"损坏 live state forensic 恢复","status":"running"},{"label":"持久 journal 与旧 block adoption","status":"running"},{"label":"legacy admin-kit/runtime 迁移","status":"running"},{"label":"真实 backup→破坏副本→restore gate","status":"pending"},{"label":"Ubuntu exact-tree 演练与冻结验收","status":"pending"}]},
     {"id":"SVR-04","scope":"route","phase":"Server","title":"Windows Remote Worker 正式启动路径","status":"created","progress":0,"priority":"P0","owner":"服务器工程师","dependsOn":["SVR-01"],"blockedBy":[],"acceptance":"PowerShell 安装/启动/停止/健康/卸载可恢复；Grok、路径、ACL、进程终止、workspace containment 和凭据隔离通过。","source":"docs/architecture/agent-runtime.md","summary":"在 Windows 测试机把 outbound Worker 与 Grok 做成可长期运行、可重启恢复的执行面，并补跨平台自动测试。"},
     {"id":"SVR-05","scope":"route","phase":"Server","title":"Ubuntu Hub ↔ Windows Grok 真实联调","status":"created","progress":0,"priority":"P0","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-03","SVR-04"],"blockedBy":[],"acceptance":"真实 Grok 完成注册→指派→事件→review；断线、Hub 重启、重复请求、取消、超时、离线与旧 lease 均按契约处理。","source":"docs/decisions/ADR-008-server-hub-local-first-runners.md","summary":"Windows 只主动连出，Hub 不持有 working copy 或 vendor credential；我负责接口对照、故障注入和最终签收。"},
     {"id":"SVR-06","scope":"route","phase":"Server","title":"服务器自动验收入口与交付矩阵","status":"created","progress":0,"priority":"P1","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-05"],"blockedBy":[],"acceptance":"静态部署门禁、双机 smoke 命令、全量 verify、脱敏证据矩阵和逐任务 commit 全部可复核。","source":"CLAUDE.md","summary":"交付本地安全门禁与明确的双机 smoke 入口；服务器工程师推送分支，我 review 后再决定集成。"},
@@ -366,6 +366,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 02:49","kind":"decision","entity":"SVR-03","title":"总体完成度与 WIP 实施检查点分离","detail":"当前 Task 新增 2/7 实施检查点，实时展示开发/审计收敛；这些检查点不进入 36.40% 总体分，只有冻结提交通过独立验收后才换算为 progress points。"},
     {"at":"2026-08-24 02:46","kind":"verified","entity":"REPO-01","title":"主分支完整仓库门禁复跑全绿","detail":"corepack pnpm verify：build、类型契约、Biome、4 条分层规则和 Vitest 全通过；15/15 文件、323/323 测试，零 lint 错误。"},
     {"at":"2026-08-24 02:44","kind":"problem","entity":"PROB-HUB-RECOVERY","title":"恢复门禁转入损坏树与旧 block 语义","detail":"首轮 metadata、recover-old 绑定、root trust 和同盘峰值缺口已在 WIP 修正；独立审计继续阻断损坏 live state 严格快照前置，以及非-restore durable block 无法进入 restore 的两条路径。"},
     {"at":"2026-08-24 02:40","kind":"problem","entity":"PROB-HUB-RECOVERY","title":"整链审计发现 restore 与 recover-old 冻结阻断","detail":"restore 缺少 metadata 发布即进入 prepared；recover-old 尚无执行 case；cold recovery 还存在 source trust 时序风险。精确位置已回传服务器工程师，禁止用组件测试绿灯提前计分。"},
@@ -568,7 +569,11 @@ function renderCurrent(){
   const basisEarned=basis.reduce((sum,item)=>sum+item.earned,0);
   const basisTotal=basis.reduce((sum,item)=>sum+item.total,0);
   const basisMarkup=basis.length?`<div class="score-list"><div class="score-head"><b>可审计进度量表</b><span>${basisEarned}/${basisTotal}</span></div>${basis.map((item)=>`<div class="score-row ${item.earned===item.total?"complete":""}"><span>${esc(item.label)}</span><strong>${item.earned}/${item.total}</strong></div>`).join("")}</div>`:"";
-  holder.innerHTML=`<span class="chip info">${statusLabels[task.status]}</span><h3>${esc(task.title)}</h3><p>${esc(task.summary)}</p>${basisMarkup}<div class="current-hint"><b>${esc(task.id)}</b> · 进度 ${task.progress}% · Owner ${esc(task.owner)}</div>`;
+  const checkpoints=task.checkpoints??[];
+  const checkpointDone=checkpoints.filter((item)=>item.status==="done").length;
+  const checkpointLabels={done:"已验证",running:"处理中",pending:"待验收"};
+  const checkpointMarkup=checkpoints.length?`<div class="score-list checkpoint"><div class="score-head"><b>实施检查点（不计总体分）</b><span>${checkpointDone}/${checkpoints.length}</span></div>${checkpoints.map((item)=>`<div class="score-row ${item.status==="done"?"complete":item.status}"><span>${esc(item.label)}</span><strong>${checkpointLabels[item.status]??esc(item.status)}</strong></div>`).join("")}</div>`:"";
+  holder.innerHTML=`<span class="chip info">${statusLabels[task.status]}</span><h3>${esc(task.title)}</h3><p>${esc(task.summary)}</p>${basisMarkup}${checkpointMarkup}<div class="current-hint"><b>${esc(task.id)}</b> · 进度 ${task.progress}% · Owner ${esc(task.owner)}</div>`;
 }
 
 function renderRoute(){
