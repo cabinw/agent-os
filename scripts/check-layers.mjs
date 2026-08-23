@@ -20,8 +20,12 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import ts from "typescript";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = resolve(
+  process.env.AGENT_OS_LAYER_ROOT ?? dirname(fileURLToPath(import.meta.url)),
+  process.env.AGENT_OS_LAYER_ROOT ? "." : "..",
+);
 const PACKAGES = join(ROOT, "packages");
 const QUIET = process.argv.includes("--quiet");
 
@@ -76,6 +80,76 @@ function safeStat(p) {
   }
 }
 
+function parseSource(file) {
+  return ts.createSourceFile(
+    file,
+    readFileSync(file, "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+}
+
+function visit(source, predicate) {
+  const matches = [];
+  function walk(node) {
+    if (predicate(node)) matches.push(node);
+    ts.forEachChild(node, walk);
+  }
+  walk(source);
+  return matches;
+}
+
+function lineOf(source, node) {
+  return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+}
+
+function lineText(source, line) {
+  return source.text.split("\n")[line - 1] ?? "";
+}
+
+/**
+ * Return actual module-specifier nodes, rather than treating every string on a
+ * line containing the word `import` as a module path. This covers static
+ * imports/exports, dynamic import(), require(), import-equals and import types.
+ */
+function moduleSpecifiers(source) {
+  const found = [];
+  const seen = new Set();
+
+  function add(node) {
+    if (!node || !ts.isStringLiteralLike(node) || seen.has(node.pos)) return;
+    seen.add(node.pos);
+    found.push({ node, specifier: node.text });
+  }
+
+  function walk(node) {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      add(node.moduleSpecifier);
+    } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference)
+    ) {
+      add(node.moduleReference.expression);
+    } else if (ts.isImportTypeNode(node)) {
+      const argument = node.argument;
+      if (ts.isLiteralTypeNode(argument)) add(argument.literal);
+    } else if (ts.isCallExpression(node)) {
+      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isRequire =
+        ts.isIdentifier(node.expression) && node.expression.text === "require";
+      if (isDynamicImport || isRequire) add(node.arguments[0]);
+    }
+    ts.forEachChild(node, walk);
+  }
+
+  walk(source);
+  return found;
+}
+
+function internalPackage(specifier) {
+  return specifier.match(/^@agent-os\/([a-z-]+)(?:\/|$)/)?.[1] ?? null;
+}
+
 /** Strip line and block comments so prose in a doc comment is never a hit. */
 function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
@@ -88,29 +162,12 @@ for (const pkg of Object.keys(ALLOWED_DEPS)) {
 
   for (const file of sourceFiles(src)) {
     const rel = relative(ROOT, file);
-    const code = stripComments(readFileSync(file, "utf8"));
+    const source = parseSource(file);
+    const code = stripComments(source.text);
     const codeLines = code.split("\n");
 
     codeLines.forEach((text, idx) => {
       const line = idx + 1;
-
-      // rule 2 — dependency direction
-      const imp = text.match(/from\s+["']@agent-os\/([a-z-]+)["']/);
-      if (imp) {
-        const target = imp[1];
-        if (target !== pkg && !allowed.has(target)) {
-          const upward = ALLOWED_DEPS[target]?.includes(pkg);
-          report(
-            "依赖方向",
-            rel,
-            line,
-            text,
-            upward
-              ? `${pkg} 不能 import ${target}——方向反了，${target} 依赖 ${pkg}`
-              : `${pkg} 不允许 import ${target}（见 docs/architecture/packages.md）`,
-          );
-        }
-      }
 
       // rule 1 — vendor names below agent-sdk
       if (VENDOR_FREE_PACKAGES.includes(pkg)) {
@@ -126,6 +183,24 @@ for (const pkg of Object.keys(ALLOWED_DEPS)) {
         }
       }
     });
+
+    // rule 2 — dependency direction. AST module nodes cover static and dynamic
+    // imports without allowing unrelated text on the same line to hide a hit.
+    for (const { node, specifier } of moduleSpecifiers(source)) {
+      const target = internalPackage(specifier);
+      if (!target || target === pkg || allowed.has(target)) continue;
+      const line = lineOf(source, node);
+      const upward = ALLOWED_DEPS[target]?.includes(pkg);
+      report(
+        "依赖方向",
+        rel,
+        line,
+        lineText(source, line),
+        upward
+          ? `${pkg} 不能 import ${target}——方向反了，${target} 依赖 ${pkg}`
+          : `${pkg} 不允许 import ${target}（见 docs/architecture/packages.md）`,
+      );
+    }
   }
 }
 
@@ -137,18 +212,18 @@ for (const [a, b] of [
   ["memory-core", "task-engine"],
 ]) {
   for (const file of sourceFiles(join(PACKAGES, a, "src"))) {
-    const code = stripComments(readFileSync(file, "utf8"));
-    code.split("\n").forEach((text, idx) => {
-      if (text.includes(`@agent-os/${b}`)) {
-        report(
-          "兄弟包互引",
-          relative(ROOT, file),
-          idx + 1,
-          text,
-          `${a} 与 ${b} 是兄弟，只能通过发事件和归约事件通信`,
-        );
-      }
-    });
+    const source = parseSource(file);
+    for (const { node, specifier } of moduleSpecifiers(source)) {
+      if (internalPackage(specifier) !== b) continue;
+      const line = lineOf(source, node);
+      report(
+        "兄弟包互引",
+        relative(ROOT, file),
+        line,
+        lineText(source, line),
+        `${a} 与 ${b} 是兄弟，只能通过发事件和归约事件通信`,
+      );
+    }
   }
 }
 
@@ -167,7 +242,7 @@ if (safeStat(CATALOG)) {
   for (const m of md.matchAll(/^\| `([a-z]+(?:\.[a-z]+)+)`/gm)) catalogTypes.add(m[1]);
 }
 
-const EVENT_LIKE = /["']([a-z]+\.[a-z]+(?:\.[a-z]+)*)["']/g;
+const EVENT_LIKE = /^([a-z]+(?:\.[a-z]+)+)$/;
 /** Module specifiers and filenames look like event types; they are not. */
 const NOT_EVENTS =
   /^(node|src|dist|index|package|tsconfig)\.|\.(mjs|cjs|js|ts|tsx|json|md|html|css|toml|yaml|yml|lock|jsonl|txt|sock)$/;
@@ -179,25 +254,39 @@ const EVENT_ROOTS = [
   join(ROOT, "apps"),
 ];
 
-if (catalogTypes.size > 0) {
+if (catalogTypes.size === 0) {
+  report(
+    "事件目录为空",
+    relative(ROOT, CATALOG),
+    1,
+    safeStat(CATALOG) ? "未找到有效的事件表格行" : "文件不存在",
+    "事件目录缺失或为空时不能验证事件类型，拒绝以成功状态退出",
+  );
+} else {
   for (const file of EVENT_ROOTS.flatMap((r) => sourceFiles(r))) {
-    const code = stripComments(readFileSync(file, "utf8"));
-    code.split("\n").forEach((text, idx) => {
-      for (const m of text.matchAll(EVENT_LIKE)) {
-        const type = m[1];
-        if (NOT_EVENTS.test(type)) continue;
-        if (text.includes("import") || text.includes("require(")) continue;
-        if (!catalogTypes.has(type)) {
-          report(
-            "事件类型绕过目录",
-            relative(ROOT, file),
-            idx + 1,
-            text,
-            `"${type}" 不在 docs/protocol/event-catalog.md 里。先写目录条目，再写 reducer，再写重放测试，最后才发`,
-          );
-        }
+    const source = parseSource(file);
+    const modules = new Set(moduleSpecifiers(source).map(({ node }) => node.pos));
+    const literals = visit(
+      source,
+      (node) => ts.isStringLiteralLike(node) && !modules.has(node.pos),
+    );
+
+    for (const literal of literals) {
+      const line = lineOf(source, literal);
+      const match = literal.text.match(EVENT_LIKE);
+      if (!match) continue;
+      const type = match[1];
+      if (NOT_EVENTS.test(type)) continue;
+      if (!catalogTypes.has(type)) {
+        report(
+          "事件类型绕过目录",
+          relative(ROOT, file),
+          line,
+          lineText(source, line),
+          `"${type}" 不在 docs/protocol/event-catalog.md 里。先写目录条目，再写 reducer，再写重放测试，最后才发`,
+        );
       }
-    });
+    }
   }
 }
 

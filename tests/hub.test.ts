@@ -14,13 +14,65 @@ afterEach(() => {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
+type FakeSend = (
+  prompt: string,
+  turn: number,
+) => string | undefined | Promise<string | undefined>;
+
+interface TestEvent {
+  id: string;
+  seq: number;
+  type: string;
+  actor: { kind: string };
+  payload: Record<string, unknown>;
+  causedBy?: string;
+}
+
+interface TestEventLog {
+  replay: () => TestEvent[];
+}
+
+interface TestHub {
+  agents: Map<string, { queue: Promise<unknown> }>;
+  tools: {
+    call: (
+      name: string,
+      args: Record<string, unknown>,
+      caller?: string | null,
+    ) => Promise<unknown>;
+  };
+  accept: (task: string) => void;
+  depthOf: (event: string) => number;
+  register: (
+    id: string,
+    profile: { id: string; role?: string; capabilities?: string[] },
+  ) => void;
+  roster: () => Array<{ hasSession: boolean }>;
+  say: (content: string, to: string) => void;
+  tasks: () => Record<string, { executor: string | null; status: string }>;
+}
+
+/** Give adapter callbacks access to a hub that is constructed after them. */
+function hubReference() {
+  let value: TestHub | undefined;
+  return {
+    get(): TestHub {
+      if (!value) throw new Error("hub reference used before initialization");
+      return value;
+    },
+    set(hub: TestHub): void {
+      value = hub;
+    },
+  };
+}
+
 /**
  * A fake vendor: no process, no network. What is under test is the seam — who
  * gets woken, in what order, and when the runtime stops — not whether a CLI
  * answers. Each adapter records the prompts it was handed and can be told to
  * reply with a `send_message` of its own.
  */
-function fakeAdapter(id: string, label: string, opts: { onSend?: Function } = {}) {
+function fakeAdapter(id: string, label: string, opts: { onSend?: FakeSend } = {}) {
   const prompts: string[] = [];
   class Fake {
     static id = id;
@@ -60,7 +112,7 @@ function makeHub(
 ) {
   const dir = mkdtempSync(join(tmpdir(), "agentos-hub-"));
   dirs.push(dir);
-  const log = new EventLog(join(dir, "events.jsonl"));
+  const log = new EventLog(join(dir, "events.jsonl")) as TestEventLog;
   const events: Array<{ type: string; data: Record<string, unknown> }> = [];
   const hub = new Hub({
     log,
@@ -71,7 +123,7 @@ function makeHub(
     workspace: join(dir, "ws"),
     url: "http://localhost:0",
     budget,
-  });
+  }) as TestHub;
   for (const a of roster) hub.register(a.id, a);
   return { hub, log, events };
 }
@@ -84,7 +136,7 @@ async function settle(hub: { agents: Map<string, { queue: Promise<unknown> }> })
   }
 }
 
-function messages(log: { replay: () => Array<Record<string, any>> }) {
+function messages(log: TestEventLog) {
   return log
     .replay()
     .filter((e) => e.type === "message.sent")
@@ -153,32 +205,37 @@ describe("A.1 适配器池", () => {
 /** The whole reason the hub exists. */
 describe("B.1 接缝：消息路由触发唤醒", () => {
   it("agent A 发给 agent B，B 被叫醒——人没有参与", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     // Alpha delegates instead of answering; beta reports to the human so the
     // exchange terminates. Replying to the sender by default is correct — it is
     // also how a two-agent ping-pong starts, which B.2 covers.
     const a = fakeAdapter("alpha", "Alpha", {
       onSend: async () => {
-        await hub.tools.call(
-          "send_message",
-          { from: "alpha", to: "beta", type: "instruction", content: "帮我查一下" },
-          "alpha",
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "send_message",
+            { from: "alpha", to: "beta", type: "instruction", content: "帮我查一下" },
+            "alpha",
+          );
         return "";
       },
     });
     const b = fakeAdapter("beta", "Beta", {
       onSend: async () => {
-        await hub.tools.call(
-          "send_message",
-          { from: "beta", to: "you", type: "answer", content: "查完了" },
-          "beta",
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "send_message",
+            { from: "beta", to: "you", type: "answer", content: "查完了" },
+            "beta",
+          );
         return "";
       },
     });
     const made = makeHub({ alpha: a, beta: b }, [{ id: "alpha" }, { id: "beta" }]);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
 
     // The human only ever speaks to alpha.
     hub.say("请找人帮忙", "alpha");
@@ -222,22 +279,25 @@ describe("B.1 接缝：消息路由触发唤醒", () => {
   });
 
   it("agent 自己调了 send_message 就不再回显正文——一轮只说一次话", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     const a = fakeAdapter("alpha", "Alpha", {
       onSend: async (p: string) => {
         if (p.includes("触发")) {
-          await hub.tools.call(
-            "send_message",
-            { from: "alpha", to: "you", type: "answer", content: "我自己说的" },
-            "alpha",
-          );
+          await hubRef
+            .get()
+            .tools.call(
+              "send_message",
+              { from: "alpha", to: "you", type: "answer", content: "我自己说的" },
+              "alpha",
+            );
           return "这段不该出现";
         }
         return "ok";
       },
     });
     const made = makeHub({ alpha: a }, [{ id: "alpha" }]);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
 
     hub.say("触发", "alpha");
     await settle(hub);
@@ -250,22 +310,25 @@ describe("B.1 接缝：消息路由触发唤醒", () => {
 
 describe("B.2 回环预算", () => {
   it("互相甩锅的循环会被停住，并且是向人报告", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     // Two agents that reflexively hand the work back to each other.
     const bounce = (self: string, other: string) => ({
       onSend: async () => {
-        await hub.tools.call(
-          "send_message",
-          { from: self, to: other, type: "instruction", content: "你来" },
-          self,
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "send_message",
+            { from: self, to: other, type: "instruction", content: "你来" },
+            self,
+          );
         return "";
       },
     });
     const a = fakeAdapter("alpha", "Alpha", bounce("alpha", "beta"));
     const b = fakeAdapter("beta", "Beta", bounce("beta", "alpha"));
     const made = makeHub({ alpha: a, beta: b }, [{ id: "alpha" }, { id: "beta" }], 4);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
 
     hub.say("开始", "alpha");
     await settle(hub);
@@ -300,22 +363,25 @@ describe("注册幂等", () => {
   });
 
   it("自己注册的 agent 会进池子，之后能被别人回信唤醒", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     const a = fakeAdapter("alpha", "Alpha");
     // Beta answers the human so the exchange terminates; replying to the sender
     // is the default, and that is a two-agent ping-pong by construction (B.2).
     const b = fakeAdapter("beta", "Beta", {
       onSend: async () => {
-        await hub.tools.call(
-          "send_message",
-          { from: "beta", to: "you", type: "answer", content: "在" },
-          "beta",
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "send_message",
+            { from: "beta", to: "you", type: "answer", content: "在" },
+            "beta",
+          );
         return "";
       },
     });
     const made = makeHub({ alpha: a, beta: b }, [{ id: "alpha" }]);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
 
     await hub.tools.call("register_agent", {
       id: "beta",
@@ -371,7 +437,12 @@ describe("B.3 按能力找人", () => {
     const gate = new Promise<void>((r) => {
       release = r;
     });
-    const a = fakeAdapter("alpha", "Alpha", { onSend: async () => (await gate, "ok") });
+    const a = fakeAdapter("alpha", "Alpha", {
+      onSend: async () => {
+        await gate;
+        return "ok";
+      },
+    });
     const { hub } = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
 
     hub.say("忙起来", "alpha");
@@ -445,19 +516,22 @@ describe("C 任务对象", () => {
 
   /** Rule 3, and the one that has to survive a persuasive agent. */
   it("agent 报 completed，任务仍然只到 review", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     const a = fakeAdapter("alpha", "Alpha", {
       onSend: async () => {
-        await hub.tools.call(
-          "report_result",
-          { task: "TASK-001", status: "completed", summary: "做完了" },
-          "alpha",
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "report_result",
+            { task: "TASK-001", status: "completed", summary: "做完了" },
+            "alpha",
+          );
         return "";
       },
     });
     const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
 
     await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
     await hub.tools.call("assign_task", { task: "TASK-001" });
@@ -470,19 +544,22 @@ describe("C 任务对象", () => {
   });
 
   it("只有人能验收，验收之后才是 completed", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     const a = fakeAdapter("alpha", "Alpha", {
       onSend: async () => {
-        await hub.tools.call(
-          "report_result",
-          { task: "TASK-001", status: "completed", summary: "做完了" },
-          "alpha",
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "report_result",
+            { task: "TASK-001", status: "completed", summary: "做完了" },
+            "alpha",
+          );
         return "";
       },
     });
     const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
     await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
     await hub.tools.call("assign_task", { task: "TASK-001" });
     await settle(hub);
@@ -532,19 +609,22 @@ describe("C 任务对象", () => {
   });
 
   it("任务给线程划了边界：消息自动落到执行者当前的任务上", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     const a = fakeAdapter("alpha", "Alpha", {
       onSend: async () => {
-        await hub.tools.call(
-          "send_message",
-          { from: "alpha", to: "you", type: "progress", content: "进行中" },
-          "alpha",
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "send_message",
+            { from: "alpha", to: "you", type: "progress", content: "进行中" },
+            "alpha",
+          );
         return "";
       },
     });
     const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
     await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
     await hub.tools.call("assign_task", { task: "TASK-001" });
     await settle(hub);
@@ -573,19 +653,22 @@ describe("C 任务对象", () => {
 
 describe("一轮只写一次（C 的真机 bug）", () => {
   it("agent 交付了任务，就不再把正文回显成一条消息", async () => {
-    let hub: any;
+    const hubRef = hubReference();
     const a = fakeAdapter("alpha", "Alpha", {
       onSend: async () => {
-        await hub.tools.call(
-          "report_result",
-          { task: "TASK-001", status: "completed", summary: "结论如下" },
-          "alpha",
-        );
+        await hubRef
+          .get()
+          .tools.call(
+            "report_result",
+            { task: "TASK-001", status: "completed", summary: "结论如下" },
+            "alpha",
+          );
         return "结论如下";
       },
     });
     const made = makeHub({ alpha: a }, [{ id: "alpha", capabilities: ["coding"] }]);
-    hub = made.hub;
+    const hub = made.hub;
+    hubRef.set(hub);
     await hub.tools.call("create_task", { title: "活", requires: ["coding"] });
     await hub.tools.call("assign_task", { task: "TASK-001" });
     await settle(hub);
