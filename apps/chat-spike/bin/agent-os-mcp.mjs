@@ -15,11 +15,11 @@
  * Attach it to Claude Code with:
  *   claude --mcp-config '{"mcpServers":{"agent-os":{"command":"node","args":["<abs path>"]}}}'
  *
- * Env: AGENT_OS_URL (default http://localhost:4173), AGENT_OS_CALLER.
+ * Env: AGENT_OS_URL (default http://127.0.0.1:4173), AGENT_OS_TOKEN.
  */
 
-const BASE = process.env.AGENT_OS_URL ?? "http://localhost:4173";
-const CALLER = process.env.AGENT_OS_CALLER ?? null;
+const BASE = process.env.AGENT_OS_URL ?? "http://127.0.0.1:4173";
+const TOKEN = process.env.AGENT_OS_TOKEN ?? null;
 
 const send = (msg) => process.stdout.write(`${JSON.stringify(msg)}\n`);
 const reply = (id, result) => send({ jsonrpc: "2.0", id, result });
@@ -27,7 +27,10 @@ const fail = (id, code, message) =>
   send({ jsonrpc: "2.0", id, error: { code, message } });
 
 async function http(path, init) {
-  const res = await fetch(`${BASE}${path}`, init);
+  if (!TOKEN) throw new Error("AGENT_OS_TOKEN 未配置");
+  const headers = new Headers(init?.headers);
+  headers.set("authorization", `Bearer ${TOKEN}`);
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
   return body;
@@ -78,7 +81,6 @@ async function handle(line) {
           body: JSON.stringify({
             name: msg.params?.name,
             arguments: msg.params?.arguments ?? {},
-            caller: CALLER,
           }),
         });
         return reply(msg.id, {

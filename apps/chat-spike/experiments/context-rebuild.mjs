@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getAdapter } from "../src/adapters/index.mjs";
 import { makeEvent } from "../src/events.mjs";
+import { newBearerToken } from "../src/http-security.mjs";
 import { Hub } from "../src/hub.mjs";
 import { EventLog } from "../src/log.mjs";
 
@@ -76,6 +77,9 @@ const CHATTER = [
 function harness(providerId, Cls) {
   const dir = mkdtempSync(join(tmpdir(), "agentos-exp-"));
   const log = new EventLog(join(dir, "events.jsonl"));
+  // Experiment-only transport credential: process-local, never written to the
+  // event log. The MCP mount stores it in its 0600 per-agent config.
+  const token = newBearerToken();
   const hub = new Hub({
     log,
     projectId: PROJECT,
@@ -83,6 +87,7 @@ function harness(providerId, Cls) {
     getAdapter: (id) => (id === providerId ? Cls : null),
     workspace: join(dir, "workspace"),
     url: "http://127.0.0.1:0",
+    tokenForAgent: (id) => (id === providerId ? token : null),
   });
   hub.register(providerId);
 

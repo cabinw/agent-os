@@ -230,8 +230,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 8,
-  "updatedAt": "2026-08-23 19:53 CST",
+  "revision": 9,
+  "updatedAt": "2026-08-23 19:59 CST",
   "updatedBy": "Codex",
   "currentTaskId": "GATE-01",
   "verification": {"testsPassed":65,"testsTotal":65,"filesPassed":5,"filesTotal":5,"gatePassed":3,"gateTotal":4,"lintErrors":19,"checkedAt":"2026-08-23 17:41 CST"},
@@ -302,7 +302,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
     {"id":"REPO-01","scope":"route","phase":"Repository","title":"恢复原 GitHub 仓库与提交基线","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"origin 指向原 GitHub 仓库；修改按任务进入 codex 分支和单一职责 commit；分支已推送且可独立审查、回退。","source":"git remote -v","summary":"原 GitHub origin 已恢复；codex/project-control 的原子提交已推送并建立 tracking，main 未被改写。"},
     {"id":"GATE-01","scope":"route","phase":"Gate","title":"恢复完整 pnpm verify","status":"running","progress":10,"priority":"P0","owner":"Codex team","dependsOn":["REPO-01"],"blockedBy":["PROB-VERIFY"],"acceptance":"corepack pnpm verify 一次完整通过；记录真实测试数。","source":"next.html#options","summary":"仓库基线已完成，质量门禁任务恢复执行。"},
-    {"id":"HUB-SEC-01","scope":"route","phase":"Security","title":"封住 Hub 访问和身份边界","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["GATE-01"],"blockedBy":["PROB-AUTH","PROB-IDENTITY"],"acceptance":"显式 bind；每条 HTTP/SSE 路由需要 bearer token；caller 与 human accept 均由服务器身份决定。","source":"next.html#options","summary":"先消除正在使用的 Hub 的高风险暴露。"},
+    {"id":"HUB-SEC-01","scope":"route","phase":"Security","title":"封住 Hub 访问和身份边界","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["GATE-01"],"blockedBy":[],"acceptance":"显式 bind；每条 HTTP/SSE 路由需要 bearer token；caller 与 human accept 均由服务器身份决定。","source":"tests/hub-security.test.ts","summary":"默认 loopback、全路由 bearer、human/agent principal、精确 CORS、HTML 转义和受限本机工具链已实现，安全集成测试 9/9。"},
     {"id":"EVIDENCE-01","scope":"route","phase":"Evidence","title":"让实验与真实 Hub 走同一路径","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":["GATE-01"],"blockedBy":[],"acceptance":"1200 条上下文经真实路径仍完整召回；伪造因果、重启和重指派均有回归测试。","source":"tests/runtime-regressions.test.ts","summary":"实验已改用 Hub runtime；1200 条完整上下文、runtime-owned cause、单次启动、重启注册幂等与损坏尾恢复测试均通过。"},
     {"id":"C-LOCAL-01","scope":"route","phase":"Local","title":"本地 Agent 调用完整闭环","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["HUB-SEC-01","EVIDENCE-01"],"blockedBy":[],"acceptance":"Hub → Local Runner → Adapter → 真实 CLI → Events / Review 跑通；失败和重启有测试。","source":"next.html#options","summary":"先把本机作为第一个 Runner，确定完整调用语义。"},
     {"id":"SESSION-01","scope":"route","phase":"Local","title":"持久化本地 Agent session","status":"created","progress":0,"priority":"P0","owner":"未安排","dependsOn":["C-LOCAL-01"],"blockedBy":["PROB-SESSION"],"acceptance":"session 以 (user, project, agent) 关联，重启后可继续或从日志正确重建。","source":"HANDOFF.md","summary":"替换只存在于 adapter 内存中的 vendor session id。"},
@@ -313,9 +313,9 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
   "problems": [
     {"id":"PROB-REPO-PUSH","status":"resolved","severity":"medium","title":"新 SSH 仓库方案已取消","detail":"用户决定继续使用原 GitHub 仓库；新 SSH origin 已移除，原 GitHub 远端恢复为 origin，因此不再需要向新仓库上传历史。","next":"后续仅向原 GitHub 仓库推送按任务隔离的 codex 分支。","affects":["REPO-01"],"source":"git remote -v"},
     {"id":"PROB-VERIFY","status":"open","severity":"high","title":"完整验证门禁为红","detail":"65/65 Vitest 通过，但 Biome 在 tests/hub.test.ts 报 19 个错误，因此 verify 当前只有 3/4 步通过。HANDOFF 的 verify green 已过时。","next":"先执行 GATE-01，仅修 lint 和类型表达并完整复跑 verify。","affects":["GATE-01"],"source":"tests/hub.test.ts"},
-    {"id":"PROB-AUTH","status":"open","severity":"critical","title":"Hub 无认证并可能监听所有接口","detail":"server.listen(PORT) 未指定 host，所有 HTTP/SSE 路由均无认证，而进程能够唤醒有本机文件权限的 Agent CLI。","next":"显式 bind address；所有路由要求 bearer token，宽绑定只能由配置开启。","affects":["HUB-SEC-01"],"source":"apps/chat-spike/src/server.mjs"},
-    {"id":"PROB-IDENTITY","status":"open","severity":"critical","title":"caller 与 human actor 可由请求方伪造","detail":"HTTP /mcp/call 信任 body.caller，/accept 可直接形成 human actor；空 caller 还可绕过部分执行者检查。","next":"身份必须由 transport/session 推导，accept 使用服务器认证的人类身份。","affects":["HUB-SEC-01","RM-1.9"],"source":"apps/chat-spike/src/server.mjs"},
-    {"id":"PROB-EXEC","status":"open","severity":"critical","title":"聊天输入可进入自动批准的本机工具执行链","detail":"Grok adapter 将任意聊天输入作为 prompt，并启用自动批准工具执行；当前没有强制 sandbox，且子进程继承完整环境。","next":"在继续远程接入前约束工具批准、sandbox、环境白名单与允许的工作目录。","affects":["HUB-SEC-01","C-LOCAL-01"],"source":"apps/chat-spike/src/adapters/grok.mjs"},
+    {"id":"PROB-AUTH","status":"resolved","severity":"critical","title":"Hub 已启用全路由认证与显式绑定","detail":"默认绑定 127.0.0.1；所有 HTTP、SSE、静态资源和 404 均先验证 bearer，宽绑定只能显式配置。","next":"Remote Runner 阶段复用 principal 模型，并增加传输重放保护。","affects":["HUB-SEC-01"],"source":"tests/hub-security.test.ts"},
+    {"id":"PROB-IDENTITY","status":"resolved","severity":"critical","title":"caller 与 human actor 已由服务端身份决定","detail":"Bearer token 唯一映射 human 或具体 Agent；/mcp/call 忽略 body.caller，/accept 仅 human principal 可达。","next":"正式 MCP Server 沿用 transport-derived identity，不暴露 caller 字段。","affects":["HUB-SEC-01","RM-1.9"],"source":"tests/hub-security.test.ts"},
+    {"id":"PROB-EXEC","status":"resolved","severity":"critical","title":"Grok 本机执行链已收敛到最小权限","detail":"移除 --always-approve；改用 dontAsk + Agent OS MCP allow rule、workspace sandbox，禁用子 Agent 和 Web，并以 0600 保存 transport token。参数组合经本机 Grok 1.0.5 解析。","next":"Local Runner contract 继续验证 workspace containment 和环境白名单。","affects":["HUB-SEC-01","C-LOCAL-01"],"source":"tests/hub-security.test.ts"},
     {"id":"PROB-ARCH","status":"open","severity":"high","title":"Accepted ADR 与最新 Hub / Runner 方向冲突","detail":"ADR-007 仍规定 single-machine / no server；HANDOFF 与当前路线要求 Server Hub、Local Runner 先、Remote Runner 后。","next":"新增 ADR-008 supersede 单机范围，并同步 roadmap、todo、README 与协议图。","affects":["ADR-008","C-REMOTE-01"],"source":"docs/decisions/ADR-007-implementation-stack.md"},
     {"id":"PROB-CONTEXT","status":"resolved","severity":"medium","title":"真实 Hub 不再默认截断上下文","detail":"Hub runtime 在省略 limit 时返回完整任务范围；显式正整数 limit 才截断。context-rebuild 实验也已移除第二套 harness，改走真实 Hub runtime。","next":"Phase 2 继续以相关性检索扩展，但不得恢复小默认上限。","affects":["EVIDENCE-01","RM-2.4"],"source":"tests/runtime-regressions.test.ts"},
     {"id":"PROB-REGRESSION","status":"resolved","severity":"high","title":"已复现的运行时回归均有测试与修复","detail":"runtime cause 覆盖伪造 replyTo；快速双重 assign 只发一个 task.started；损坏尾后 append 可重启重放；Hub 重启注册仍幂等。HTTP caller 身份由 HUB-SEC-01 单独覆盖。","next":"保留 tests/runtime-regressions.test.ts 作为本地 Runner contract 的回归层。","affects":["EVIDENCE-01","C-LOCAL-01"],"source":"tests/runtime-regressions.test.ts"},
@@ -330,6 +330,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层零依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-23 19:59","kind":"completed","entity":"HUB-SEC-01","title":"Hub 认证、身份与本机执行边界完成","detail":"真实启动 Hub 的 9 项集成测试通过；匿名路由、SSE、伪造 caller、Agent accept、跨站请求和宽权限 Grok 均被阻断。"},
     {"at":"2026-08-23 19:53","kind":"completed","entity":"EVIDENCE-01","title":"真实 Hub 证据路径与四类回归完成","detail":"1,200 条默认完整上下文、伪造 replyTo、重复指派、重启注册和损坏尾恢复共 5 项新测试通过；相关测试合计 42/42。"},
     {"at":"2026-08-23 19:46","kind":"completed","entity":"REPO-01","title":"原 GitHub 仓库提交基线完成","detail":"原 GitHub 已恢复为 origin；codex/project-control 分支和 b870a26 原子提交已推送并建立 tracking，main 保持不变。"},
     {"at":"2026-08-23 19:45","kind":"decision","entity":"REPO-01","title":"继续使用原 GitHub 仓库","detail":"按用户决定移除新 SSH origin，并将 https://github.com/cabinw/agent-os.git 恢复为 origin；后续按任务提交到 codex 分支。"},

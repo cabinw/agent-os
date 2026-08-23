@@ -22,6 +22,14 @@ import { createServer } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describeAdapters, getAdapter } from "./adapters/index.mjs";
+import {
+  DEFAULT_HOST,
+  allowedOrigins,
+  applySecurityHeaders,
+  createCredentialStore,
+  parseAgentTokens,
+  requestOrigin,
+} from "./http-security.mjs";
 import { Hub } from "./hub.mjs";
 import { EventLog } from "./log.mjs";
 import { HUMAN_ID } from "./mcp-tools.mjs";
@@ -31,6 +39,7 @@ import { ValidationError } from "./validate.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = resolve(HERE, "../public");
 const PORT = Number(process.env.PORT ?? 4173);
+const HOST = process.env.HOST ?? DEFAULT_HOST;
 const WORKSPACE = process.env.AGENT_CWD ?? resolve(HERE, "../workspace");
 const LOG_PATH = process.env.LOG_PATH ?? resolve(HERE, "../data/events.jsonl");
 const PROJECT = "proj_hub";
@@ -48,6 +57,17 @@ const ROSTER = [
   { id: "codex", role: "worker", capabilities: ["coding", "testing"] },
 ];
 
+const credentials = createCredentialStore({
+  humanToken: process.env.AGENT_OS_HUMAN_TOKEN,
+  agentTokens: parseAgentTokens(process.env.AGENT_OS_AGENT_TOKENS),
+  agentIds: ROSTER.map((agent) => agent.id),
+});
+let origins = allowedOrigins({
+  host: HOST,
+  port: PORT,
+  configured: process.env.AGENT_OS_ALLOWED_ORIGINS,
+});
+
 const log = new EventLog(LOG_PATH);
 const clients = new Set();
 
@@ -64,21 +84,78 @@ const hub = new Hub({
   workspace: WORKSPACE,
   url: `http://localhost:${PORT}`,
   budget: Number(process.env.HOP_BUDGET ?? 6),
+  tokenForAgent: (id) => credentials.tokenForAgent(id),
 });
 
 for (const a of ROSTER) {
   if (getAdapter(a.id)) hub.register(a.id, a);
 }
 
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+const server = createServer((req, res) => {
+  handleRequest(req, res).catch((error) => {
+    if (res.headersSent) return res.destroy(error);
+    applySecurityHeaders(res);
+    res.writeHead(500, { "content-type": "application/json" });
+    return res.end(JSON.stringify({ error: "internal server error" }));
+  });
+});
+
+async function handleRequest(req, res) {
+  // The Host header is attacker-controlled. Only the path is needed here, so a
+  // fixed base avoids turning it into URL or origin authority.
+  const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const json = (code, body) => {
     res.writeHead(code, { "content-type": "application/json" });
     res.end(JSON.stringify(body));
   };
 
+  const principal = credentials.authenticate(req.headers.authorization);
+  if (!principal) {
+    applySecurityHeaders(res);
+    res.setHeader("www-authenticate", 'Bearer realm="agent-os"');
+    return json(401, { error: "bearer token required" });
+  }
+
+  const cors = requestOrigin(req, origins);
+  applySecurityHeaders(res, cors.origin);
+  if (!cors.ok) return json(403, { error: "cross-origin request denied" });
+
+  if (req.method === "OPTIONS") {
+    res.setHeader("access-control-allow-headers", "authorization, content-type");
+    res.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    return res.writeHead(204).end();
+  }
+
+  const requireKind = (kind) => {
+    if (principal.kind === kind) return true;
+    json(403, { error: `${kind} credential required` });
+    return false;
+  };
+
   if (req.method === "GET" && url.pathname === "/") {
-    const html = await readFile(join(PUBLIC, "index.html"), "utf8");
+    if (!requireKind("human")) return undefined;
+    const sessionToken = credentials.issue(principal);
+    const [source, reducerSource, htmlSource] = await Promise.all([
+      readFile(join(PUBLIC, "index.html"), "utf8"),
+      readFile(join(HERE, "thread.mjs"), "utf8"),
+      readFile(join(HERE, "html.mjs"), "utf8"),
+    ]);
+    // Module requests cannot attach an Authorization header. Inline the two
+    // pure browser modules into the already-authenticated HTML response instead
+    // of weakening their routes with query credentials or cookies.
+    const html = source
+      .replace(
+        "<!--AGENT_OS_BOOTSTRAP-->",
+        `<script>globalThis.__AGENT_OS_BEARER__=${JSON.stringify(sessionToken)};</script>`,
+      )
+      .replace(
+        'import { reduce } from "/src/thread.mjs";',
+        reducerSource.replace(/^export /gm, ""),
+      )
+      .replace(
+        'import { escapeHtml as esc } from "/src/html.mjs";',
+        `${htmlSource.replace(/^export /gm, "")}\nconst esc = escapeHtml;`,
+      );
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     return res.end(html);
   }
@@ -86,12 +163,21 @@ const server = createServer(async (req, res) => {
   // The browser imports the reducer rather than reimplementing it — one rule,
   // one module, two consumers.
   if (req.method === "GET" && url.pathname === "/src/thread.mjs") {
+    if (!requireKind("human")) return undefined;
     const js = await readFile(join(HERE, "thread.mjs"), "utf8");
     res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
     return res.end(js);
   }
 
+  if (req.method === "GET" && url.pathname === "/src/html.mjs") {
+    if (!requireKind("human")) return undefined;
+    const js = await readFile(join(HERE, "html.mjs"), "utf8");
+    res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+    return res.end(js);
+  }
+
   if (req.method === "GET" && url.pathname === "/events") {
+    if (!requireKind("human")) return undefined;
     res.writeHead(200, {
       "content-type": "text/event-stream",
       "cache-control": "no-cache",
@@ -120,6 +206,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/say") {
+    if (!requireKind("human")) return undefined;
     const body = await readBody(req);
     const text = String(body?.text ?? "").trim();
     const to = String(body?.to ?? "");
@@ -132,21 +219,24 @@ const server = createServer(async (req, res) => {
   // The participation channel. bin/agent-os-mcp.mjs is a stdio↔HTTP bridge onto
   // exactly these two routes, and holds no state of its own.
   if (req.method === "GET" && url.pathname === "/mcp/tools") {
+    if (!requireKind("agent")) return undefined;
     return json(200, { tools: hub.tools.list() });
   }
 
   if (req.method === "POST" && url.pathname === "/mcp/call") {
+    if (!requireKind("agent")) return undefined;
     const body = await readBody(req);
     try {
-      const result = await hub.tools.call(
-        body?.name,
-        body?.arguments,
-        body?.caller ?? null,
-      );
+      if (body?.name === "register_agent" && body?.arguments?.id !== principal.id) {
+        throw new ValidationError(
+          `token for "${principal.id}" cannot register "${body?.arguments?.id ?? ""}"`,
+        );
+      }
+      const result = await hub.tools.call(body?.name, body?.arguments, principal.id);
       // Which tools an agent actually reaches for is the observation B.3 turns
       // on — whether a model cooperates with "ask by capability, don't name
       // names" is not something the schema can enforce.
-      console.log(`  tool  ${(body?.caller ?? "?").padEnd(7)} ${body?.name}`);
+      console.log(`  tool  ${principal.id.padEnd(7)} ${body?.name}`);
       return json(200, { result });
     } catch (e) {
       // A rejected call is a normal outcome at a trust boundary, not a crash.
@@ -159,6 +249,7 @@ const server = createServer(async (req, res) => {
    * is guidance, never a grant. It lives here, on the human's surface only.
    */
   if (req.method === "POST" && url.pathname === "/accept") {
+    if (!requireKind("human")) return undefined;
     const body = await readBody(req);
     try {
       hub.accept(String(body?.task ?? ""), body?.ok !== false);
@@ -169,6 +260,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/task") {
+    if (!requireKind("human")) return undefined;
     const body = await readBody(req);
     try {
       const made = await hub.tools.call("create_task", {
@@ -184,6 +276,7 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === "POST" && url.pathname === "/reset") {
+    if (!requireKind("human")) return undefined;
     const body = await readBody(req);
     const entry = hub.agents.get(String(body?.agent ?? ""));
     if (!entry) return json(400, { error: "未知 agent" });
@@ -195,9 +288,8 @@ const server = createServer(async (req, res) => {
     return json(200, { ok: true });
   }
 
-  res.writeHead(404);
-  return res.end("not found");
-});
+  return json(404, { error: "not found" });
+}
 
 function readBody(req) {
   return new Promise((resolveBody) => {
@@ -215,8 +307,18 @@ function readBody(req) {
   });
 }
 
-server.listen(PORT, () => {
-  console.log(`agent hub  →  http://localhost:${PORT}`);
+server.listen(PORT, HOST, () => {
+  const address = server.address();
+  const listeningPort = typeof address === "object" && address ? address.port : PORT;
+  if (!process.env.AGENT_OS_ALLOWED_ORIGINS && listeningPort !== PORT) {
+    origins = allowedOrigins({ host: HOST, port: listeningPort });
+  }
+  const callbackHost = ["0.0.0.0", "::"].includes(HOST) ? "127.0.0.1" : HOST;
+  hub.url = `http://${callbackHost}:${listeningPort}`;
+  console.log(`agent hub  →  http://${HOST}:${listeningPort}`);
+  if (!process.env.AGENT_OS_HUMAN_TOKEN) {
+    console.log(`human token →  ${credentials.humanToken}`);
+  }
   console.log(`日志       →  ${LOG_PATH}（已有 ${log.size} 条，seq ${log.seq}）`);
   for (const a of hub.roster()) {
     const mark = a.integration.participates ? "会调工具" : "需适配器翻译";

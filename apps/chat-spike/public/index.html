@@ -325,8 +325,10 @@
   </div></div>
 </main>
 
+<!--AGENT_OS_BOOTSTRAP-->
 <script type="module">
 import { reduce } from "/src/thread.mjs";
+import { escapeHtml as esc } from "/src/html.mjs";
 
 /**
  * Strings live here rather than inline: the product ships zh-CN and en from the
@@ -385,8 +387,13 @@ let scope = "*";
 const streams = new Map();
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) =>
-  String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+const bearer = globalThis.__AGENT_OS_BEARER__;
+delete globalThis.__AGENT_OS_BEARER__;
+const apiFetch = (path, init = {}) => {
+  const headers = new Headers(init.headers);
+  headers.set("authorization", `Bearer ${bearer}`);
+  return fetch(path, { ...init, headers });
+};
 const clock = (at) => new Date(at).toLocaleTimeString("zh-CN", { hour12: false });
 const nameOf = (id) =>
   id === human ? T.you : (agents.find((a) => a.id === id)?.label ?? id);
@@ -466,7 +473,7 @@ document.addEventListener("click", async (e) => {
   if (e.target.closest("[data-new]")) {
     const title = prompt(T.taskPrompt);
     if (title) {
-      const res = await fetch("/task", {
+      const res = await apiFetch("/task", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ title }),
@@ -477,7 +484,7 @@ document.addEventListener("click", async (e) => {
   }
   const acc = e.target.closest("[data-accept], [data-reject]");
   if (acc) {
-    await fetch("/accept", {
+    await apiFetch("/accept", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ task: acc.dataset.accept ?? acc.dataset.reject, ok: !!acc.dataset.accept }),
@@ -554,12 +561,7 @@ function messageRow(i) {
 
 // ----------------------------------------------------------------- transport
 
-const es = new EventSource("/events");
-es.onerror = () => {
-  $("statusline").textContent = T.disconnected;
-};
-es.onmessage = (e) => {
-  const d = JSON.parse(e.data);
+function receive(d) {
   switch (d.type) {
     case "hello":
       thread = d.thread;
@@ -609,7 +611,40 @@ es.onmessage = (e) => {
       $("statusline").textContent = `✗ ${d.message}`;
       break;
   }
-};
+}
+
+async function connectEvents() {
+  for (;;) {
+    try {
+      const response = await apiFetch("/events", {
+        headers: { accept: "text/event-stream" },
+      });
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        for (let end = buffer.indexOf("\n\n"); end >= 0; end = buffer.indexOf("\n\n")) {
+          const frame = buffer.slice(0, end);
+          buffer = buffer.slice(end + 2);
+          const data = frame
+            .split("\n")
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trimStart())
+            .join("\n");
+          if (data) receive(JSON.parse(data));
+        }
+      }
+    } catch {
+      $("statusline").textContent = T.disconnected;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+connectEvents();
 
 // ------------------------------------------------------------------ composer
 
@@ -618,7 +653,7 @@ async function send() {
   if (!text || !target) return;
   $("input").value = "";
   $("input").style.height = "auto";
-  const res = await fetch("/say", {
+  const res = await apiFetch("/say", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ text, to: target }),
