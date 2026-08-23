@@ -43,6 +43,9 @@ export class Hub {
    * @param {string} opts.url                       where the MCP bridge calls back
    * @param {number} [opts.budget]
    * @param {(id: string) => string|null} [opts.tokenForAgent]
+   * @param {{dispatch: Function, hasSession?: Function, resetSession?: Function,
+   *          close?: Function}} [opts.runner] shared execution-plane contract
+   * @param {string} [opts.userId] authenticated owner of Runner sessions
    */
   constructor({
     log,
@@ -53,6 +56,8 @@ export class Hub {
     url,
     budget,
     tokenForAgent,
+    runner,
+    userId,
   }) {
     this.log = log;
     this.projectId = projectId;
@@ -62,6 +67,8 @@ export class Hub {
     this.url = url;
     this.budget = budget ?? DEFAULT_BUDGET;
     this.tokenForAgent = tokenForAgent ?? (() => null);
+    this.runner = runner ?? null;
+    this.userId = userId ?? HUMAN_ID;
 
     /** @type {Map<string, {id, label, adapter, queue, busy, integration}>} */
     this.agents = new Map();
@@ -175,12 +182,7 @@ export class Hub {
       cwd: dir,
       mcp,
       onEvent: (e) => {
-        if (e.kind === "delta")
-          this.broadcast("delta", { agent: entry.id, text: e.text });
-        else if (e.kind === "thought")
-          this.broadcast("thought", { agent: entry.id, text: e.text });
-        else if (e.kind === "usage") this.broadcast("usage", { agent: entry.id, ...e });
-        else this.broadcast("progress", { agent: entry.id, kind: e.label ?? "event" });
+        this.broadcastExecutionEvent(entry, e);
       },
     });
     return entry.adapter;
@@ -194,8 +196,45 @@ export class Hub {
       capabilities: a.capabilities,
       integration: a.integration,
       busy: a.busy,
-      hasSession: a.adapter?.hasSession ?? false,
+      hasSession:
+        this.runner?.hasSession?.({
+          user: this.userId,
+          project: this.projectId,
+          agent: a.id,
+        }) ??
+        a.adapter?.hasSession ??
+        false,
     }));
+  }
+
+  broadcastExecutionEvent(entry, event) {
+    if (event.kind === "delta") {
+      this.broadcast("delta", { agent: entry.id, text: event.text });
+    } else if (event.kind === "thought") {
+      this.broadcast("thought", { agent: entry.id, text: event.text });
+    } else if (event.kind === "usage") {
+      this.broadcast("usage", { agent: entry.id, ...event });
+    } else if (["started", "completed", "failed"].includes(event.kind)) {
+      this.broadcast("runner", { agent: entry.id, event });
+    } else {
+      this.broadcast("progress", {
+        agent: entry.id,
+        kind: event.label ?? "event",
+      });
+    }
+  }
+
+  broadcastTurnError(entry, error) {
+    const normalized = error?.error;
+    this.broadcast("error", {
+      agent: entry.id,
+      message: String(normalized?.message ?? error?.message ?? error),
+      ...(normalized?.requestId ? { requestId: normalized.requestId } : {}),
+      ...(normalized?.code ? { code: normalized.code } : {}),
+      ...(typeof normalized?.retryable === "boolean"
+        ? { retryable: normalized.retryable }
+        : {}),
+    });
   }
 
   // ------------------------------------------------------------------- tasks
@@ -284,10 +323,7 @@ export class Hub {
     entry.queue = entry.queue
       .then(() => this.turn(entry, cause))
       .catch((err) => {
-        this.broadcast("error", {
-          agent: entry.id,
-          message: String(err?.message ?? err),
-        });
+        this.broadcastTurnError(entry, err);
       });
     return entry.queue;
   }
@@ -308,7 +344,7 @@ export class Hub {
     try {
       // Everything this agent writes during the turn lands after this mark.
       const before = this.log.seq;
-      const reply = await this.adapterFor(entry).send(this.prompt(entry, cause));
+      const reply = await this.execute(entry, cause, this.prompt(entry, cause));
 
       // An agent that already acted — sent a message, or delivered a task — has
       // spoken. Echoing its transcript on top would double every turn, and the
@@ -338,6 +374,28 @@ export class Hub {
       entry.task = null;
       this.broadcast("roster", { agents: this.roster() });
     }
+  }
+
+  /** Run one prompt through the shared Runner, with the old direct path as fallback. */
+  execute(entry, cause, prompt) {
+    if (!this.runner) return this.adapterFor(entry).send(prompt);
+    if (!cause?.id) {
+      throw new ValidationError("Runner dispatch 缺少 runtime-owned cause id");
+    }
+    return this.runner.dispatch(
+      {
+        requestId: cause.id,
+        user: this.userId,
+        project: this.projectId,
+        agent: entry.id,
+        adapter: entry.Cls.id ?? entry.id,
+        workspace: entry.id,
+        prompt,
+        ...(entry.task ? { taskId: entry.task } : {}),
+        causedBy: cause.id,
+      },
+      { onEvent: (event) => this.broadcastExecutionEvent(entry, event) },
+    );
   }
 
   /**
@@ -630,10 +688,7 @@ export class Hub {
         await this.turn(entry, { ...cause, id: started.id }, taskId);
       })
       .catch((err) => {
-        this.broadcast("error", {
-          agent: entry.id,
-          message: String(err?.message ?? err),
-        });
+        this.broadcastTurnError(entry, err);
       });
     return entry.queue;
   }
@@ -682,7 +737,22 @@ export class Hub {
     return stored;
   }
 
+  async resetSession(agentId) {
+    const entry = this.agents.get(agentId);
+    if (!entry) throw new ValidationError(`未知 agent "${agentId}"`);
+    if (this.runner?.resetSession) {
+      await this.runner.resetSession({
+        user: this.userId,
+        project: this.projectId,
+        agent: agentId,
+      });
+      return;
+    }
+    entry.adapter?.resetSession();
+  }
+
   async close() {
     for (const a of this.agents.values()) await a.adapter?.close().catch(() => {});
+    await this.runner?.close?.().catch(() => {});
   }
 }

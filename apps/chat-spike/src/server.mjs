@@ -17,6 +17,7 @@
  * rule 5), tasks, memory.
  */
 
+import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, join, resolve } from "node:path";
@@ -32,7 +33,10 @@ import {
 } from "./http-security.mjs";
 import { Hub } from "./hub.mjs";
 import { EventLog } from "./log.mjs";
+import { mountMcp } from "./mcp-mount.mjs";
 import { HUMAN_ID } from "./mcp-tools.mjs";
+import { LocalRunner } from "./runners/local.mjs";
+import { SessionStore } from "./runners/session-store.mjs";
 import { project } from "./thread.mjs";
 import { ValidationError } from "./validate.mjs";
 
@@ -42,6 +46,7 @@ const PORT = Number(process.env.PORT ?? 4173);
 const HOST = process.env.HOST ?? DEFAULT_HOST;
 const WORKSPACE = process.env.AGENT_CWD ?? resolve(HERE, "../workspace");
 const LOG_PATH = process.env.LOG_PATH ?? resolve(HERE, "../data/events.jsonl");
+const SESSION_PATH = process.env.SESSION_PATH ?? join(dirname(LOG_PATH), "sessions.json");
 const PROJECT = "proj_hub";
 
 /** Claude Code is the default coordinator: measured to participate, and holding
@@ -70,11 +75,30 @@ let origins = allowedOrigins({
 
 const log = new EventLog(LOG_PATH);
 const clients = new Set();
+mkdirSync(WORKSPACE, { recursive: true, mode: 0o700 });
+for (const agent of ROSTER) {
+  mkdirSync(join(WORKSPACE, agent.id), { recursive: true, mode: 0o700 });
+}
 
 function broadcast(type, data) {
   const frame = `data: ${JSON.stringify({ type, ...data })}\n\n`;
   for (const res of clients) res.write(frame);
 }
+
+// This process is the first Local Runner. The closure is invoked only after
+// `hub` exists, so every adapter receives the final bound callback URL.
+const runner = new LocalRunner({
+  workspaceRoot: WORKSPACE,
+  sessionStore: new SessionStore(SESSION_PATH),
+  getAdapter,
+  hostId: process.env.AGENT_OS_RUNNER_ID ?? "local",
+  mcpFor: (request, workspace) =>
+    mountMcp(request.adapter, {
+      dir: workspace,
+      url: hub.url,
+      token: credentials.tokenForAgent(request.agent),
+    }),
+});
 
 const hub = new Hub({
   log,
@@ -85,6 +109,8 @@ const hub = new Hub({
   url: `http://localhost:${PORT}`,
   budget: Number(process.env.HOP_BUDGET ?? 6),
   tokenForAgent: (id) => credentials.tokenForAgent(id),
+  runner,
+  userId: HUMAN_ID,
 });
 
 for (const a of ROSTER) {
@@ -276,9 +302,10 @@ async function handleRequest(req, res) {
   if (req.method === "POST" && url.pathname === "/reset") {
     if (!requireKind("human")) return undefined;
     const body = await readBody(req);
-    const entry = hub.agents.get(String(body?.agent ?? ""));
+    const agentId = String(body?.agent ?? "");
+    const entry = hub.agents.get(agentId);
     if (!entry) return json(400, { error: "未知 agent" });
-    entry.adapter?.resetSession();
+    await hub.resetSession(agentId);
     broadcast("roster", { agents: hub.roster() });
     broadcast("notice", {
       text: `${entry.label} 的 vendor 会话已丢弃——下一轮冷启动。日志不受影响。`,

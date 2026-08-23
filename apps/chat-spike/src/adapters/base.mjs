@@ -68,6 +68,21 @@ export class Adapter {
     this._sessionId = null;
   }
 
+  /**
+   * Restore an opaque vendor session previously persisted by a Runner. Keeping
+   * this operation on the adapter boundary avoids callers mutating protected
+   * state or inventing a provider-specific resume path.
+   */
+  restoreSession(sessionId) {
+    if (typeof sessionId !== "string" || sessionId.trim() === "") {
+      throw new TypeError("sessionId 必须是非空字符串");
+    }
+    if (!this.constructor.capabilities?.session) {
+      throw new TypeError(`${this.constructor.label} 不支持 session 恢复`);
+    }
+    this._sessionId = sessionId;
+  }
+
   /** @returns {Promise<{text: string, sessionId: string|null, ms: number, fresh: boolean}>} */
   async send(_prompt) {
     throw new Error("not implemented");
