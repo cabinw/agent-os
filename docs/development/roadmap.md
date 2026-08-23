@@ -15,8 +15,8 @@ order; Remote Runner work does not start until Local Runner semantics pass.
 | LF | done | Strict Local Runner foundation | A real subprocess passes result / event / error, workspace-containment and restart-session tests |
 | L | done | Add injectable Hub → Local Runner vertical slice | A real subprocess crosses Hub → Runner → adapter, records its reply and recovers after failure |
 | C | done | Finish the shared Runner contract; remove direct-adapter fallback | Session, event stream, cancellation, retry, error and liveness cases have transport-neutral tests; Hub requires a Runner |
-| R | active | Remote Runner transport | The Local acceptance task runs unchanged; the normalized event sequence matches |
-| 1.1 | pending | Formal Event Core | The proven envelope and contracts move into `packages/` |
+| R | done | Remote Runner transport | The Local acceptance task runs unchanged; the normalized event sequence matches |
+| 1.1 | active | Formal Event Core | The proven envelope and contracts move into `packages/` |
 
 The Hub is the server control plane and dispatches only. Project working copies,
 vendor credentials and adapters stay on Runners. See

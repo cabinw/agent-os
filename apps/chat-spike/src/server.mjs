@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { describeAdapters, getAdapter } from "./adapters/index.mjs";
 import {
   DEFAULT_HOST,
+  MIN_TOKEN_LENGTH,
   allowedOrigins,
   applySecurityHeaders,
   createCredentialStore,
@@ -36,6 +37,7 @@ import { EventLog } from "./log.mjs";
 import { mountMcp } from "./mcp-mount.mjs";
 import { HUMAN_ID } from "./mcp-tools.mjs";
 import { LocalRunner } from "./runners/local.mjs";
+import { RemotePlacementStore, RemoteRunner } from "./runners/remote.mjs";
 import { SessionStore } from "./runners/session-store.mjs";
 import { project } from "./thread.mjs";
 import { ValidationError } from "./validate.mjs";
@@ -47,8 +49,45 @@ const HOST = process.env.HOST ?? DEFAULT_HOST;
 const WORKSPACE = process.env.AGENT_CWD ?? resolve(HERE, "../workspace");
 const LOG_PATH = process.env.LOG_PATH ?? resolve(HERE, "../data/events.jsonl");
 const SESSION_PATH = process.env.SESSION_PATH ?? join(dirname(LOG_PATH), "sessions.json");
+const REMOTE_STATE_PATH =
+  process.env.AGENT_OS_REMOTE_STATE_PATH ??
+  join(dirname(LOG_PATH), "remote-placement.json");
+const RUNNER_MODE = process.env.AGENT_OS_RUNNER_MODE ?? "local";
 const PROJECT = "proj_hub";
 const HUB_URL = `http://localhost:${PORT}`;
+
+if (!new Set(["local", "remote"]).has(RUNNER_MODE)) {
+  throw new Error(
+    `AGENT_OS_RUNNER_MODE must be "local" or "remote", received ${JSON.stringify(RUNNER_MODE)}`,
+  );
+}
+
+function requiredRemoteSetting(name) {
+  const value = process.env[name];
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${name} is required when AGENT_OS_RUNNER_MODE=remote`);
+  }
+  return value;
+}
+
+const runnerHostId =
+  RUNNER_MODE === "remote"
+    ? requiredRemoteSetting("AGENT_OS_RUNNER_ID")
+    : (process.env.AGENT_OS_RUNNER_ID ?? "local");
+const runnerToken =
+  RUNNER_MODE === "remote" ? requiredRemoteSetting("AGENT_OS_RUNNER_TOKEN") : null;
+const humanToken =
+  RUNNER_MODE === "remote"
+    ? requiredRemoteSetting("AGENT_OS_HUMAN_TOKEN")
+    : process.env.AGENT_OS_HUMAN_TOKEN;
+if (
+  runnerToken !== null &&
+  (runnerToken.length < MIN_TOKEN_LENGTH || /\s/.test(runnerToken))
+) {
+  throw new Error(
+    `AGENT_OS_RUNNER_TOKEN must be at least ${MIN_TOKEN_LENGTH} non-whitespace characters`,
+  );
+}
 
 /** Claude Code is the default coordinator: measured to participate, and holding
  *  one vendor fixed keeps "how a coordinator behaves" from being a moving part. */
@@ -63,11 +102,28 @@ const ROSTER = [
   { id: "codex", role: "worker", capabilities: ["coding", "testing"] },
 ];
 
+const configuredAgentTokens = parseAgentTokens(process.env.AGENT_OS_AGENT_TOKENS);
+if (RUNNER_MODE === "remote") {
+  const missingAgentTokens = ROSTER.map((agent) => agent.id).filter(
+    (agentId) => !Object.hasOwn(configuredAgentTokens, agentId),
+  );
+  if (missingAgentTokens.length > 0) {
+    throw new Error(
+      `AGENT_OS_AGENT_TOKENS must explicitly configure remote Worker principals: ${missingAgentTokens.join(", ")}`,
+    );
+  }
+}
+
 const credentials = createCredentialStore({
-  humanToken: process.env.AGENT_OS_HUMAN_TOKEN,
-  agentTokens: parseAgentTokens(process.env.AGENT_OS_AGENT_TOKENS),
+  humanToken,
+  agentTokens: configuredAgentTokens,
   agentIds: ROSTER.map((agent) => agent.id),
 });
+if (runnerToken !== null && credentials.authenticate(`Bearer ${runnerToken}`) !== null) {
+  throw new Error(
+    "AGENT_OS_RUNNER_TOKEN must be independent from human and agent credentials",
+  );
+}
 let origins = allowedOrigins({
   host: HOST,
   port: PORT,
@@ -76,30 +132,39 @@ let origins = allowedOrigins({
 
 const log = new EventLog(LOG_PATH);
 const clients = new Set();
-mkdirSync(WORKSPACE, { recursive: true, mode: 0o700 });
-for (const agent of ROSTER) {
-  mkdirSync(join(WORKSPACE, agent.id), { recursive: true, mode: 0o700 });
-}
 
 function broadcast(type, data) {
   const frame = `data: ${JSON.stringify({ type, ...data })}\n\n`;
   for (const res of clients) res.write(frame);
 }
 
-// This process is the first Local Runner. It owns adapter construction,
-// working-copy placement and MCP mounting; the Hub only dispatches requests.
-const runner = new LocalRunner({
-  workspaceRoot: WORKSPACE,
-  sessionStore: new SessionStore(SESSION_PATH),
-  getAdapter,
-  hostId: process.env.AGENT_OS_RUNNER_ID ?? "local",
-  mcpFor: (request, workspace) =>
-    mountMcp(request.adapter, {
-      dir: workspace,
-      url: HUB_URL,
-      token: credentials.tokenForAgent(request.agent),
-    }),
-});
+// The composition root selects one shared Runner contract. Remote mode owns no
+// adapter, working copy or vendor session; those stay on the outbound Worker.
+let runner;
+if (RUNNER_MODE === "local") {
+  mkdirSync(WORKSPACE, { recursive: true, mode: 0o700 });
+  for (const agent of ROSTER) {
+    mkdirSync(join(WORKSPACE, agent.id), { recursive: true, mode: 0o700 });
+  }
+  runner = new LocalRunner({
+    workspaceRoot: WORKSPACE,
+    sessionStore: new SessionStore(SESSION_PATH),
+    getAdapter,
+    hostId: runnerHostId,
+    mcpFor: (request, workspace) =>
+      mountMcp(request.adapter, {
+        dir: workspace,
+        url: HUB_URL,
+        token: credentials.tokenForAgent(request.agent),
+      }),
+  });
+} else {
+  runner = new RemoteRunner({
+    token: runnerToken,
+    hostId: runnerHostId,
+    placementStore: new RemotePlacementStore({ filePath: REMOTE_STATE_PATH }),
+  });
+}
 
 const hub = new Hub({
   log,
@@ -132,6 +197,17 @@ async function handleRequest(req, res) {
     res.writeHead(code, { "content-type": "application/json" });
     res.end(JSON.stringify(body));
   };
+
+  // Runner transport has an independent host principal. It is deliberately
+  // mounted before human/agent auth, and only for this versioned namespace.
+  if (
+    RUNNER_MODE === "remote" &&
+    (url.pathname === "/runner/v1" || url.pathname.startsWith("/runner/v1/"))
+  ) {
+    applySecurityHeaders(res);
+    await runner.handleHttp(req, res);
+    return undefined;
+  }
 
   // Public, inert bootstrap only. It contains no project state, roster, token
   // or capability data. The fragment credential is handled entirely in the
@@ -182,6 +258,16 @@ async function handleRequest(req, res) {
     return false;
   };
 
+  const requireRunnerReady = async () => {
+    if (RUNNER_MODE === "local" || (await runner.health()).ready) return true;
+    // Reject before reading or emitting anything: an offline Worker cannot
+    // leave a message/task recorded as if execution had started.
+    req.resume();
+    res.setHeader("retry-after", "1");
+    json(503, { error: "remote runner unavailable" });
+    return false;
+  };
+
   // The browser imports the reducer rather than reimplementing it — one rule,
   // one module, two consumers.
   if (req.method === "GET" && url.pathname === "/src/thread.mjs") {
@@ -229,6 +315,7 @@ async function handleRequest(req, res) {
 
   if (req.method === "POST" && url.pathname === "/say") {
     if (!requireKind("human")) return undefined;
+    if (!(await requireRunnerReady())) return undefined;
     const body = await readBody(req);
     const text = String(body?.text ?? "").trim();
     const to = String(body?.to ?? "");
@@ -283,6 +370,7 @@ async function handleRequest(req, res) {
 
   if (req.method === "POST" && url.pathname === "/task") {
     if (!requireKind("human")) return undefined;
+    if (!(await requireRunnerReady())) return undefined;
     const body = await readBody(req);
     try {
       const made = await hub.tools.call("create_task", {
@@ -339,7 +427,7 @@ server.listen(PORT, HOST, () => {
   const callbackHost = ["0.0.0.0", "::"].includes(HOST) ? "127.0.0.1" : HOST;
   hub.url = `http://${callbackHost}:${listeningPort}`;
   console.log(`agent hub  →  http://${HOST}:${listeningPort}`);
-  if (!process.env.AGENT_OS_HUMAN_TOKEN) {
+  if (RUNNER_MODE === "local" && !process.env.AGENT_OS_HUMAN_TOKEN) {
     console.log(`human token →  ${credentials.humanToken}`);
   }
   console.log(`日志       →  ${LOG_PATH}（已有 ${log.size} 条，seq ${log.seq}）`);
@@ -352,9 +440,28 @@ server.listen(PORT, HOST, () => {
   console.log(`回环预算   →  ${hub.budget} 跳`);
 });
 
-for (const sig of ["SIGINT", "SIGTERM"]) {
-  process.on(sig, async () => {
+let shutdownPromise = null;
+function shutdown() {
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
     await hub.close();
-    process.exit(0);
+    for (const response of clients) response.end();
+    clients.clear();
+    await new Promise((resolveClose, rejectClose) => {
+      server.close((error) => (error ? rejectClose(error) : resolveClose()));
+      server.closeIdleConnections?.();
+    });
+  })();
+  return shutdownPromise;
+}
+
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.once(signal, () => {
+    void shutdown().catch((error) => {
+      console.error(
+        `agent hub shutdown failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      process.exitCode = 1;
+    });
   });
 }

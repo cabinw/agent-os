@@ -208,6 +208,14 @@ export class Hub {
     });
   }
 
+  async requireExecutionReady() {
+    const health = await this.runner.health();
+    if (health?.ready === true) return;
+    throw new ValidationError(
+      "Runner 尚未就绪，未写入会唤醒 agent 的事件；请等待 Worker 连接后重试",
+    );
+  }
+
   // ------------------------------------------------------------------- tasks
 
   /** Current derived task state. Never stored — this is a fold, every time. */
@@ -523,7 +531,8 @@ export class Hub {
        * and the caller never names a vendor (ADR-004). Naming one is allowed but
        * still has to be an agent that exists.
        */
-      assignTask(p, caller) {
+      async assignTask(p, caller) {
+        await hub.requireExecutionReady();
         const task = hub.guard(p.task, "task.assigned");
         let executor = p.executor;
         if (!executor) {
@@ -578,7 +587,8 @@ export class Hub {
         return { task: p.task, status: "review", seq: evt.seq };
       },
 
-      sendMessage(p) {
+      async sendMessage(p) {
+        if (p.to !== HUMAN_ID) await hub.requireExecutionReady();
         // The runtime-owned wake cause wins over caller input. Otherwise an
         // agent could point at an older event and reset its own hop budget.
         const causedBy = hub.causeFor(p.from, p.replyTo);

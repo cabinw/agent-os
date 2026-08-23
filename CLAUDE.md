@@ -30,15 +30,20 @@ Alongside the code: Markdown specs under `docs/`, high-fidelity renders under `u
 
 Stack: TypeScript + Tauri 2 + SQLite. Deployment is Server Hub plus outbound
 Runners ([ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md));
-ADR-007's single-machine scope is superseded. Gates / auth, the Local Runner
-vertical slice and the shared Runner contract are complete; current order is
-Remote Runner → formal Event Core ([roadmap](docs/development/roadmap.md)).
+ADR-007's single-machine scope is superseded. Gates / auth, Local Runner, the
+shared contract and the production Remote Runner path are complete; formal
+Event Core is now active ([roadmap](docs/development/roadmap.md)).
 
 The Local Runner has strict request / result / event / error shapes, durable
 request-id idempotency, cancellation / health / close semantics, workspace
 containment and persistent `(user, project, agent)` sessions. Runner injection
 is mandatory: the Hub has no direct-adapter, working-copy or vendor execution
 path.
+
+Remote mode uses an independent host principal, an outbound-only Worker,
+durable host placement and request replay, random lease fencing and heartbeat.
+The Hub owns no remote working copy or vendor credential; vendor children do
+not inherit Agent OS control-plane credentials.
 
 ## What Agent OS is
 

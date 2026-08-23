@@ -2050,7 +2050,7 @@ seq 2  message.sent      agent:claude-code  Claude Code registered and context l
 <tr><td>质量门禁与 Hub 认证</td><td>已完成</td><td>所有能力路由按 principal 授权，完整 verify 全绿</td></tr>
 <tr><td>Local Runner 纵向切片</td><td>已完成</td><td>Hub 注入 Runner，真实子进程回写事件并可从 failure 恢复</td></tr>
 <tr><td>共享 Runner contract</td><td>已完成</td><td>持久幂等、cancel / retry / health / close；Hub 强制 Runner 且无 direct fallback</td></tr>
-<tr><td>Remote Runner</td><td>进行中</td><td>同一 Local 验收任务不改地远程运行，normalized event sequence 一致</td></tr>
+<tr><td>Remote Runner</td><td>已完成</td><td>生产 Hub / outbound Worker、随机 lease fencing、持久 placement 与重启 replay 全部通过</td></tr>
 </table>
 
 <h3>Phase 1 — 核心循环（无 UI）</h3>

@@ -17,7 +17,9 @@ log, MCP trust boundary, Hub runtime and four vendor adapters; formal
 complete. The shared Runner contract now covers durable request-id idempotency,
 events, sessions, cancellation, health, retry classification and close; Runner
 injection is mandatory and the Hub has no vendor execution fallback. The active
-step is Remote Runner, followed by formal Event Core.
+Remote path now runs through the production Server Hub / outbound Worker
+composition with durable placement, fenced leases, restart replay and isolated
+credentials. The active step is formal Event Core.
 
 ## Where to start
 

@@ -62,6 +62,44 @@ AGENT_OS_HUMAN_TOKEN='<human-token-at-least-32-chars>' \
 The Hub defaults to `127.0.0.1`. Widen `HOST` only with an explicit Origin
 allowlist; authentication remains mandatory.
 
+### Remote Runner mode
+
+Remote mode keeps adapters, working copies and vendor sessions out of the Hub
+process. Give the Hub and Worker the same dedicated Runner credential and host
+id, and give both sides the same explicit per-agent credentials. Every bearer
+value must be unique and at least 32 non-whitespace characters.
+
+```bash
+# terminal 1: Hub / inbound Runner transport
+AGENT_OS_RUNNER_MODE=remote \
+AGENT_OS_RUNNER_ID=runner-east-1 \
+AGENT_OS_RUNNER_TOKEN="$RUNNER_TOKEN" \
+AGENT_OS_HUMAN_TOKEN="$HUMAN_TOKEN" \
+AGENT_OS_AGENT_TOKENS="$AGENT_TOKENS" \
+AGENT_OS_REMOTE_STATE_PATH=/var/lib/agent-os/remote-placement.json \
+corepack pnpm --filter @agent-os/chat-spike start
+
+# terminal 2: outbound execution Worker
+AGENT_OS_URL=http://127.0.0.1:4173 \
+AGENT_OS_RUNNER_ID=runner-east-1 \
+AGENT_OS_RUNNER_TOKEN="$RUNNER_TOKEN" \
+AGENT_OS_AGENT_TOKENS="$AGENT_TOKENS" \
+AGENT_CWD=/srv/agent-os/workspaces \
+SESSION_PATH=/var/lib/agent-os/runner-sessions.json \
+corepack pnpm --filter @agent-os/chat-spike start:worker
+```
+
+`AGENT_TOKENS` is a JSON object with explicit `claude`, `codex`, `grok` and
+`kimi` keys. Remote mode also requires an explicit `AGENT_OS_HUMAN_TOKEN`; it
+never generates or prints a bootstrap credential. The Hub persists only logical
+session placement at `AGENT_OS_REMOTE_STATE_PATH` (by default beside
+`LOG_PATH`); the Worker owns `AGENT_CWD` and `SESSION_PATH`. Both processes
+handle `SIGINT` and `SIGTERM` without printing credentials.
+
+The Worker accepts plain HTTP only for loopback development URLs. Put a Hub on
+another host behind an HTTPS reverse proxy and set `AGENT_OS_URL` to that HTTPS
+origin; credentials, query strings and fragments are rejected in the URL.
+
 Requires `codex` on PATH (verified against codex-cli 0.142.5) and a logged-in
 Codex account. The agent runs `sandbox: read-only`, `approval-policy: never`,
 with its working directory pinned to `apps/chat-spike/workspace/`.
@@ -231,6 +269,6 @@ co-located orchestration and `log.mjs` are scaffolding.
    coverage.
 4. **Done:** freeze cancellation, retry and liveness tests; persist request-id
    idempotency; require Runner injection and remove the direct fallback.
-5. **Active:** add an outbound Remote Runner connection and rerun the same
-   acceptance task.
+5. **Done:** outbound Remote Runner production composition reruns the same
+   acceptance task through the Hub, authenticated transport and Worker entry.
 6. Move the proven envelope and contracts into formal packages.

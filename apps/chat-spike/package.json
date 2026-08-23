@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Protocol spike: chat with an agent through the Agent OS dispatch path",
   "scripts": {
-    "start": "node src/server.mjs"
+    "start": "node src/server.mjs",
+    "start:worker": "node src/runner-worker.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"

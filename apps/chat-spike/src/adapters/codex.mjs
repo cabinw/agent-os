@@ -13,7 +13,7 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { Adapter } from "./base.mjs";
+import { Adapter, childProcessEnv } from "./base.mjs";
 
 /** Two 4-minute hangs showed up while probing. Never leave a turn open. */
 const CALL_TIMEOUT_MS = 180_000;
@@ -37,6 +37,7 @@ export class CodexAdapter extends Adapter {
     const transport = new StdioClientTransport({
       command: "codex",
       args: ["mcp-server"],
+      env: childProcessEnv(),
       stderr: "ignore",
     });
 

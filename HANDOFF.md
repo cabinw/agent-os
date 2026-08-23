@@ -172,7 +172,7 @@ provenance must be captured live.
 
 ## What to do next
 
-Follow one route. Do not start Remote Runner work early:
+Follow one route. The Runner track is complete:
 
 ```
 Gates + Hub auth ✓
@@ -183,9 +183,9 @@ Local Runner end-to-end ✓
        ↓
 Shared Runner contract ✓
        ↓
-Remote Runner transport ← active
+Remote Runner transport ✓
        ↓
-Phase 1.1 Event Core
+Phase 1.1 Event Core ← active
 ```
 
 **G · Gates and Hub trust boundary — complete.** Every data, control,
@@ -220,13 +220,14 @@ failed requests replay across restart; a crash during queued/running becomes
 explicit `UNAVAILABLE` and never silently executes twice. Runner injection is
 mandatory and the Hub has no adapter, working-copy or vendor execution path.
 
-**R · Remote Runner — active.** Add authentication, serialization, reconnect and
-backpressure to an outbound Runner connection. Workstations expose no inbound
-port. Capability is registered for `(agent, host)`.
-*Done when:* the unchanged Local acceptance task runs remotely and produces the
-same normalized event sequence.
+**R · Remote Runner — complete.** The Server Hub mounts a separately
+authenticated `/runner/v1` transport; the Worker connects out and owns adapters,
+working copies and vendor sessions. Random lease fencing, heartbeat, bounded
+backpressure, durable placement / request replay, cancellation and Hub restart
+reconciliation are tested. Vendor children receive only their scoped agent
+credential, never the Runner, human or full agent-token map.
 
-**A · Phase 1.1 Event Core.** Move the proven envelope into
+**A · Phase 1.1 Event Core — active.** Move the proven envelope into
 `packages/event-core`: Zod schemas for all catalog types, ULID and strict unknown
 field rejection.
 *Done when:* an unknown `type` or extra field is rejected at parse time.

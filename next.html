@@ -206,32 +206,32 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
       <header class="hero" id="overview">
         <div>
           <div class="eyebrow">Next move · decision brief</div>
-          <h1>先跑通本地 Agent，再把同一条调用链搬到远程</h1>
-          <p class="lede">当前最合适的路线不是一开始就开发远程调用。先让验证门禁和实验边界重新可信，把本机作为第一个 Runner，完整跑通 Hub → 本地 Agent → 事件日志 → 人工验收；再从这条已验证链路中提取稳定契约，远程阶段只替换 transport，最后把已经证明的契约下沉到正式内核。</p>
+          <h1>调用链已经跑通，现在进入正式 Event Core</h1>
+          <p class="lede">Local Runner、共享契约和生产 Remote Runner 均已验证。当前关键路径是先统一 canonical 事件规范，再依次实现 strict 信封、SQLite 事件存储、重放与任务生命周期；Spike 继续作为证据，不直接演变成正式内核。</p>
           <div class="hero-actions">
             <a class="btn primary" href="#start">从推荐起点开始</a>
             <a class="btn" href="#options">查看全部选择</a>
           </div>
         </div>
         <aside class="route-card" aria-label="默认推荐路线">
-          <div class="route-head"><strong>默认推荐路线</strong><span class="recommended">B+ → C.local → C.remote → A</span></div>
+          <div class="route-head"><strong>默认推荐路线</strong><span class="recommended">1.1 → 1.2 → 1.3 → 1.5 → 1.8</span></div>
           <div class="mini-route">
-            <div class="mini-step"><span class="mini-n">01</span><span><b>恢复验证可信度</b><small>lint、实验同路、回归缺口</small></span><span class="mini-time">0.5–1d</span></div>
-            <div class="mini-step"><span class="mini-n">02</span><span><b>本地 Agent 调用闭环</b><small>本机 Runner · 真实 CLI · 完整事件链</small></span><span class="mini-time">1–2d</span></div>
-            <div class="mini-step"><span class="mini-n">03</span><span><b>固化共享契约</b><small>Hub v2 ADR + Runner contract</small></span><span class="mini-time">0.5–1d</span></div>
-            <div class="mini-step"><span class="mini-n">04</span><span><b>远程 Agent 调用开发</b><small>只替换 transport，不改调用语义</small></span><span class="mini-time">3–5d</span></div>
-            <div class="mini-step"><span class="mini-n">05</span><span><b>进入 Event Core</b><small>把两阶段证明的契约落进 packages</small></span><span class="mini-time">2d</span></div>
+            <div class="mini-step"><span class="mini-n">01</span><span><b>统一事件规范</b><small>信封 · draft/stored · 29 类 payload</small></span><span class="mini-time">当前</span></div>
+            <div class="mini-step"><span class="mini-n">02</span><span><b>实现 strict Event Core</b><small>ULID · parser · 类型导出</small></span><span class="mini-time">1–2d</span></div>
+            <div class="mini-step"><span class="mini-n">03</span><span><b>SQLite append-only store</b><small>事务 seq · WAL · 幂等 token</small></span><span class="mini-time">2–3d</span></div>
+            <div class="mini-step"><span class="mini-n">04</span><span><b>重放与 reducer</b><small>总线 · 注册 · replay 等价</small></span><span class="mini-time">1–2d</span></div>
+            <div class="mini-step"><span class="mini-n">05</span><span><b>任务循环与 MCP</b><small>生命周期 · 路由 · strict tools</small></span><span class="mini-time">后续</span></div>
           </div>
         </aside>
       </header>
 
       <div class="alert">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3.5v.5M10.3 4.3 2.8 17.2A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.8L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <div><strong>唯一执行面已落实，当前进入 Remote transport</strong><p><a href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008</a> 已取代 <a href="docs/decisions/ADR-007-implementation-stack.md">ADR-007</a> 的单机范围：Server Hub 只 dispatch，Local / Remote Runner 共用契约。Runner 已成为服务组合根的必经路径，direct-adapter fallback 已移除；当前只替换 transport 开发 Remote Runner。</p></div>
+        <div><strong>Local / Remote 调用路线已完成，当前进入正式 Event Core</strong><p><a href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008</a> 已落实：Server Hub 只 dispatch，Local / Remote Runner 共用契约；生产远程模式、出站 Worker、随机 lease fencing、持久 placement 与重启 replay 已通过。下一步把已证明的信封和边界移入正式 packages。</p></div>
       </div>
 
       <div class="kpis" aria-label="当前状态">
-        <article class="kpi"><div class="kpi-top"><span>正式实现阶段</span><span class="kpi-icon tone-info">P0</span></div><div class="kpi-value">Phase 0</div><div class="kpi-meta">packages 仍是契约与类型</div></article>
+        <article class="kpi"><div class="kpi-top"><span>正式实现阶段</span><span class="kpi-icon tone-info">P1</span></div><div class="kpi-value">Phase 1</div><div class="kpi-meta">RM-1.1 Event Core 执行中</div></article>
         <article class="kpi"><div class="kpi-top"><span>行为测试</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">全绿</div><div class="kpi-meta">以 pnpm verify 输出为准</div></article>
         <article class="kpi"><div class="kpi-top"><span>完整验证门禁</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">PASS</div><div class="kpi-meta">build · Biome · layers · tests</div></article>
         <article class="kpi"><div class="kpi-top"><span>可运行实现</span><span class="kpi-icon tone-warn">S</span></div><div class="kpi-value">Spike</div><div class="kpi-meta">实验依据，不是最终产品</div></article>
@@ -244,14 +244,14 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
         </div>
         <div class="call-evolution" aria-label="本地调用到远程调用的演进路线">
           <article class="call-stage local">
-            <div class="call-label">Phase L · Local first</div>
+            <div class="call-label">Phase L · Local complete</div>
             <h3>先确定完整调用语义</h3>
             <p>本机就是第一个 Runner。调用、事件、会话、错误与验收全部跑通，网络尚不是变量。</p>
             <div class="call-chain"><span>Hub</span><i>→</i><span>Local Runner</span><i>→</i><span>Adapter</span><i>→</i><span>CLI</span><i>→</i><span>Events</span></div>
           </article>
           <div class="call-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
           <article class="call-stage remote">
-            <div class="call-label">Phase R · Remote next</div>
+            <div class="call-label">Phase R · Remote complete</div>
             <h3>再验证 transport 与恢复</h3>
             <p>保留同一 Runner 契约，把进程内调用换成认证的出站连接，只新增网络失败模式。</p>
             <div class="call-chain"><span>Hub</span><i>⇄</i><span>Transport</span><i>⇄</i><span>Remote Runner</span><i>→</i><span>同一 Adapter</span></div>
@@ -265,8 +265,8 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
         <div class="decision-panel" aria-live="polite">
           <div class="decision-copy">
             <span class="badge" id="mode-badge">推荐</span>
-            <h3 id="mode-title">本地闭环优先的纵向演进</h3>
-            <p id="mode-desc">先修准绳，用 Local Runner 跑通完整调用，再从实测中固化共享契约；远程阶段只替换 transport。</p>
+            <h3 id="mode-title">从事件信封进入正式内核</h3>
+            <p id="mode-desc">先消除 canonical 规范冲突，再按依赖顺序落地 Event Store、replay、Task Engine 与 MCP。</p>
           </div>
           <div class="decision-list" id="route-list"></div>
         </div>
@@ -288,21 +288,21 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           <article class="work-card" data-tone="risk">
             <div class="work-top"><div><div class="work-id">B+</div><h3>封住 Hub 的访问与身份边界</h3></div><a class="source-link" href="apps/chat-spike/src/server.mjs">server.mjs →</a></div>
             <p>显式绑定地址、所有路由要求 token，并让 caller 由 transport/session 推导；验收入口也必须验证 human 身份。</p>
-            <div class="tags"><span class="tag risk">阻断项</span><span class="tag">0.5–1 天</span><span class="tag">依赖 GATE-01</span></div>
+            <div class="tags"><span class="tag ok">已完成</span><span class="tag">持续回归</span><span class="tag">依赖 GATE-01</span></div>
             <div class="done-when"><b>完成判据：</b>匿名请求全部 401；伪造 caller、直接调用 accept 的测试失败。</div>
           </article>
 
           <article class="work-card" data-tone="warn">
             <div class="work-top"><div><div class="work-id">EVIDENCE-01</div><h3>让实验与真实 Hub 走同一路径</h3></div><a class="source-link" href="apps/chat-spike/experiments/context-rebuild.mjs">实验 →</a></div>
             <p>去掉真实 Hub 的 200 条默认截断，或让实验直接调用 Hub runtime；同时覆盖伪造 <code>replyTo</code> 和重启后重复注册。</p>
-            <div class="tags"><span class="tag warn">高收益</span><span class="tag">0.5–1 天</span><span class="tag">测试先行</span></div>
+            <div class="tags"><span class="tag ok">已完成</span><span class="tag">持续回归</span><span class="tag">测试先行</span></div>
             <div class="done-when"><b>完成判据：</b>1200 条用真实路径仍召回；伪造因果与重启注册回归用例稳定通过。</div>
           </article>
 
           <article class="work-card" data-tone="info">
             <div class="work-top"><div><div class="work-id">C-LOCAL-01</div><h3>先实现本地 Agent 调用闭环</h3></div><a class="source-link" href="apps/chat-spike/src/adapters/base.mjs">适配器契约 →</a></div>
             <p>把本机作为第一个 Runner：Hub 通过明确的 Runner 接口调用本地 adapter 和真实 vendor CLI；工具参与、事件写入、session、错误与人工验收全部走完整链路。</p>
-            <div class="tags"><span class="tag info">本地优先</span><span class="tag">1–2 天</span><span class="tag">依赖 B+ / EVIDENCE-01</span></div>
+            <div class="tags"><span class="tag ok">已完成</span><span class="tag">共享契约已冻结</span><span class="tag">依赖 B+ / EVIDENCE-01</span></div>
             <div class="done-when"><b>完成判据：</b>浏览器发起一项本地任务，真实 CLI 执行并通过 MCP/adapter 回报，事件可重放，失败与重启行为有测试。</div>
           </article>
 
@@ -314,10 +314,10 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
           </article>
 
           <article class="work-card" data-tone="info">
-            <div class="work-top"><div><div class="work-id">C-REMOTE-01</div><h3>再启动远程 Agent 调用开发</h3></div><a class="source-link" href="apps/chat-spike/src/adapters/base.mjs">共享契约 →</a></div>
+            <div class="work-top"><div><div class="work-id">C-REMOTE-01</div><h3>生产 Remote Runner 路径</h3></div><a class="source-link" href="apps/chat-spike/src/adapters/base.mjs">共享契约 →</a></div>
             <p>保留本地阶段已经跑通的请求、流式事件、结果和 session 语义，把 Local Runner 调用换成经过认证的出站连接。Hub 只 dispatch，不启动 vendor CLI。</p>
-            <div class="tags"><span class="tag info">第二阶段</span><span class="tag">3–5 天</span><span class="tag">依赖 C-LOCAL-01 / ADR-008</span></div>
-            <div class="done-when"><b>完成判据：</b>同一个任务测试既能走 Local Runner，也能走 Remote Runner；除 transport 外核心事件序列与归约结果一致。</div>
+            <div class="tags"><span class="tag ok">已完成</span><span class="tag">38 + 4 项测试</span><span class="tag">生产组合根</span></div>
+            <div class="done-when"><b>已验证：</b>同一个真实任务走 Local 与 Remote；核心事件一致，断线、旧 lease、Hub 重启、离线与凭据隔离均有回归。</div>
           </article>
 
           <article class="work-card" data-tone="ok">
@@ -332,14 +332,14 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
       <section id="week">
         <div class="section-head">
           <div><div class="section-kicker">Suggested week</div><h2>建议的一周切片</h2></div>
-          <p class="section-desc">目标不是一开始就“做远程”，而是先用本地调用排除业务语义问题；第五天再用同一契约验证网络 transport 与恢复。</p>
+          <p class="section-desc">Local / Remote 调用切片已经完成。下一切片严格按 Event Core 的依赖顺序推进，每天都以完整门禁和可重放性质验收。</p>
         </div>
         <div class="week">
-          <article class="day"><div class="day-no">Day 1</div><h3>恢复绿灯与边界</h3><p>修 lint；补认证与身份测试；修 context、causal、重启与重指派回归。</p><div class="day-out"><b>产出：</b>verify 全绿 + 可信准绳</div></article>
-          <article class="day"><div class="day-no">Day 2</div><h3>跑通本地调用</h3><p>定义 Local Runner 接口；Hub 调用本地 adapter，执行一次真实 CLI 任务并写事件。</p><div class="day-out"><b>产出：</b>本地 Agent 完整事件链</div></article>
-          <article class="day"><div class="day-no">Day 3</div><h3>补齐本地生命周期</h3><p>覆盖流式事件、工具参与、失败、取消、重启与 session；根据实测固化 ADR。</p><div class="day-out"><b>产出：</b>共享 Runner contract</div></article>
-          <article class="day"><div class="day-no">Day 4</div><h3>替换成远程 transport</h3><p>Runner 主动连接、认证、上报 host capability；调用语义继续复用本地契约。</p><div class="day-out"><b>产出：</b>真实跨机器 wake</div></article>
-          <article class="day"><div class="day-no">Day 5</div><h3>对照闭环同一任务</h3><p>同一用例分别走本地与远程，比较事件序列、延迟、断线恢复与 session。</p><div class="day-out"><b>产出：</b>本地／远程对照测量</div></article>
+          <article class="day"><div class="day-no">Day 1</div><h3>消除规范冲突</h3><p>统一事件信封、draft/stored、subject 与 29 类 payload；把约束写回权威文档和 ADR。</p><div class="day-out"><b>产出：</b>唯一可实现的事件契约</div></article>
+          <article class="day"><div class="day-no">Day 2</div><h3>实现 strict schema</h3><p>完成 ULID、信封 parser、discriminated union 与额外字段拒绝测试。</p><div class="day-out"><b>产出：</b>RM-1.1 完成</div></article>
+          <article class="day"><div class="day-no">Day 3</div><h3>建立 SQLite 事件存储</h3><p>实现 append-only、事务 seq、WAL 与 idempotency token。</p><div class="day-out"><b>产出：</b>RM-1.2 核心性质</div></article>
+          <article class="day"><div class="day-no">Day 4</div><h3>验证并发与恢复</h3><p>覆盖多写者、重复提交、损坏恢复与进程重启。</p><div class="day-out"><b>产出：</b>可靠事件真相源</div></article>
+          <article class="day"><div class="day-no">Day 5</div><h3>接入重放与 reducer</h3><p>实现事件总线、注册机制，并证明增量投影与从零重放一致。</p><div class="day-out"><b>产出：</b>RM-1.3 纵向切片</div></article>
         </div>
       </section>
 
@@ -364,7 +364,7 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
       <section id="boundaries">
         <div class="section-head">
           <div><div class="section-kicker">Scope control</div><h2>现在不要做什么，以及必须拍板什么</h2></div>
-          <p class="section-desc">这里最容易浪费时间的方式，是在关键拓扑还没正式化时提前铺开长期能力。</p>
+          <p class="section-desc">Runner 拓扑已经正式化；当前最容易浪费时间的方式，是绕过 Event Core 依赖顺序或再造一份事件规范。</p>
         </div>
         <div class="two-col">
           <article class="plain-card do-not">
@@ -374,18 +374,18 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
               <li>不要提前做完整 memory/retrieval；先保留不可事后恢复的 provenance 事件。</li>
               <li>不要重新引入容器、独立 Unix 用户或 credential broker；可信协作者模型已由 owner 选定。</li>
               <li>不要扩完整桌面 UI；本地与远程调用切片都只需要最小可观察面。</li>
-              <li>不要把“没有 CI”当作当前问题；真正的问题是唯一手工门禁现在不绿。</li>
+              <li>不要把“没有 CI”当作当前阻断项；唯一手工门禁已经恢复，并须在每个任务提交前保持全绿。</li>
             </ul>
           </article>
           <article class="plain-card decisions">
-            <h3>启动远程开发前要拍板</h3>
+            <h3>Event Core 开始前要拍板</h3>
             <ul>
-              <li>Hub v2 是 supersede ADR-007 的 scope，还是只增加一种部署模式？</li>
-              <li>Local Runner 与 Remote Runner 必须共享哪些请求、事件、session 和错误语义？</li>
-              <li>Runner 连接的身份单位是 user、host、agent，还是三者组合？</li>
-              <li>服务器端 event store 是否仍用 SQLite；不要从“上服务器”自动推导成 Postgres。</li>
-              <li>持久 session 的最小事件／对象是什么，如何与 vendor session id 分离？</li>
-              <li>Windows Runner 继续作为明确 deferred，不让它拖慢首个纵向切片。</li>
+              <li>Event Core 校验完整领域 payload，还是只保存 opaque payload？</li>
+              <li><code>EventDraft.seq = null</code> 与持久事件正整数 seq 的边界如何表达？</li>
+              <li><code>subject</code> 是否始终必填；Spike 的可选字段如何迁移？</li>
+              <li>29 类 payload 的必填字段以 event catalog 为唯一权威。</li>
+              <li>未知事件由 parser 拒绝；reducer 对未来版本事件的兼容策略单独定义。</li>
+              <li>正式 Event Store 继续采用 SQLite + WAL，不从服务器部署自动推导为 Postgres。</li>
             </ul>
           </article>
         </div>
@@ -416,24 +416,24 @@ body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}bod
 
 <script>
 const routes={
-  balanced:{badge:"推荐",title:"本地闭环优先的纵向演进",desc:"先修准绳，用 Local Runner 跑通完整调用，再从实测中固化共享契约；远程阶段只替换 transport。",steps:[
-    ["恢复 verify 与回归准绳","让之后每次变化都有可信的红绿信号","0.5–1d"],
-    ["本地 Agent 调用闭环","Hub → Local Runner → 真实 CLI → Events / Review","1–2d"],
-    ["固化 Local / Remote Runner 契约","用本地实测定义共享请求、事件、session 与错误语义","0.5–1d"],
-    ["远程 Agent 调用开发","只替换认证 transport，并测试断线恢复","3–5d"],
-    ["Event Core","把本地与远程共同证明的契约下沉到正式 packages","2d"]]},
-  daily:{badge:"最快见效",title:"先把本地 Agent 变成可靠日常工具",desc:"先收紧访问边界，再完善本地 Agent 调用；本地稳定后才让远程 Runner 接入同一契约。",steps:[
-    ["Hub token + caller identity","先消除当前真实暴露与身份绕过","0.5–1d"],
-    ["本地 Agent 完整调用","先改善每天实际使用的调用闭环","1–2d"],
-    ["修 context / causal 回归","避免日常使用建立在假阳性测试上","0.5–1d"],
-    ["固化共享 Runner contract","把本地事实写进 ADR","0.5d"],
-    ["远程 Agent 调用","复用本地契约验证 transport","3–5d"]]},
-  core:{badge:"正式内核",title:"先证明本地调用，再进入 Phase 1.1",desc:"即使目标是正式内核，也先用最小 Local Runner 证明调用边界；远程开发仍放在本地契约稳定之后。",steps:[
-    ["恢复 verify","先让唯一门禁真实可用","0.5d"],
-    ["最小本地 Agent 调用","证明 Hub / Runner / Adapter / Events 的接缝","1d"],
-    ["Event envelope + 29 schemas","从已证明的 spike 契约开始","2d"],
-    ["SQLite store + replay","把本地调用落到正式事件内核","3–4d"],
-    ["远程 Agent 调用","复用正式化的本地 Runner contract","后续"]]}
+  balanced:{badge:"推荐",title:"从事件信封进入正式内核",desc:"先消除 canonical 规范冲突，再按依赖顺序落地 Event Store、replay、Task Engine 与 MCP。",steps:[
+    ["统一 event catalog 与信封","把 draft/stored、subject 和 payload 冲突写成唯一契约","当前"],
+    ["Event envelope + 29 schemas","实现 ULID、strict parser 与 discriminated union","1–2d"],
+    ["SQLite store","实现事务 seq、WAL 与幂等 token","2–3d"],
+    ["Replay + reducers","证明从零重放与增量投影一致","1–2d"],
+    ["Task Engine + MCP","在可信事件内核上实现正式核心循环","后续"]]},
+  daily:{badge:"最快见效",title:"优先把 Spike 证据变成可靠存储",desc:"先完成最小 strict envelope 和 SQLite store，让现有调用链尽快拥有正式、可重放的真相源。",steps:[
+    ["冻结最小事件契约","只解决会阻断存储的 canonical 冲突","当前"],
+    ["Strict envelope","先提供正式输入边界与 ULID","1d"],
+    ["SQLite append-only store","替换 JSONL 的单进程限制","2–3d"],
+    ["Replay probe","用现有 Hub 事件证明恢复等价","1d"],
+    ["补齐全部 payload schema","关闭 29 类事件的剩余差异","1d"]]},
+  core:{badge:"正式内核",title:"严格按 Phase 1 依赖顺序推进",desc:"把 schema、store、bus、task lifecycle 和 MCP 逐层做成机器守住的性质。",steps:[
+    ["RM-1.1 schema + ULID","未知类型和额外字段全部拒绝","1–2d"],
+    ["RM-1.2 SQLite store","并发 append 与幂等重试","2–3d"],
+    ["RM-1.3 bus + replay","增量与全量归约一致","1–2d"],
+    ["RM-1.5 task matrix","覆盖完整状态转移和依赖图","2d"],
+    ["RM-1.8 strict MCP","把已验证的 Hub 工具正式化","2–3d"]]}
 };
 const routeList=document.querySelector("#route-list");
 function setMode(mode){

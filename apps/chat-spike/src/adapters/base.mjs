@@ -24,6 +24,35 @@ function abortReason(signal, fallback = "Adapter 已取消") {
   return signal?.reason instanceof Error ? signal.reason : new Error(fallback);
 }
 
+const SCOPED_AGENT_ENV = new Set(["AGENT_OS_URL", "AGENT_OS_TOKEN"]);
+const isAgentOsEnv = (name) => name.toUpperCase().startsWith("AGENT_OS_");
+
+/**
+ * Vendor processes inherit normal tool/runtime configuration, never Agent OS
+ * control-plane credentials. A per-agent MCP mount may add back only its own
+ * scoped URL and bearer token.
+ */
+export function childProcessEnv(extra = {}) {
+  if (extra === null || typeof extra !== "object" || Array.isArray(extra)) {
+    throw new TypeError("child process extra env 必须是对象");
+  }
+  const environment = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([name, value]) => !isAgentOsEnv(name) && value !== undefined,
+    ),
+  );
+  for (const [name, value] of Object.entries(extra)) {
+    if (isAgentOsEnv(name) && !SCOPED_AGENT_ENV.has(name)) {
+      throw new TypeError(`child process 不允许注入控制面变量 ${name}`);
+    }
+    if (typeof value !== "string") {
+      throw new TypeError(`child process env ${name} 必须是字符串`);
+    }
+    environment[name] = value;
+  }
+  return environment;
+}
+
 /**
  * @typedef {object} Capabilities
  * @property {boolean} streaming  emits `delta` events as the answer is produced
@@ -147,7 +176,7 @@ export class SubprocessAdapter extends Adapter {
       const child = spawn(cmd, args, {
         cwd: this.cwd,
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, ...(this.mcp?.env ?? {}) },
+        env: childProcessEnv(this.mcp?.env ?? {}),
       });
       let closeResolve = () => {};
       const childClosed = new Promise((closed) => {
