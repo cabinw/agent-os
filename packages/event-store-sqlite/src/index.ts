@@ -15,6 +15,7 @@ export {
 export type {
   BackupEvidence,
   OpenSqliteEventStoreOptions,
+  ReadEventsOptions,
   SqliteEventStoreAppendOptions,
 } from "./store.js";
 

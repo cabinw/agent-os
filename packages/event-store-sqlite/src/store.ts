@@ -19,8 +19,10 @@ import {
   newEventId,
   parseEventInput,
   parseStoredEvent,
+  projectIdSchema,
 } from "@agent-os/event-core";
 import type {
+  EventAppendInput,
   EventId,
   EventInput,
   EventType,
@@ -191,14 +193,7 @@ export type OpenSqliteEventStoreOptions = Readonly<{
 }>;
 
 export type SqliteEventStoreAppendOptions = Readonly<{ token: string }>;
-
-type AppendInput<Type extends EventType> = EventInput<Type> &
-  Readonly<{
-    schemaVersion?: never;
-    id?: never;
-    seq?: never;
-    at?: never;
-  }>;
+export type ReadEventsOptions = Readonly<{ afterSeq?: number }>;
 
 export type BackupEvidence = Readonly<{
   path: string;
@@ -218,6 +213,7 @@ type ExistingEventRow = {
 };
 type SequenceRow = { readonly seq: number };
 type CountRow = { readonly count: number };
+type ReadEventRow = { readonly seq: number; readonly event_json: string };
 type ObjectRow = {
   readonly type: string;
   readonly name: string;
@@ -245,6 +241,17 @@ function integerPragma(database: Database.Database, source: string): number {
 function assertSafeCount(value: unknown, label: string): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) {
     throw new EventStoreIntegrityError(`${label} is not a non-negative safe integer`);
+  }
+  return value as number;
+}
+
+function parseAfterSequence(value: unknown): number {
+  if (value === undefined) return 0;
+  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+    throw new SqliteEventStoreError(
+      "INVALID_OPTIONS",
+      "afterSeq must be a non-negative safe integer",
+    );
   }
   return value as number;
 }
@@ -557,6 +564,7 @@ export class SqliteEventStore {
   readonly #insertEvent: Database.Statement<
     [string, number, string, number, string, string, string, string]
   >;
+  readonly #readEvents: Database.Statement<[string, number], ReadEventRow>;
   readonly #appendTransaction: Database.Transaction<
     (
       input: EventInput,
@@ -620,6 +628,12 @@ export class SqliteEventStore {
          input_json, input_sha256, event_json
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     );
+    this.#readEvents = database.prepare<[string, number], ReadEventRow>(
+      `SELECT seq, event_json
+       FROM events
+       WHERE project = ? AND seq > ?
+       ORDER BY seq`,
+    );
     this.#appendTransaction = database.transaction(
       (input, token, canonicalInput, digest) =>
         this.#appendInsideTransaction(input, token, canonicalInput, digest),
@@ -631,7 +645,7 @@ export class SqliteEventStore {
   }
 
   append<Type extends EventType>(
-    input: AppendInput<Type>,
+    input: EventAppendInput<Type>,
     options: SqliteEventStoreAppendOptions,
   ): StoredEvent<Type> {
     this.#assertOpen();
@@ -650,6 +664,46 @@ export class SqliteEventStore {
       if (cause instanceof SqliteEventStoreError) throw cause;
       throw new EventStoreAppendError(cause);
     }
+  }
+
+  read(project: ProjectId, options: ReadEventsOptions = {}): readonly StoredEvent[] {
+    this.#assertOpen();
+    if (options === null || typeof options !== "object") {
+      throw new SqliteEventStoreError(
+        "INVALID_OPTIONS",
+        "read options must be an object",
+      );
+    }
+    const admittedProject = projectIdSchema.safeParse(project);
+    if (!admittedProject.success) {
+      throw new SqliteEventStoreError("INVALID_OPTIONS", "invalid project id", {
+        cause: admittedProject.error,
+      });
+    }
+    const afterSeq = parseAfterSequence(options?.afterSeq);
+    const events: StoredEvent[] = [];
+    let expectedSeq = afterSeq + 1;
+    for (const row of this.#readEvents.iterate(admittedProject.data, afterSeq)) {
+      if (row.seq !== expectedSeq) {
+        throw new EventStoreIntegrityError(
+          `event sequence gap: expected ${expectedSeq}, found ${row.seq}`,
+        );
+      }
+      let event: StoredEvent;
+      try {
+        event = parseStoredEvent(JSON.parse(row.event_json));
+      } catch (cause) {
+        throw new EventStoreIntegrityError("stored event cannot be replayed", { cause });
+      }
+      if (event.project !== admittedProject.data || event.seq !== row.seq) {
+        throw new EventStoreIntegrityError(
+          "stored event columns disagree with replay JSON",
+        );
+      }
+      events.push(event);
+      expectedSeq += 1;
+    }
+    return Object.freeze(events);
   }
 
   async backup(destination: string): Promise<BackupEvidence> {

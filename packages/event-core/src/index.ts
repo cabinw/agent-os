@@ -91,6 +91,28 @@ export {
   subjectSchema,
   taskIdSchema,
 } from "./primitives.js";
+export {
+  EventBus,
+  EventBusError,
+  EventReplayError,
+  ReducerExecutionError,
+  ReducerRegistrationError,
+  createEventBus,
+} from "./bus.js";
+export type {
+  EventAppendOptions,
+  EventAppendInput,
+  EventBusOptions,
+  EventBusStore,
+  EventReadOptions,
+  EventReducer,
+  EventSubscriber,
+  ReducerHandle,
+  ReplayEvidence,
+  SubscribeOptions,
+  SubscriberErrorHandler,
+} from "./bus.js";
+export type { DeepReadonly } from "./immutable.js";
 export type {
   Actor,
   ActorKind,
