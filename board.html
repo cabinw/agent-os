@@ -133,13 +133,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
       <section class="overall-progress" id="overview" aria-labelledby="overall-title">
         <div class="overall-meters">
-          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:62.92%">
-            <div class="overall-number"><strong id="overall-percent">62.92%</strong><small>总体实际完成度</small></div>
+          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:62.95%">
+            <div class="overall-number"><strong id="overall-percent">62.95%</strong><small>总体实际完成度</small></div>
           </div>
-          <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 86%">
-            <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">86%</strong></div>
-            <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:86%"></span></div>
-            <small id="current-live-detail">RM-2.3 · 6/7 已验证 · 逻辑提交与交付中</small>
+          <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 0%">
+            <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">0%</strong></div>
+            <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:0%"></span></div>
+            <small id="current-live-detail">RM-2.4 · 0/7 已验证 · get_context canonical审计待开始</small>
           </div>
         </div>
         <div class="overall-copy">
@@ -159,8 +159,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
           <p class="lede">这里不把“跑通的实验原型”误写成“正式产品已完成”。进度按验证原型、当前执行路线和 canonical Roadmap 分轨计算；所有任务状态来自 ADR-002，问题保留开放与已解决历史。</p>
         </div>
         <aside class="hero-status" aria-label="当前安排">
-          <div class="status-head"><b>当前安排</b><span class="status-chip running">执行中 · RM-2.3</span></div>
-          <p>确定性因果窗口与runtime-owned来源已完成；当前实现knowledge.superseded的不可变覆盖投影与严格admission。</p>
+          <div class="status-head"><b>当前安排</b><span class="status-chip running">执行中 · RM-2.4</span></div>
+          <p>不可变supersession线性链已完成；当前把仍有效且与任务相关的决策注入get_context，并重跑recall探针。</p>
           <div class="next-chain"><span>Phase 1 ✓</span><i>→</i><span>RM-2.1</span><i>→</i><span>RM-2.2</span><i>→</i><span>RM-2.3/2.4/2.5</span></div>
         </aside>
       </header>
@@ -173,7 +173,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
       </section>
 
       <section id="current" aria-labelledby="current-title">
-        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">RM-2.1/2.2 已完成并保留证据；RM-2.3 按canonical审计、覆盖契约、投影、测试和交付逐段计分。</p></div>
+        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">RM-2.1–2.3 已完成并保留证据；RM-2.4 按canonical审计、相关性契约、context实现、recall测试和交付逐段计分。</p></div>
         <div class="current-layout">
           <article class="current-card" id="current-task"></article>
           <div class="todo-panel" id="route-list" aria-label="推荐任务顺序"></div>
@@ -240,10 +240,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 187,
-  "updatedAt": "2026-08-25 00:49 CST",
+  "revision": 188,
+  "updatedAt": "2026-08-25 01:01 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "RM-2.3",
+  "currentTaskId": "RM-2.4",
   "verification": {"testsPassed":654,"testsTotal":654,"filesPassed":28,"filesTotal":28,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-25 00:49 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":29,"eventSchemaTotal":29,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
@@ -292,8 +292,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
     {"id":"RM-2.1","scope":"roadmap","phase":"Phase 2","title":"知识项模型与抽取触发规则","status":"completed","progress":100,"priority":"P1","owner":"Codex","dependsOn":["RM-1.5c"],"acceptance":"六类知识和噪声筛选规则可测试。","source":"todo.html#p2","summary":"ADR-020、canonical strict draft与29事件exhaustive structural classifier完成；五类anchor、7类message、四类noise、关键词无关、derived递归拒绝由28专项及全仓613/613验证。6b61ce5文档、b3341e3实现、84dc222测试与64ba821看板已推送原GitHub仓库。","progressBasis":[{"label":"Canonical Memory/Event审计","earned":15,"total":15},{"label":"Knowledge model与trigger ADR/API","earned":15,"total":15},{"label":"知识项模型与strict parser","earned":25,"total":25},{"label":"抽取触发与噪声过滤规则","earned":25,"total":25},{"label":"专项与负向测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Memory/event/MCP canonical对照","status":"done"},{"label":"Knowledge model与trigger ADR/API","status":"done"},{"label":"六类知识项模型","status":"done"},{"label":"抽取触发与噪声过滤","status":"done"},{"label":"专项与负向测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
     {"id":"RM-2.2","scope":"roadmap","phase":"Phase 2","title":"摘要管线：窗口化 + 因果上下文","status":"completed","progress":100,"priority":"P1","owner":"Codex","dependsOn":["RM-2.1"],"acceptance":"每句结论都能回溯到 sourceEvents。","source":"todo.html#p2","summary":"ADR-021、完整历史校验、causedBy/reply/approval/task/artifact确定性窗口与provider-neutral strict extractor完成；runtime拥有exact sources/tasks，52专项及全仓637/637绿色。d3d803a文档、82a5c6b实现、1ff1e7a测试与770dbe5看板已推送原GitHub仓库。","progressBasis":[{"label":"Canonical window/causality审计","earned":15,"total":15},{"label":"Window与summarizer ADR/API","earned":15,"total":15},{"label":"确定性相关事件窗口","earned":25,"total":25},{"label":"摘要模型与strict admission管线","earned":25,"total":25},{"label":"专项与负向测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Event causality/Memory canonical对照","status":"done"},{"label":"Window与summarizer ADR/API","status":"done"},{"label":"确定性相关事件窗口","status":"done"},{"label":"摘要与strict admission管线","status":"done"},{"label":"专项与负向测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
-    {"id":"RM-2.3","scope":"roadmap","phase":"Phase 2","title":"知识覆盖机制 supersedes","status":"running","progress":98,"priority":"P1","owner":"Codex","dependsOn":["RM-2.1"],"acceptance":"新知识覆盖旧知识但旧知识仍可读。","source":"todo.html#p2","summary":"Knowledge reducer/strict snapshot与supersession service完成并通过全仓门禁：28文件654/654，build、类型契约、Biome 131文件、7包/4规则、29事件目录和native boundary全绿。线性链与creation fences落地；仅余逻辑提交与原仓库交付。","progressBasis":[{"label":"Canonical supersedes/projection审计","earned":15,"total":15},{"label":"Supersession ADR/API","earned":15,"total":15},{"label":"Knowledge projection reducer","earned":25,"total":25},{"label":"Supersession strict admission语义","earned":25,"total":25},{"label":"专项与负向测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":0,"total":2}],"checkpoints":[{"label":"Memory/Event supersedes canonical对照","status":"done"},{"label":"Supersession ADR/API","status":"done"},{"label":"Knowledge projection reducer","status":"done"},{"label":"覆盖链与admission语义","status":"done"},{"label":"专项与负向测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"running"}]},
-    {"id":"RM-2.4","scope":"roadmap","phase":"Phase 2","title":"get_context：注入相关决策","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-2.2"],"acceptance":"相关知识不被小默认 limit 截断，并重跑 recall 探针。","source":"todo.html#p2","summary":"Memory-first 的核心产品能力。"},
+    {"id":"RM-2.3","scope":"roadmap","phase":"Phase 2","title":"知识覆盖机制 supersedes","status":"completed","progress":100,"priority":"P1","owner":"Codex","dependsOn":["RM-2.1"],"acceptance":"新知识覆盖旧知识但旧知识仍可读。","source":"todo.html#p2","summary":"ADR-022、Knowledge reducer/strict snapshot、old/new双向不可变线性链与带creation-event fences的supersession service完成；69专项及全仓654/654绿色。9c61ec0文档、175a58f实现、d3f772f测试与d16f36e看板已推送原GitHub仓库。","progressBasis":[{"label":"Canonical supersedes/projection审计","earned":15,"total":15},{"label":"Supersession ADR/API","earned":15,"total":15},{"label":"Knowledge projection reducer","earned":25,"total":25},{"label":"Supersession strict admission语义","earned":25,"total":25},{"label":"专项与负向测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Memory/Event supersedes canonical对照","status":"done"},{"label":"Supersession ADR/API","status":"done"},{"label":"Knowledge projection reducer","status":"done"},{"label":"覆盖链与admission语义","status":"done"},{"label":"专项与负向测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
+    {"id":"RM-2.4","scope":"roadmap","phase":"Phase 2","title":"get_context：注入相关决策","status":"running","progress":0,"priority":"P0","owner":"Codex","dependsOn":["RM-2.2"],"acceptance":"相关知识不被小默认 limit 截断，并重跑 recall 探针。","source":"todo.html#p2","summary":"已接棒；准备对照formal MCP get_context、Task/Knowledge projection、supersession active head、跨任务相关性和context-rebuild recall探针，尚无完成证据所以保持0%。","progressBasis":[{"label":"Canonical MCP/context/recall审计","earned":0,"total":15},{"label":"Context relevance与format ADR/API","earned":0,"total":15},{"label":"有效决策相关性选择","earned":0,"total":25},{"label":"get_context正式组合与输出","earned":0,"total":25},{"label":"专项/recall负向测试","earned":0,"total":15},{"label":"全仓集成验证","earned":0,"total":3},{"label":"逻辑提交与交付","earned":0,"total":2}],"checkpoints":[{"label":"MCP/Memory/recall canonical对照","status":"running"},{"label":"Context relevance与format ADR/API","status":"pending"},{"label":"有效决策相关性选择","status":"pending"},{"label":"get_context正式组合与输出","status":"pending"},{"label":"专项与recall探针","status":"pending"},{"label":"全仓验证门禁","status":"pending"},{"label":"逻辑提交与远端交付","status":"pending"}]},
     {"id":"RM-2.5","scope":"roadmap","phase":"Phase 2","title":"query_memory + 图 API","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.3"],"acceptance":"支持类型、时间、关系查询；边由 causedBy 派生。","source":"todo.html#p2","summary":"为查询和知识图提供正式 API。"},
 
     {"id":"RM-3.1","scope":"roadmap","phase":"Phase 3","title":"Tauri 壳、七项导航与 design token","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-2.5"],"acceptance":"CSS token 与 canonical 设计语言一致，导航按 ADR-003。","source":"todo.html#p3","summary":"正式 macOS 人类界面的地基。"},
@@ -397,6 +397,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-25 01:01","kind":"completed","entity":"RM-2.3","title":"不可变Knowledge supersession线性链原仓库交付完成，任务达到100%","detail":"9c61ec0文档、175a58f实现、d3f772f测试与d16f36e验证看板已推送origin/codex/project-control；交付只补最后2分，总体从62.92%升至62.95%，当前任务切换RM-2.4。"},
     {"at":"2026-08-25 00:49","kind":"progress","entity":"RM-2.3","title":"完整仓库28文件654/654通过，进度即时升至98%","detail":"build、全类型契约、Biome 131文件、7包/4条分层、29事件目录、native boundary及全测试绿色；Memory专项69/69。总体从62.87%升至62.92%，交付仍只占最后2分。"},
     {"at":"2026-08-25 00:36","kind":"progress","entity":"RM-2.3","title":"Knowledge reducer、线性覆盖admission与69项专项完成，进度即时升至95%","detail":"A→B→C、旧内容保留、envelope authority、strict snapshot、decision/order/active/unattached、分叉/合并/悬空/倒序拒绝及creation fences通过；所有无效状态零admission。总体从61.84%升至62.87%，全仓门禁未计分。"},
     {"at":"2026-08-25 00:18","kind":"progress","entity":"RM-2.3","title":"ADR-022与线性supersession API冻结，进度即时升至30%","detail":"old subject、双向derived links、decision-only、new更晚、old active/new unattached、strict snapshot与creation-event fences已定义；PROB-MEMORY-SUPERSEDES关闭。总体从61.60%升至61.84%。"},
