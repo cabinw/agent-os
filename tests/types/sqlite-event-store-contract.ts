@@ -3,12 +3,14 @@ import type {
   EventOf,
   EventReducer,
   ProjectId,
+  ProjectionSnapshotCache,
 } from "../../packages/event-core/src/index.js";
 import { createEventBus } from "../../packages/event-core/src/index.js";
 import type {
   BackupEvidence,
   EventStoreAppendError,
   SqliteEventStore,
+  SqliteSnapshotStore,
 } from "../../packages/event-store-sqlite/src/index.js";
 
 type Equal<Left, Right> = (<Value>() => Value extends Left ? 1 : 2) extends <
@@ -53,3 +55,22 @@ const asyncReducer: EventReducer<number> = async (state) => state + 1;
 void asyncReducer;
 // @ts-expect-error stored runtime fields cannot be appended as producer input
 bus.append(stored, { token: "wrong-shape" });
+
+declare const snapshots: SqliteSnapshotStore;
+const cacheContract: ProjectionSnapshotCache = snapshots;
+const snapshottedBus = createEventBus({
+  store,
+  snapshots: cacheContract,
+  snapshotEvery: 100,
+});
+const snapshotted = snapshottedBus.registerReducer(
+  "sequence",
+  () => [] as number[],
+  (state, event) => [...state, event.seq],
+  {
+    version: "1",
+    parseState: (value) => value as number[],
+  },
+);
+const snapshottedState: readonly number[] = snapshotted.get(project);
+void snapshottedState;
