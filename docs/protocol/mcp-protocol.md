@@ -52,6 +52,13 @@ stable boundary error codes; lifecycle, graph, routing and append conflicts from
 the Runtime Port remain domain errors. See
 [ADR-013](../decisions/ADR-013-mcp-call-admission-boundary.md).
 
+Before dispatch, a read-only Authorization Port applies ADR-014's fixed matrix.
+Registration is self-only. Every other tool requires the same authenticated
+`(project, agent, host)` registration; `assign_task` additionally requires task
+ownership, while `update_task`, `notify_blocked` and `report_result` require the
+task executor. Agent-supplied role, provider and capability never grant
+authority. Missing facts or policy-read failures fail closed.
+
 ## Objects
 
 ```
@@ -315,6 +322,8 @@ context rather than writing a second knowledge table.
 - An agent may never set task status directly. It reports; the Task Engine
   transitions.
 - An agent may never approve its own request.
+- Agent registration `role` is display metadata and never an authorization
+  input.
 - Every tool call is validated at the MCP Server boundary. Unknown fields are
   rejected, not ignored.
 - Caller and host identity come from authenticated principals, never request
