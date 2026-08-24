@@ -1,5 +1,6 @@
 import { parseStoredEvent } from "./envelope.js";
 import type { EventInput, StoredEvent } from "./envelope.js";
+import type { EventId } from "./id.js";
 import { deepFreeze } from "./immutable.js";
 import type { DeepReadonly } from "./immutable.js";
 import type { EventType } from "./payloads.js";
@@ -30,10 +31,34 @@ export type EventReducer<State> = (
 ) => State;
 export type EventSubscriber = (event: StoredEvent) => void | Promise<void>;
 export type SubscriberErrorHandler = (cause: unknown, event: StoredEvent) => void;
+export type SnapshotErrorHandler = (cause: unknown, project: ProjectId) => void;
+
+export type ProjectionSnapshot = Readonly<{
+  project: ProjectId;
+  throughSeq: number;
+  throughEventId: EventId;
+  manifest: string;
+  states: Readonly<Record<string, unknown>>;
+}>;
+
+export interface ProjectionSnapshotCache {
+  load(project: ProjectId, manifest: string): ProjectionSnapshot | null;
+  save(snapshot: ProjectionSnapshot): void;
+  delete(project: ProjectId, manifest: string): void;
+  clear(project?: ProjectId): number;
+}
+
+export type ReducerSnapshotOptions<State> = Readonly<{
+  version: string;
+  parseState: (value: unknown) => State;
+}>;
 
 export type EventBusOptions = Readonly<{
   store: EventBusStore;
   onSubscriberError?: SubscriberErrorHandler;
+  snapshots?: ProjectionSnapshotCache;
+  snapshotEvery?: number;
+  onSnapshotError?: SnapshotErrorHandler;
 }>;
 
 export type SubscribeOptions = Readonly<{ project?: ProjectId }>;
@@ -117,10 +142,13 @@ type ReducerRecord = {
   readonly name: string;
   readonly initialState: () => unknown;
   readonly reduce: (state: unknown, event: StoredEvent) => unknown;
+  readonly snapshotVersion?: string;
+  readonly parseState?: (value: unknown) => unknown;
 };
 
 type ProjectProjection = {
   throughSeq: number;
+  throughEventId: EventId | null;
   eventCount: number;
   states: Map<string, unknown>;
 };
@@ -171,6 +199,9 @@ function parseReducerName(name: unknown): string {
 export class EventBus {
   readonly #store: EventBusStore;
   readonly #onSubscriberError: SubscriberErrorHandler;
+  readonly #snapshots: ProjectionSnapshotCache | null;
+  readonly #snapshotEvery: number;
+  readonly #onSnapshotError: SnapshotErrorHandler;
   readonly #reducers = new Map<string, ReducerRecord>();
   readonly #projects = new Map<ProjectId, ProjectProjection>();
   readonly #subscriptions = new Set<Subscription>();
@@ -195,8 +226,42 @@ export class EventBus {
     ) {
       throw new EventBusError("INVALID_OPTIONS", "onSubscriberError must be a function");
     }
+    if (options.snapshots !== undefined) {
+      const cache = options.snapshots;
+      if (
+        cache === null ||
+        typeof cache !== "object" ||
+        typeof cache.load !== "function" ||
+        typeof cache.save !== "function" ||
+        typeof cache.delete !== "function" ||
+        typeof cache.clear !== "function"
+      ) {
+        throw new EventBusError("INVALID_OPTIONS", "snapshot cache is invalid");
+      }
+    } else if (options.snapshotEvery !== undefined) {
+      throw new EventBusError(
+        "INVALID_OPTIONS",
+        "snapshotEvery requires a snapshot cache",
+      );
+    }
+    const snapshotEvery = options.snapshotEvery ?? 100;
+    if (!Number.isSafeInteger(snapshotEvery) || snapshotEvery <= 0) {
+      throw new EventBusError(
+        "INVALID_OPTIONS",
+        "snapshotEvery must be a positive safe integer",
+      );
+    }
+    if (
+      options.onSnapshotError !== undefined &&
+      typeof options.onSnapshotError !== "function"
+    ) {
+      throw new EventBusError("INVALID_OPTIONS", "onSnapshotError must be a function");
+    }
     this.#store = options.store;
     this.#onSubscriberError = options.onSubscriberError ?? (() => {});
+    this.#snapshots = options.snapshots ?? null;
+    this.#snapshotEvery = snapshotEvery;
+    this.#onSnapshotError = options.onSnapshotError ?? (() => {});
   }
 
   append<Type extends EventType>(
@@ -256,7 +321,7 @@ export class EventBus {
 
   replay(project: ProjectId): ReplayEvidence {
     const admittedProject = parseProject(project);
-    const rebuilt = this.#buildProject(admittedProject);
+    const rebuilt = this.#buildProject(admittedProject, false);
     this.#projects.set(admittedProject, rebuilt);
     return Object.freeze({
       project: admittedProject,
@@ -270,6 +335,7 @@ export class EventBus {
     name: string,
     initialState: () => State,
     reducer: EventReducer<State>,
+    snapshot?: ReducerSnapshotOptions<State>,
   ): ReducerHandle<State> {
     const admittedName = parseReducerName(name);
     if (typeof initialState !== "function" || typeof reducer !== "function") {
@@ -280,6 +346,21 @@ export class EventBus {
     }
     if (this.#reducers.has(admittedName)) {
       throw new ReducerRegistrationError("DUPLICATE_REDUCER", admittedName);
+    }
+    if (this.#snapshots !== null) {
+      if (
+        snapshot === undefined ||
+        typeof snapshot.version !== "string" ||
+        snapshot.version.length === 0 ||
+        snapshot.version.length > 128 ||
+        snapshot.version.trim() !== snapshot.version ||
+        typeof snapshot.parseState !== "function"
+      ) {
+        throw new EventBusError(
+          "INVALID_OPTIONS",
+          `reducer ${admittedName} requires snapshot version and parser`,
+        );
+      }
     }
     if (
       isDeclaredAsync(initialState as (...args: never[]) => unknown) ||
@@ -292,6 +373,12 @@ export class EventBus {
       name: admittedName,
       initialState,
       reduce: reducer as (state: unknown, event: StoredEvent) => unknown,
+      ...(snapshot === undefined
+        ? {}
+        : {
+            snapshotVersion: snapshot.version,
+            parseState: snapshot.parseState as (value: unknown) => unknown,
+          }),
     };
     const states = new Map<ProjectId, unknown>();
     for (const [project, projection] of this.#projects) {
@@ -306,6 +393,9 @@ export class EventBus {
     this.#reducers.set(admittedName, record);
     for (const [project, state] of states) {
       this.#projects.get(project)?.states.set(admittedName, state);
+    }
+    for (const [project, projection] of this.#projects) {
+      this.#captureSnapshot(project, projection);
     }
 
     return Object.freeze({
@@ -327,22 +417,32 @@ export class EventBus {
 
   #ensureProject(project: ProjectId): void {
     if (!this.#projects.has(project))
-      this.#projects.set(project, this.#buildProject(project));
+      this.#projects.set(project, this.#buildProject(project, true));
   }
 
-  #buildProject(project: ProjectId): ProjectProjection {
+  #buildProject(project: ProjectId, useSnapshot: boolean): ProjectProjection {
+    if (useSnapshot) {
+      const restored = this.#restoreSnapshot(project);
+      if (restored !== null) return restored;
+    }
     const states = new Map<string, unknown>();
     for (const reducer of this.#reducers.values()) {
       states.set(reducer.name, this.#initialState(reducer, project));
     }
-    let throughSeq = 0;
-    let eventCount = 0;
+    const projection: ProjectProjection = {
+      throughSeq: 0,
+      throughEventId: null,
+      eventCount: 0,
+      states,
+    };
     for (const event of this.#readValidated(project, 0)) {
       this.#reduceAll(states, event);
-      throughSeq = event.seq;
-      eventCount += 1;
+      projection.throughSeq = event.seq;
+      projection.throughEventId = event.id;
+      projection.eventCount += 1;
+      this.#captureSnapshot(project, projection);
     }
-    return { throughSeq, eventCount, states };
+    return projection;
   }
 
   #catchUp(project: ProjectId): StoredEvent[] {
@@ -354,7 +454,9 @@ export class EventBus {
     for (const event of events) {
       this.#reduceAll(projection.states, event);
       projection.throughSeq = event.seq;
+      projection.throughEventId = event.id;
       projection.eventCount += 1;
+      this.#captureSnapshot(project, projection);
     }
     return events;
   }
@@ -464,6 +566,116 @@ export class EventBus {
   #reportSubscriberError(cause: unknown, event: StoredEvent): void {
     try {
       this.#onSubscriberError(cause, event);
+    } catch {}
+  }
+
+  #manifest(): string {
+    return JSON.stringify(
+      [...this.#reducers.values()]
+        .map((reducer) => [reducer.name, reducer.snapshotVersion] as const)
+        .sort(([left], [right]) => left.localeCompare(right)),
+    );
+  }
+
+  #captureSnapshot(project: ProjectId, projection: ProjectProjection): void {
+    if (
+      this.#snapshots === null ||
+      projection.throughSeq === 0 ||
+      projection.throughSeq % this.#snapshotEvery !== 0 ||
+      projection.throughEventId === null
+    ) {
+      return;
+    }
+    const states: Record<string, unknown> = {};
+    for (const name of [...this.#reducers.keys()].sort()) {
+      states[name] = projection.states.get(name);
+    }
+    try {
+      this.#snapshots.save(
+        Object.freeze({
+          project,
+          throughSeq: projection.throughSeq,
+          throughEventId: projection.throughEventId,
+          manifest: this.#manifest(),
+          states: Object.freeze(states),
+        }),
+      );
+    } catch (cause) {
+      this.#reportSnapshotError(cause, project);
+    }
+  }
+
+  #restoreSnapshot(project: ProjectId): ProjectProjection | null {
+    if (this.#snapshots === null || this.#reducers.size === 0) return null;
+    const manifest = this.#manifest();
+    try {
+      const snapshot = this.#snapshots.load(project, manifest);
+      if (snapshot === null) return null;
+      if (
+        snapshot.project !== project ||
+        snapshot.manifest !== manifest ||
+        !Number.isSafeInteger(snapshot.throughSeq) ||
+        snapshot.throughSeq <= 0 ||
+        snapshot.states === null ||
+        typeof snapshot.states !== "object" ||
+        Array.isArray(snapshot.states)
+      ) {
+        throw new Error("snapshot envelope is invalid");
+      }
+      const expectedNames = [...this.#reducers.keys()].sort();
+      if (
+        JSON.stringify(Object.keys(snapshot.states).sort()) !==
+        JSON.stringify(expectedNames)
+      ) {
+        throw new Error("snapshot state keys do not match installed reducers");
+      }
+      const states = new Map<string, unknown>();
+      for (const name of expectedNames) {
+        const reducer = this.#reducers.get(name);
+        if (reducer?.parseState === undefined) {
+          throw new Error(`reducer ${name} has no snapshot parser`);
+        }
+        const parsed = reducer.parseState(snapshot.states[name]);
+        if (isThenable(parsed)) throw new Error(`reducer ${name} parser is asynchronous`);
+        states.set(name, deepFreeze(parsed));
+      }
+      const anchorAndTail = this.#readValidated(project, snapshot.throughSeq - 1);
+      const anchor = anchorAndTail[0];
+      if (
+        anchor === undefined ||
+        anchor.seq !== snapshot.throughSeq ||
+        anchor.id !== snapshot.throughEventId
+      ) {
+        throw new Error("snapshot event anchor does not match the durable log");
+      }
+      const projection: ProjectProjection = {
+        throughSeq: snapshot.throughSeq,
+        throughEventId: snapshot.throughEventId,
+        eventCount: snapshot.throughSeq,
+        states,
+      };
+      for (const event of anchorAndTail.slice(1)) {
+        this.#reduceAll(states, event);
+        projection.throughSeq = event.seq;
+        projection.throughEventId = event.id;
+        projection.eventCount += 1;
+        this.#captureSnapshot(project, projection);
+      }
+      return projection;
+    } catch (cause) {
+      this.#reportSnapshotError(cause, project);
+      try {
+        this.#snapshots.delete(project, manifest);
+      } catch (discardCause) {
+        this.#reportSnapshotError(discardCause, project);
+      }
+      return null;
+    }
+  }
+
+  #reportSnapshotError(cause: unknown, project: ProjectId): void {
+    try {
+      this.#onSnapshotError(cause, project);
     } catch {}
   }
 }

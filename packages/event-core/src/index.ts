@@ -107,8 +107,12 @@ export type {
   EventReadOptions,
   EventReducer,
   EventSubscriber,
+  ProjectionSnapshot,
+  ProjectionSnapshotCache,
   ReducerHandle,
+  ReducerSnapshotOptions,
   ReplayEvidence,
+  SnapshotErrorHandler,
   SubscribeOptions,
   SubscriberErrorHandler,
 } from "./bus.js";
