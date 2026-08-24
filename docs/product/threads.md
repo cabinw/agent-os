@@ -50,8 +50,16 @@ in the task's own lifecycle events reads as a record of the work:
 ```
 
 Interleaved event types: `task.started`, `task.blocked`, `task.unblocked`,
-`task.review.requested`, `task.completed`, `task.failed`, `approval.*`,
-`knowledge.created`. They render as dividers, not as messages.
+`task.review.requested`, `task.completed`, `task.failed`, `task.cancelled`,
+`approval.*`, `knowledge.created`. They render as dividers, not as messages.
+Task creation creates the empty task thread; assignment and numeric progress
+update task metadata without adding transcript rows.
+
+Approval attribution comes from `approval.requested.payload.task` and is reused
+by its later decision event. A request without a task stays in the project
+thread. `knowledge.created` is woven into every `relatedTasks` thread, or the
+project thread when no task is related. See
+[ADR-018](../decisions/ADR-018-thread-projection-attribution.md).
 
 ## Message types
 
@@ -68,7 +76,9 @@ The seven from the protocol, each with distinct visual weight:
 | `progress` | Status, no decision | Muted, collapsible |
 
 `progress` is muted and collapsible on purpose: in a long agentic run it is
-most of the volume and almost none of the meaning.
+most of the volume and almost none of the meaning. Consecutive progress messages
+from the same sender and recipient become a lossless run containing every
+original message; expanded/collapsed state remains local UI state.
 
 ## Human participation
 

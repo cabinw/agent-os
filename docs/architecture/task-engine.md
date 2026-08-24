@@ -130,6 +130,16 @@ Gate must additionally grant before `task.completed` is admitted. There is no
 direct `running → completed` path. See
 [product/approvals.md](../product/approvals.md).
 
+## Thread projection
+
+`task-engine` also owns the pure thread projection. It creates one derived
+thread per task plus the project thread, attributes messages directly, carries
+approval attribution from request to decision, and fans related knowledge into
+the named task threads. Lifecycle dividers and lossless progress runs remain in
+project `seq` order. Replay rejects missing task, approval and reply references;
+snapshot state is strict and versioned. See
+[ADR-018](../decisions/ADR-018-thread-projection-attribution.md).
+
 ## Emitted events
 
 `task.created`, `task.assigned`, `task.started`, `task.progress.updated`,
