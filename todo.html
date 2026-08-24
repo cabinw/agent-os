@@ -253,8 +253,8 @@ td code{white-space:nowrap}
 
 <table>
 <tr><th>领域</th><th>选型</th><th>理由 / 否决的替代</th></tr>
-<tr><td>Monorepo</td><td><code>pnpm workspaces</code> + TS project references</td><td>5 个包，Turborepo 现在是过度工程。等构建慢了再加，不会白干。<b>pnpm 由 corepack 提供</b>（11.17.0），未全局安装</td></tr>
-<tr><td>install 脚本</td><td><code>allowBuilds</code> 白名单</td><td>pnpm 默认拦截 install 脚本。只放行了 Biome 和 esbuild（都要下载平台原生二进制）。<b>这个默认值保持开着</b>，以后加依赖逐个确认</td></tr>
+<tr><td>Monorepo</td><td><code>pnpm workspaces</code> + TS project references</td><td>5 个核心包 + 1 个 Hub-only SQLite adapter，Turborepo 现在是过度工程。等构建慢了再加，不会白干。<b>pnpm 由 corepack 提供</b>（11.17.0），未全局安装</td></tr>
+<tr><td>install 脚本</td><td><code>allowBuilds</code> 白名单</td><td>pnpm 默认拦截 install 脚本。只放行 Biome、esbuild 与 Hub-only better-sqlite3 的平台原生构建；Runner/UI filtered deploy 必须证明不含后者。<b>这个默认值保持开着</b>，以后加依赖逐个确认</td></tr>
 <tr><td>构建</td><td><code>tsup</code></td><td>零配置输出 ESM + d.ts，够用</td></tr>
 <tr><td>测试</td><td><code>Vitest</code> + 自建重放 harness</td><td>重放 harness 是自己写的，别的框架不提供</td></tr>
 <tr><td>Lint/Format</td><td><code>Biome</code></td><td>一个工具替代 ESLint + Prettier，快一个数量级</td></tr>
@@ -335,10 +335,10 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
 <ul class="tasks" data-phase="p0">
   <li><input type="checkbox" id="t-0-1" checked><label for="t-0-1" class="tb">
-    <span class="tt"><span class="tid">0.1</span>pnpm workspace + 五个空包骨架</span>
+    <span class="tt"><span class="tid">0.1</span>pnpm workspace + 核心包骨架</span>
     <span class="td">依赖方向用 TS project references 编码。<code>event-core</code> 的 <code>references</code> 是空数组，且 <code>dependencies</code> 不得包含任何 <code>@agent-os/*</code>——零内部依赖机械可验；纯 schema / storage 运行库允许直接声明。<code>tsconfig.base.json</code> 的 <code>lib</code> <b>刻意不含 DOM</b>：packages 里碰 <code>window</code> 直接类型报错，把「内核不得假设 UI 存在」变成编译期约束。</span>
     <span class="tm"><span class="tag crit">关键路径</span><span class="tag sz">半天</span></span>
-    <span class="done-when"><b>已验证：</b><code>tsc --build</code> 通过，五个包各产出 <code>dist/index.d.ts</code></span>
+    <span class="done-when"><b>已验证：</b><code>tsc --build</code> 通过；当前 5 个核心包与 Hub-only SQLite adapter 各产出 <code>dist/index.d.ts</code></span>
   </label></li>
 
   <li><input type="checkbox" id="t-0-2" checked><label for="t-0-2" class="tb">

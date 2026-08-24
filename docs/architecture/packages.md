@@ -13,6 +13,7 @@ agent-os/
 │   └── macos/          native client: Pulse, Canvas, Library, menu bar
 ├── packages/
 │   ├── event-core/     kernel
+│   ├── event-store-sqlite/ Hub-only durable adapter
 │   ├── task-engine/    task lifecycle
 │   ├── memory-core/    knowledge pipeline
 │   ├── agent-sdk/      adapters and agent-facing API
@@ -27,23 +28,29 @@ agent-os/
 `A ──▶ B` reads **A imports B**. Arrows only ever point downward.
 
 ```
-                  apps/hub                       apps/runner
-                     │                                │
-                     ▼                                ▼
-                mcp-server ────────────────▶      agent-sdk
-                     │                                │
-              ┌──────┼──────────────┐                 │
-              ▼      ▼              ▼                 │
-         agent-sdk  task-engine  memory-core          │
-              └──────┴──────────────┴─────────────────┘
-                              ▼
-                         event-core      ← kernel, zero workspace dependencies
+                         apps/hub                       apps/runner
+                    ┌────────┴────────┐                     │
+                    ▼                 ▼                     ▼
+               mcp-server    event-store-sqlite         agent-sdk
+                    │                 │                     │
+             ┌──────┼──────────────┐  │                     │
+             ▼      ▼              ▼  │                     │
+        agent-sdk  task-engine  memory-core                │
+             └──────┴──────────────┴──┴─────────────────────┘
+                                  ▼
+                             event-core   ← kernel, zero workspace dependencies
 ```
 
 Only `apps/hub` composes the event store. `apps/runner` uses shared event types
 through `agent-sdk` and sends requests to the Hub; it never opens the store.
 `apps/macos` is an authenticated Hub client, not part of this server import
 graph.
+
+`event-store-sqlite` is the only package allowed to depend on
+`better-sqlite3`. It depends downward on `event-core`; the kernel does not
+import the adapter. A filtered Runner or UI deployment must contain neither the
+adapter package nor the native driver. This closure is a release gate, not an
+assumption based on unused imports.
 
 `event-core` is the **bottom** of the stack, not the middle. It currently exports
 the versioned event schemas; RM-1.1c adds `registerReducer`, through which domain
@@ -70,7 +77,8 @@ Mechanically checked by `pnpm check:layers`.
 
 | Package | Exports | Owns |
 | --- | --- | --- |
-| `event-core` | v1 event schemas and types; then `append`, `subscribe`, `replay`, `registerReducer` in RM-1.1b/c | Permanent record contract, log, ordering, snapshots |
+| `event-core` | v1 event schemas and types; then `subscribe`, `replay`, `registerReducer` in RM-1.1c | Permanent record contract and projection semantics |
+| `event-store-sqlite` | `openSqliteEventStore`, transactional `append`, online `backup` | Hub-only durable log, ordering and idempotency |
 | `task-engine` | `createTask`, `assignTask`, `transition`, `taskState` | Legal transitions, dependencies |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
 | `agent-sdk` | strict `dispatch`, normalized result / event / error shapes, `cancel`, adapter `send` | Shared Local / Remote Runner and adapter contract |

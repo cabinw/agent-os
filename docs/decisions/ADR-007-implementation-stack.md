@@ -35,6 +35,17 @@ implementation order, not the product topology.
 monotonic `seq`, separate snapshot table. The synchronous API keeps reducers pure
 functions — an async reducer would destroy replay determinism.
 
+**Native driver isolation: a separate SQLite adapter package.**
+`@agent-os/event-core` keeps the permanent contract and zero workspace
+dependencies. `@agent-os/event-store-sqlite` depends on Event Core and pins
+`better-sqlite3`; only the Hub composition root depends on that adapter. Runner
+and UI filtered deployments must prove the adapter and native binary absent.
+Putting the driver in Event Core, including behind a subpath export, is rejected
+because package installation would still pull the native addon into every
+consumer. An optional peer is also rejected: with pnpm peer auto-install enabled
+it still attempts resolution, so isolation would depend on workspace-wide
+installer policy rather than the import graph.
+
 **Supervisor model: `claude-opus-5`, adaptive thinking, `effort: "high"`.**
 Applies to goal decomposition, memory summarization, and Pulse headline
 generation alike.
@@ -75,6 +86,10 @@ downstream, and mixed tiers make regressions harder to attribute.
 - **`event-core` must compile with no vendor SDK and no UI import.** This is
   mechanically checkable; see the layering checks in
   [development/package-development-guide.md](../development/package-development-guide.md).
+- **Native storage is Hub-only.** Layer checks permit
+  `event-store-sqlite → event-core` and forbid the reverse edge. Release checks
+  inspect filtered Runner/UI deploy trees for both the adapter and
+  `better-sqlite3`.
 - **Message content is untrusted input.** Threads render agent-authored markdown
   ([product/threads.md](../product/threads.md)); in a WebView that is an
   injection surface. Escaping is mandatory, not a hardening pass.

@@ -96,6 +96,76 @@ Event names and payloads are specified in
 | Replay | Reducing every event from the start reproduces current state exactly. Cold storage may move bytes but cannot make events unavailable. |
 | Idempotence | Producers supply a client token; a retried append returns the original event. |
 
+## SQLite store (RM-1.1b)
+
+The concrete store lives in `@agent-os/event-store-sqlite`, not in the
+dependency-free `event-core` package. Only `apps/hub` installs it. Runner and UI
+deployments must not contain `better-sqlite3` or its native binary.
+
+The RM-1.1b surface is deliberately smaller than the later Event Bus:
+
+```ts
+openSqliteEventStore(options) → SqliteEventStore
+store.append(input, { token }) → StoredEvent
+store.backup(destination) → Promise<BackupEvidence>
+store.close() → void
+```
+
+`input` is parsed as strict `EventInput` before storage. `token` is trimmed,
+non-empty command metadata with a 256-byte UTF-8 limit; it is scoped by
+`project`. Reusing `(project, token)` with the same parsed input returns the
+original stored event. Reusing it with different input fails with an explicit
+idempotency conflict. The retry lookup happens before generating runtime-owned
+`id` or `at`.
+
+The v1 database is identified by a fixed SQLite `application_id` and
+`user_version = 1`. Its permanent tables are:
+
+```sql
+event_store_meta(format_version, created_at)
+project_sequences(project PRIMARY KEY, next_seq)
+events(
+  project, seq,
+  id UNIQUE,
+  schema_version,
+  client_token,
+  input_json, input_sha256,
+  event_json,
+  PRIMARY KEY(project, seq),
+  UNIQUE(project, client_token)
+)
+```
+
+All tables are `STRICT`. `events` has `BEFORE UPDATE` and `BEFORE DELETE`
+triggers that abort, and the connection enables recursive triggers so
+`INSERT OR REPLACE` cannot hide a delete. Store startup verifies the exact
+tables, indexes and guards; unknown or partial objects fail closed.
+
+Append uses `BEGIN IMMEDIATE`. Inside that transaction it:
+
+1. looks up `(project, token)` and returns or rejects the prior command;
+2. allocates the next project-local sequence from `project_sequences`;
+3. creates and validates the draft, then inserts one immutable stored event;
+4. commits before returning the event to the producer.
+
+The canonical parsed input JSON is stored alongside its SHA-256 digest. The
+digest is an index aid, never the sole equality proof. `UNIQUE(id)` protects the
+global event identity independently of project ordering.
+
+Opening an empty database creates the schema in one exclusive transaction.
+Opening a non-empty database with a foreign application id, unknown version,
+unexpected object or failed integrity check performs no migration and no schema
+write. Normal connections require WAL, `synchronous=FULL`, foreign keys,
+`trusted_schema=OFF`, recursive triggers and a bounded busy timeout.
+
+Online backup uses SQLite's backup API, never a file copy of the live database.
+It writes a new same-directory temporary database, verifies application id,
+schema, integrity and event counts, closes and fsyncs it, then publishes it by
+atomic rename and fsyncs the destination directory. An existing destination,
+source alias or failed verification is rejected without replacing evidence.
+Opening the backup with the same store is the restore proof; operational file
+replacement remains the deployment layer's responsibility.
+
 ## Reducers
 
 A reducer is a pure function `(state, event) → state`. Registering one is how a
