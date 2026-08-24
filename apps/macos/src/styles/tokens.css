@@ -14,9 +14,11 @@
   --warn: #f59e0b;
   --warn-soft: #fffbeb;
   --risk: #ef4444;
+  --risk-soft: #fef2f2;
   --info: #3b82f6;
   --focus: #4f46e5;
   --overlay: rgba(17, 24, 39, 0.08);
+  --overlay-strong: rgba(17, 24, 39, 0.42);
   --brand-gradient: linear-gradient(135deg, var(--accent), var(--accent-end));
   --brand-gradient-soft: linear-gradient(135deg, var(--accent-soft), var(--surface));
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI",
@@ -25,6 +27,7 @@
   --font-size-page: 28px;
   --font-size-hero: 36px;
   --font-size-section: 15px;
+  --font-size-section-large: 20px;
   --font-size-card: 14px;
   --font-size-body: 13px;
   --font-size-meta: 12px;
@@ -61,6 +64,16 @@
   --foundation-card-min-height: 140px;
   --pending-surface-min-height: 150px;
   --pending-glyph-size: 64px;
+  --approval-center-width: 980px;
+  --approval-center-height: 760px;
+  --approval-list-width: 280px;
+  --approval-id-width: 220px;
+  --approval-empty-height: 360px;
+  --approval-mobile-list-height: 220px;
+  --rejection-field-height: 96px;
+  --menu-rejection-height: 72px;
+  --backdrop-blur: 6px;
+  --disabled-opacity: 0.46;
   --density-card-padding: var(--space-5);
   --density-gap: var(--space-4);
   --motion-fast: 120ms;
@@ -87,7 +100,9 @@
     --accent-soft: #25254d;
     --ok-soft: #12382f;
     --warn-soft: #3b2d12;
+    --risk-soft: #3d171b;
     --focus: #a5b4fc;
     --overlay: rgba(0, 0, 0, 0.2);
+    --overlay-strong: rgba(0, 0, 0, 0.68);
   }
 }

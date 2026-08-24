@@ -169,6 +169,16 @@
   color: var(--accent);
 }
 
+.controls .approvalTrigger {
+  border-color: var(--warn);
+  color: var(--warn);
+  font-weight: var(--weight-semibold);
+}
+
+.approvalTrigger span {
+  margin-right: var(--space-1);
+}
+
 .content {
   display: grid;
   gap: var(--space-8);

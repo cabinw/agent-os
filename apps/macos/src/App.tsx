@@ -1,8 +1,18 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styles from "./App.module.css";
+import {
+  ApprovalCenter,
+  type ApprovalCenterViewModel,
+  type ApprovalSurfaceClient,
+} from "./ApprovalCenter.js";
 import { Icon } from "./Icon.js";
 import { ProjectPulseView, type ProjectPulseViewModel } from "./Pulse.js";
 import { type Locale, t } from "./i18n.js";
+import {
+  listenForMenuBarIntents,
+  syncNativeMenuBar,
+  toMenuBarPresentation,
+} from "./menu-bar.js";
 import {
   NAVIGATION,
   type RouteId,
@@ -15,10 +25,48 @@ type Density = "comfortable" | "compact";
 
 export function App({
   pulse = null,
-}: Readonly<{ pulse?: ProjectPulseViewModel | null }>) {
+  approvals = null,
+  approvalClient,
+}: Readonly<{
+  pulse?: ProjectPulseViewModel | null;
+  approvals?: ApprovalCenterViewModel | null;
+  approvalClient?: ApprovalSurfaceClient;
+}>) {
   const [locale, setLocale] = useState<Locale>("zh-CN");
   const [density, setDensity] = useState<Density>("comfortable");
   const [route, setRoute] = useState<RouteId>(() => landingRoute(false));
+  const [approvalCenterOpen, setApprovalCenterOpen] = useState(false);
+  const [approvalFocus, setApprovalFocus] = useState<string | null>(null);
+  const menuView = useMemo(
+    () => toMenuBarPresentation(approvals, pulse, approvalClient !== undefined),
+    [approvals, pulse, approvalClient],
+  );
+  const menuViewRef = useRef(menuView);
+  menuViewRef.current = menuView;
+
+  useEffect(() => {
+    void syncNativeMenuBar(menuView).catch(() => {});
+  }, [menuView]);
+
+  useEffect(() => {
+    let dispose: (() => void) | undefined;
+    void listenForMenuBarIntents(
+      () => menuViewRef.current,
+      approvalClient,
+      (approval) => {
+        setApprovalFocus(approval);
+        setApprovalCenterOpen(true);
+      },
+      (destination) => {
+        if (destination === "pulse") setRoute("project-pulse");
+      },
+    )
+      .then((unlisten) => {
+        dispose = unlisten;
+      })
+      .catch(() => {});
+    return () => dispose?.();
+  }, [approvalClient]);
   const toggleLocale = () =>
     setLocale((current) => (current === "zh-CN" ? "en" : "zh-CN"));
   const toggleDensity = () =>
@@ -73,6 +121,17 @@ export function App({
             <h1>{labelFor(route, locale)}</h1>
           </div>
           <div className={styles.controls}>
+            {approvals && approvals.pendingCount > 0 ? (
+              <button
+                type="button"
+                className={styles.approvalTrigger}
+                onClick={() => setApprovalCenterOpen(true)}
+                aria-label={t(locale, "approval.open.ariaLabel")}
+              >
+                <span aria-hidden="true">●</span>
+                {t(locale, "approval.pending.shortLabel")} · {approvals.pendingCount}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={toggleDensity}
@@ -154,6 +213,18 @@ export function App({
           </div>
         )}
       </main>
+      {approvalCenterOpen ? (
+        <ApprovalCenter
+          view={approvals}
+          locale={locale}
+          {...(approvalClient === undefined ? {} : { client: approvalClient })}
+          {...(approvalFocus === null ? {} : { preferredApproval: approvalFocus })}
+          onClose={() => {
+            setApprovalCenterOpen(false);
+            setApprovalFocus(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
