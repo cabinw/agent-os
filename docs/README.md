@@ -48,6 +48,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | Doc | Covers |
 | --- | --- |
 | [design-language](design/design-language.md) | **Canonical.** Color, type, elevation, motion |
+| [memory](design/memory.md) | Memory list/graph toggle, semantic relations and evidence inspection |
 | [project-library-ui](design/project-library-ui.md) | Library and project detail layouts |
 | [threads-ui](design/threads-ui.md) | Thread reader layout |
 | [canvas](design/canvas.md) | The spatial workspace |

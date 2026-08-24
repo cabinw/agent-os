@@ -7,6 +7,7 @@ import {
 } from "./ApprovalCenter.js";
 import { CanvasView, type ProjectCanvasViewModel } from "./Canvas.js";
 import { Icon } from "./Icon.js";
+import { MemoryView, type ProjectMemoryViewModel } from "./Memory.js";
 import {
   ProjectLibraryView,
   type ProjectLibraryViewModel,
@@ -46,6 +47,7 @@ export function App({
   revivalStepClient,
   approvalClient,
   canvas = null,
+  memory = null,
 }: Readonly<{
   pulse?: ProjectPulseViewModel | null;
   library?: ProjectLibraryViewModel | null;
@@ -57,6 +59,7 @@ export function App({
   revivalStepClient?: RevivalStepClient;
   approvalClient?: ApprovalSurfaceClient;
   canvas?: ProjectCanvasViewModel | null;
+  memory?: ProjectMemoryViewModel | null;
 }>) {
   const [locale, setLocale] = useState<Locale>("zh-CN");
   const [density, setDensity] = useState<Density>("comfortable");
@@ -203,6 +206,8 @@ export function App({
           />
         ) : route === "canvas" ? (
           <CanvasView canvas={canvas} locale={locale} />
+        ) : route === "memory" ? (
+          <MemoryView memory={memory} locale={locale} />
         ) : (
           <div className={styles.content}>
             <section className={styles.hero}>
