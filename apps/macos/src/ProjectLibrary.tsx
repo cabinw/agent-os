@@ -184,6 +184,7 @@ export function ProjectDetailPanel({
   const [tab, setTab] = useState<DetailTab>("overview");
   const [activatingStep, setActivatingStep] = useState<number | null>(null);
   const [activationFailed, setActivationFailed] = useState(false);
+  const [selectedSnapshot, setSelectedSnapshot] = useState(0);
   const decisions = project.knowledge.filter((item) => item.type === "decision");
 
   return (
@@ -396,14 +397,38 @@ export function ProjectDetailPanel({
               {project.snapshots.length === 0 ? (
                 <Empty>{t(locale, "library.overview.snapshots.empty")}</Empty>
               ) : (
-                <div className={styles.filmstrip}>
-                  {project.snapshots.map((snapshot) => (
-                    <article key={snapshot.sourceEvents[0]}>
-                      <div>{snapshot.label}</div>
-                      <small>{snapshot.at}</small>
-                    </article>
-                  ))}
-                </div>
+                <>
+                  <figure className={styles.snapshotPreview}>
+                    <img
+                      src={project.snapshots[selectedSnapshot]?.image}
+                      alt={project.snapshots[selectedSnapshot]?.label}
+                    />
+                    <figcaption>
+                      <strong>{project.snapshots[selectedSnapshot]?.label}</strong>
+                      <small>{project.snapshots[selectedSnapshot]?.at}</small>
+                      <Evidence
+                        events={project.snapshots[selectedSnapshot]?.sourceEvents ?? []}
+                        locale={locale}
+                        onInspect={onInspectEvent}
+                      />
+                    </figcaption>
+                  </figure>
+                  <div className={styles.filmstrip}>
+                    {project.snapshots.map((snapshot, index) => (
+                      <button
+                        type="button"
+                        key={snapshot.sourceEvents[0]}
+                        aria-current={selectedSnapshot === index ? "true" : undefined}
+                        aria-label={`${t(locale, "library.snapshot.select")} ${snapshot.label}`}
+                        onClick={() => setSelectedSnapshot(index)}
+                      >
+                        <img src={snapshot.image} alt="" />
+                        <strong>{snapshot.label}</strong>
+                        <small>{snapshot.at}</small>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </section>
             <section>

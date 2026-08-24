@@ -180,6 +180,7 @@
   "library.overview.nextSteps.empty": "当前没有持久化的恢复计划。",
   "library.overview.filmstrip": "视觉检查点",
   "library.overview.snapshots.empty": "尚未捕获项目快照。",
+  "library.snapshot.select": "查看项目快照",
   "library.overview.decisions": "决策记录",
   "library.timeline.empty": "当前没有时间线事件。",
   "library.memory.empty": "当前没有项目知识。",

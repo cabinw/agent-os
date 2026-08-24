@@ -180,6 +180,7 @@
   "library.overview.nextSteps.empty": "No durable revival plan is available.",
   "library.overview.filmstrip": "Visual checkpoints",
   "library.overview.snapshots.empty": "No project snapshots have been captured.",
+  "library.snapshot.select": "View project snapshot",
   "library.overview.decisions": "Decision log",
   "library.timeline.empty": "No timeline events are available.",
   "library.memory.empty": "No project knowledge is available.",

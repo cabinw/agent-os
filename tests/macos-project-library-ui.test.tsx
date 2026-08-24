@@ -221,6 +221,9 @@ describe("RM-3.5 Project Library macOS surface", () => {
     expect(html).toContain("Check environment");
     expect(html).toContain("Create and assign restart step Check environment");
     expect(html).toContain("Visual checkpoints");
+    expect(html).toContain('src="snapshots/mvp.png"');
+    expect(html).toContain("View project snapshot MVP");
+    expect(html).toContain('aria-current="true"');
     expect(html).toContain("Use SQLite");
     expect(html).toContain("Project selection is not connected");
   });

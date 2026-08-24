@@ -7,6 +7,11 @@ import type {
 } from "../src/ProjectLibrary.js";
 import "../src/styles/global.css";
 
+const SNAPSHOT_ONE =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='960' height='540'%3E%3Crect width='960' height='540' fill='%23151a24'/%3E%3Crect x='64' y='64' width='832' height='412' rx='24' fill='%23232a38' stroke='%237c6df2' stroke-width='4'/%3E%3Ctext x='96' y='140' fill='white' font-size='38' font-family='sans-serif'%3EAgent OS · MVP%3C/text%3E%3Ctext x='96' y='205' fill='%23aab2c3' font-size='24' font-family='sans-serif'%3EEvent Core and local runtime ready%3C/text%3E%3C/svg%3E";
+const SNAPSHOT_TWO =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='960' height='540'%3E%3Crect width='960' height='540' fill='%23151a24'/%3E%3Crect x='64' y='64' width='832' height='412' rx='24' fill='%23232a38' stroke='%234ac7a5' stroke-width='4'/%3E%3Ctext x='96' y='140' fill='white' font-size='38' font-family='sans-serif'%3EAgent OS · Revival%3C/text%3E%3Ctext x='96' y='205' fill='%23aab2c3' font-size='24' font-family='sans-serif'%3ESourced report and restart plan%3C/text%3E%3C/svg%3E";
+
 const base: ProjectLibraryItemViewModel = {
   project: "proj_agent_os",
   name: "Agent OS",
@@ -117,9 +122,15 @@ const base: ProjectLibraryItemViewModel = {
   snapshots: [
     {
       label: "MVP",
-      image: "snapshots/mvp.png",
+      image: SNAPSHOT_TWO,
       at: "2026-06-30T08:00:00Z",
       sourceEvents: ["evt_snapshot"],
+    },
+    {
+      label: "Foundation",
+      image: SNAPSHOT_ONE,
+      at: "2026-05-30T08:00:00Z",
+      sourceEvents: ["evt_snapshot_foundation"],
     },
   ],
   nextSteps: [
