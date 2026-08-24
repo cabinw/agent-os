@@ -77,9 +77,9 @@ the canonical draft, then hands one command to an injected admission port.
   "alternatives": ["MongoDB", "SQLite"],
   "sourceEvents": ["evt_...", "evt_..."],
   "relatedTasks": ["TASK-012"],
-  "author": "claude-architect",
+  "author": { "kind": "agent", "id": "claude-architect" },
   "at": "2024-03-25",
-  "supersedes": null
+  "supersedes": "KN-020"
 }
 ```
 
@@ -98,10 +98,16 @@ the only copy of anything.
 
 ## Superseding
 
-Knowledge is not edited. A later decision sets `supersedes` on the earlier item,
-which stays readable. "We used to do X, then changed to Y in month N, here is
-why" is a first-class query, and the reason Revival Mode can explain a project's
-drift.
+Knowledge is not edited. `knowledge.superseded { old, new }` targets the old
+item and derives reciprocal projection links: `old.supersededBy = new` and
+`new.supersedes = old`. Both are decisions; the new item was created later and
+was previously unattached. Each item has at most one predecessor and one
+successor, so chains cannot fork, merge or cycle. See
+[ADR-022](../decisions/ADR-022-linear-knowledge-supersession.md).
+
+The old item and its sources stay readable. "We used to do X, then changed to Y
+in month N, here is why" is a first-class query, and the reason Revival Mode can
+explain a project's drift.
 
 ## Consumption
 

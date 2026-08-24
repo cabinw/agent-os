@@ -86,6 +86,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-019](decisions/ADR-019-phase-one-demo-composition.md) | Phase 1 acceptance is an offline formal-package composition with atomic event groups |
 | [ADR-020](decisions/ADR-020-knowledge-candidate-classification.md) | Memory extraction opens only from exhaustive structural anchors; strict drafts reuse Event Core |
 | [ADR-021](decisions/ADR-021-causal-knowledge-windows.md) | Memory derives complete causal/task/artifact windows and keeps source authority outside the model |
+| [ADR-022](decisions/ADR-022-linear-knowledge-supersession.md) | Decision replacement derives reciprocal links in immutable, non-branching chains |
 
 ## Assets
 
