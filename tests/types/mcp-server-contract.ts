@@ -1,5 +1,7 @@
 import {
+  CONTEXT_INCLUDE_KINDS,
   TOOL_NAMES,
+  buildTaskContext,
   createApprovalGate,
   createMcpToolRouter,
   toolInputSchemas,
@@ -21,6 +23,7 @@ declare const context: McpCallContext;
 declare const input: ToolInputMap["create_task"];
 declare const approvalCommands: ApprovalCommandPort;
 declare const human: HumanPrincipal;
+declare const contextSource: Parameters<typeof buildTaskContext>[0];
 
 const router = createMcpToolRouter(runtime, authorization);
 const names: readonly ToolName[] = TOOL_NAMES;
@@ -29,6 +32,10 @@ const title: string = toolInputSchemas.create_task.parse(input).title;
 void names;
 void result;
 void title;
+const contextKinds: readonly ("decisions" | "outputs")[] = CONTEXT_INCLUDE_KINDS;
+const taskContext = buildTaskContext(contextSource);
+void contextKinds;
+void taskContext;
 
 const approvalGate = createApprovalGate({
   commands: approvalCommands,
