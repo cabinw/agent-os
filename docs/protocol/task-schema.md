@@ -54,6 +54,11 @@ dependsOn, requiresApproval`. Task id comes from the event subject; project,
 owner and creation time derive from the envelope. No task payload repeats those
 fields.
 
+A single create references existing same-project tasks. A batch plan may use
+forward references only inside that batch; the whole graph is checked before
+append and emitted in deterministic topological order. Readiness is derived,
+never stored. See ADR-011.
+
 ## Priority
 
 `low` · `medium` · `high` · `critical`. Affects routing order and Pulse

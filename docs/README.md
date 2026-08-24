@@ -75,6 +75,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-008](decisions/ADR-008-server-hub-local-first-runners.md) | Server Hub; Local Runner first, Remote Runner next |
 | [ADR-009](decisions/ADR-009-versioned-strict-event-contract.md) | Versioned strict events; draft/stored boundary; lossless replay |
 | [ADR-010](decisions/ADR-010-projection-snapshots-as-sidecar-cache.md) | Projection snapshots are versioned, validated, discardable sidecar cache |
+| [ADR-011](decisions/ADR-011-task-dependency-admission.md) | Batch dependency graphs validate before append; readiness stays derived |
 
 ## Assets
 

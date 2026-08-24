@@ -510,7 +510,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-1-6"><label for="t-1-6" class="tb">
     <span class="tt"><span class="tid">1.2b</span>依赖图 + 环检测 + 就绪重算</span>
-    <span class="td">有未满足 <code>dependsOn</code> 的任务不能离开 <code>created</code>。依赖完成时重算就绪集。创建时拒绝成环。</span>
+    <span class="td">有未满足 <code>dependsOn</code> 的任务不能离开 <code>created</code>。单创建只引用现有任务；批计划允许批内前向引用，但整图先做missing/cycle检查，再按确定拓扑序append。就绪集纯派生，不存ready字段。</span>
     <span class="tm"><span class="tag pkg">task-engine</span><span class="tag dep">依赖 1.2a</span><span class="tag sz">2 天</span></span>
   </label></li>
 

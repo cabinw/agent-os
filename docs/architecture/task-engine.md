@@ -85,6 +85,14 @@ it never silently sits unassigned.
 A task with unmet `dependsOn` cannot leave `created`. When a dependency reaches
 `completed` the engine re-evaluates readiness. Cycles are rejected at creation.
 
+Single creation references existing same-project tasks only. A Supervisor batch
+may use forward references inside the batch, but `validateTaskPlan` validates
+the complete proposed graph before any append and returns deterministic
+topological order. `readyTaskIds` and `unmetDependencies` are pure selectors;
+there is no stored ready flag. `task.assigned` fails admission and replay while
+any dependency is not `completed`. See
+[ADR-011](../decisions/ADR-011-task-dependency-admission.md).
+
 ## Progress
 
 Progress is agent-reported and advisory. It drives UI only — never state
