@@ -59,10 +59,11 @@ replayed projections to match. See
 
 | Milestone | Deliverable |
 | --- | --- |
-| 2.1 | Knowledge extraction pipeline from events |
-| 2.2 | Typed, sourced knowledge items with superseding |
-| 2.3 | `get_context` — agents start work with prior decisions loaded |
-| 2.4 | Query and graph API |
+| 2.1 | Knowledge item model and structural extraction triggers |
+| 2.2 | Windowed extraction with runtime-owned causal sources |
+| 2.3 | Immutable linear decision supersession |
+| 2.4 | `get_context` — active decisions and upstream outputs |
+| 2.5 | Query and graph API |
 
 Phase 2 is where the product becomes different from a task tracker. Do not defer
 it to chase UI.

@@ -122,6 +122,13 @@ The agent-context case is the important one: an agent starting TASK-014 receives
 the decisions that constrain it, so it does not re-litigate settled questions or
 contradict an earlier choice.
 
+The formal context composer includes only active project-wide decisions and
+active decisions whose `relatedTasks` intersects the target's transitive task
+dependency scope. Superseded decisions remain readable through Memory but are
+not injected beside their replacement. Accepted upstream outputs use the same
+scope; there is no small recency limit. See
+[ADR-023](../decisions/ADR-023-relevance-bounded-task-context.md).
+
 ## Consequences
 
 `sourceEvents` traces a claim backwards. Nothing traced it forwards, so a

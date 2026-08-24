@@ -284,6 +284,18 @@ research, upstream results.
 { "method": "get_context", "params": { "task": "TASK-014", "include": ["decisions", "outputs"] } }
 ```
 
+`include` is a non-empty unique selection of exactly `decisions` and `outputs`.
+The strict response always contains `project`, `included`, the requested `task`,
+`scopeTasks`, `decisions` and `outputs`; an unrequested section is an empty
+array. `scopeTasks` is the target plus its complete transitive dependency scope.
+
+Current decisions are selected structurally: project-wide active decisions and
+active decisions related to the target or an upstream dependency. Items with
+`supersededBy` are omitted without deleting their history. Outputs come only
+from completed upstream dependencies. Ordering is deterministic and neither
+selection nor ordering uses text, provider or wall-clock recency. See
+[ADR-023](../decisions/ADR-023-relevance-bounded-task-context.md).
+
 An agent is expected to call this before starting work. Working from an isolated
 context is the failure this protocol exists to prevent.
 
