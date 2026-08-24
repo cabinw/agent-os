@@ -16,7 +16,8 @@
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "check:layers": "node scripts/check-layers.mjs",
-    "verify": "tsc --build && pnpm run check:types && biome check . && node scripts/check-layers.mjs && vitest run"
+    "check:native-boundary": "node scripts/check-native-boundary.mjs",
+    "verify": "tsc --build && pnpm run check:types && biome check . && node scripts/check-layers.mjs && node scripts/check-native-boundary.mjs && vitest run"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",

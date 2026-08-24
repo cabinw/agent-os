@@ -7,4 +7,5 @@ packages:
 # scripts by default, and that default should stay on for anything added later.
 allowBuilds:
   "@biomejs/biome": true
+  better-sqlite3: true
   esbuild: true

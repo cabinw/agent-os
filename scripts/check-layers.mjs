@@ -35,6 +35,7 @@ const QUIET = process.argv.includes("--quiet");
  */
 const ALLOWED_DEPS = {
   "event-core": [],
+  "event-store-sqlite": ["event-core"],
   "task-engine": ["event-core"],
   "memory-core": ["event-core"],
   "agent-sdk": ["event-core"],
@@ -47,7 +48,12 @@ const ALLOWED_DEPS = {
  */
 const VENDOR_PATTERN =
   /\b(openai|anthropic|gemini|google-?ai|xai|grok|mistral|perplexity|cohere|ollama|kimi|moonshot)\b/i;
-const VENDOR_FREE_PACKAGES = ["event-core", "task-engine", "memory-core"];
+const VENDOR_FREE_PACKAGES = [
+  "event-core",
+  "event-store-sqlite",
+  "task-engine",
+  "memory-core",
+];
 
 const violations = [];
 
