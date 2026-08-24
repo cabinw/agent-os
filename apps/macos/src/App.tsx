@@ -6,7 +6,11 @@ import {
   type ApprovalSurfaceClient,
 } from "./ApprovalCenter.js";
 import { Icon } from "./Icon.js";
-import { ProjectLibraryView, type ProjectLibraryViewModel } from "./ProjectLibrary.js";
+import {
+  ProjectLibraryView,
+  type ProjectLibraryViewModel,
+  type RevivalStepClient,
+} from "./ProjectLibrary.js";
 import { ProjectPulseView, type ProjectPulseViewModel } from "./Pulse.js";
 import type {
   ConversationProjectViewModel,
@@ -38,6 +42,7 @@ export function App({
   conversation = null,
   postingPolicy = null,
   postingClient,
+  revivalStepClient,
   approvalClient,
 }: Readonly<{
   pulse?: ProjectPulseViewModel | null;
@@ -47,6 +52,7 @@ export function App({
   conversation?: ConversationProjectViewModel | null;
   postingPolicy?: HumanPostingPolicyViewModel | null;
   postingClient?: HumanPostingClient;
+  revivalStepClient?: RevivalStepClient;
   approvalClient?: ApprovalSurfaceClient;
 }>) {
   const [locale, setLocale] = useState<Locale>("zh-CN");
@@ -171,7 +177,11 @@ export function App({
         {route === "project-pulse" ? (
           <ProjectPulseView pulse={pulse} locale={locale} />
         ) : route === "project-library" ? (
-          <ProjectLibraryView library={library} locale={locale} />
+          <ProjectLibraryView
+            library={library}
+            locale={locale}
+            {...(revivalStepClient === undefined ? {} : { revivalStepClient })}
+          />
         ) : route === "tasks" ? (
           <TasksView
             workforce={workforce}

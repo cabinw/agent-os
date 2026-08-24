@@ -6,6 +6,7 @@ import {
   type ProjectLibraryItemViewModel,
   ProjectLibraryView,
   type ProjectLibraryViewModel,
+  createRevivalStepActivationIntent,
 } from "../apps/macos/src/ProjectLibrary.js";
 
 const PROJECT: ProjectLibraryItemViewModel = {
@@ -41,6 +42,60 @@ const PROJECT: ProjectLibraryItemViewModel = {
     sourceEvents: ["evt_blocked"],
   },
   dormantDays: 54,
+  revival: {
+    built: [
+      {
+        task: "TASK-001",
+        title: "Event Core",
+        status: "completed",
+        priority: "high",
+        sourceEvents: ["evt_completed"],
+      },
+    ],
+    current: {
+      state: "paused",
+      progress: 72,
+      health: "blocked",
+      sourceEvents: ["evt_blocked"],
+    },
+    decisions: [
+      {
+        knowledge: "knowledge-1",
+        type: "decision",
+        title: "Use SQLite",
+        summary: "Keep the store local.",
+        rationale: "One native boundary is easier to audit.",
+        at: "2026-06-29T08:00:00Z",
+        sourceEvents: ["evt_decision"],
+      },
+    ],
+    unfinished: [
+      {
+        task: "TASK-014",
+        title: "Build Project Library",
+        status: "blocked",
+        priority: "high",
+        sourceEvents: ["evt_blocked"],
+      },
+    ],
+    issues: [
+      {
+        task: "TASK-014",
+        title: "Build Project Library",
+        kind: "blocked",
+        reason: "Owner decision required",
+        sourceEvents: ["evt_blocked"],
+      },
+    ],
+    plan: [
+      {
+        title: "Check environment",
+        estimateMinutes: 30,
+        detail: "Run the build and verify credentials.",
+        sourceEvents: ["evt_revived"],
+      },
+    ],
+  },
   snapshots: [
     {
       label: "MVP",
@@ -132,10 +187,38 @@ describe("RM-3.5 Project Library macOS surface", () => {
     }
     expect(html).toContain("Revival Mode");
     expect(html).toContain("54 days without activity");
+    expect(html).toContain("Completed");
+    expect(html).toContain("Unfinished");
+    expect(html).toContain("Known issues");
+    expect(html).toContain("Past decisions");
+    expect(html).toContain("Current state");
+    expect(html).toContain("Recommended restart plan");
     expect(html).toContain("Check environment");
+    expect(html).toContain("Create and assign restart step Check environment");
     expect(html).toContain("Visual checkpoints");
     expect(html).toContain("Use SQLite");
     expect(html).toContain("Project selection is not connected");
+  });
+
+  it("creates a strict ordered step intent for the first connected executor", () => {
+    const intent = createRevivalStepActivationIntent(PROJECT, 0);
+    expect(intent).toEqual({
+      project: "proj_library",
+      ordinal: 1,
+      executor: "agent-codex",
+      title: "Check environment",
+      estimateMinutes: 30,
+      detail: "Run the build and verify credentials.",
+    });
+    expect(Object.isFrozen(intent)).toBe(true);
+    expect(Object.keys(intent)).toEqual([
+      "project",
+      "ordinal",
+      "executor",
+      "title",
+      "estimateMinutes",
+      "detail",
+    ]);
   });
 
   it("renders honest empty Overview sections", () => {
@@ -143,6 +226,7 @@ describe("RM-3.5 Project Library macOS surface", () => {
       ...PROJECT,
       state: "active" as const,
       dormantDays: 0,
+      revival: null,
       summary: null,
       snapshots: [],
       nextSteps: [],

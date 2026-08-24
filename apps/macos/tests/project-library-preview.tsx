@@ -40,6 +40,60 @@ const base: ProjectLibraryItemViewModel = {
     sourceEvents: ["evt_blocked"],
   },
   dormantDays: 54,
+  revival: {
+    built: [
+      {
+        task: "TASK-001",
+        title: "Event Core",
+        status: "completed",
+        priority: "high",
+        sourceEvents: ["evt_completed"],
+      },
+    ],
+    current: {
+      state: "paused",
+      progress: 72,
+      health: "blocked",
+      sourceEvents: ["evt_blocked"],
+    },
+    decisions: [
+      {
+        knowledge: "knowledge-1",
+        type: "decision",
+        title: "Use SQLite",
+        summary: "Keep the store local.",
+        rationale: "One native boundary is easier to audit.",
+        at: "2026-06-29T08:00:00Z",
+        sourceEvents: ["evt_decision"],
+      },
+    ],
+    unfinished: [
+      {
+        task: "TASK-014",
+        title: "Build Project Library",
+        status: "blocked",
+        priority: "high",
+        sourceEvents: ["evt_blocked"],
+      },
+    ],
+    issues: [
+      {
+        task: "TASK-014",
+        title: "Build Project Library",
+        kind: "blocked",
+        reason: "Owner decision required",
+        sourceEvents: ["evt_blocked"],
+      },
+    ],
+    plan: [
+      {
+        title: "Check environment",
+        estimateMinutes: 30,
+        detail: "Run the build and verify credentials.",
+        sourceEvents: ["evt_revived"],
+      },
+    ],
+  },
   snapshots: [
     {
       label: "MVP",
@@ -110,6 +164,7 @@ const active: ProjectLibraryItemViewModel = {
     sourceEvents: ["evt_runner"],
   },
   dormantDays: 0,
+  revival: null,
   snapshots: [],
   nextSteps: [],
 };
@@ -129,6 +184,7 @@ const completed: ProjectLibraryItemViewModel = {
     sourceEvents: ["evt_demo"],
   },
   dormantDays: 4,
+  revival: null,
 };
 
 const library: ProjectLibraryViewModel = {
@@ -143,6 +199,6 @@ if (root === null) throw new Error("missing Project Library preview root");
 
 createRoot(root).render(
   <StrictMode>
-    <App library={library} />
+    <App library={library} revivalStepClient={{ createAndAssignStep: async () => {} }} />
   </StrictMode>,
 );

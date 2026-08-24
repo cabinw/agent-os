@@ -7,6 +7,14 @@ type Source = Readonly<{ sourceEvents: readonly string[] }>;
 type ProjectState = "active" | "paused" | "archived" | "completed";
 type DetailTab = "overview" | "timeline" | "memory" | "files" | "settings";
 
+type RevivalTaskViewModel = Source &
+  Readonly<{
+    task: string;
+    title: string;
+    status: string;
+    priority: "low" | "medium" | "high" | "critical";
+  }>;
+
 export type ProjectLibraryItemViewModel = Readonly<{
   project: string;
   name: string;
@@ -32,6 +40,25 @@ export type ProjectLibraryItemViewModel = Readonly<{
     }>)[];
   lastActivity: Source & Readonly<{ at: string; actor: string; type: string }>;
   dormantDays: number;
+  revival?: Readonly<{
+    built: readonly RevivalTaskViewModel[];
+    current: Source &
+      Readonly<{
+        state: ProjectState;
+        progress: number;
+        health: "healthy" | "attention" | "blocked";
+      }>;
+    decisions: readonly ProjectLibraryItemViewModel["knowledge"][number][];
+    unfinished: readonly RevivalTaskViewModel[];
+    issues: readonly (Source &
+      Readonly<{
+        task: string;
+        title: string;
+        kind: "blocked" | "failed";
+        reason: string;
+      }>)[];
+    plan: readonly ProjectLibraryItemViewModel["nextSteps"][number][];
+  }> | null;
   snapshots: readonly (Source & Readonly<{ label: string; image: string; at: string }>)[];
   nextSteps: readonly (Source &
     Readonly<{ title: string; estimateMinutes: number; detail: string }>)[];
@@ -55,6 +82,38 @@ export type ProjectLibraryItemViewModel = Readonly<{
   files: readonly (Source &
     Readonly<{ path: string; kind: string; task?: string; at: string }>)[];
 }>;
+
+export type RevivalStepActivationIntent = Readonly<{
+  project: string;
+  ordinal: number;
+  executor: string;
+  title: string;
+  estimateMinutes: number;
+  detail: string;
+}>;
+
+export interface RevivalStepClient {
+  createAndAssignStep(intent: RevivalStepActivationIntent): Promise<void>;
+}
+
+export function createRevivalStepActivationIntent(
+  project: ProjectLibraryItemViewModel,
+  ordinal: number,
+): RevivalStepActivationIntent {
+  const step = project.revival?.plan[ordinal];
+  const executor = project.agents[0]?.id;
+  if (step === undefined || executor === undefined) {
+    throw new TypeError("revival step and connected executor are required");
+  }
+  return Object.freeze({
+    project: project.project,
+    ordinal: ordinal + 1,
+    executor,
+    title: step.title,
+    estimateMinutes: step.estimateMinutes,
+    detail: step.detail,
+  });
+}
 
 export type ProjectLibraryViewModel = Readonly<{
   now: string;
@@ -106,6 +165,7 @@ export function ProjectDetailPanel({
   onClose,
   onInspectEvent,
   onOpenProject,
+  revivalStepClient,
 }: Readonly<{
   project: ProjectLibraryItemViewModel;
   now: string;
@@ -113,8 +173,11 @@ export function ProjectDetailPanel({
   onClose: () => void;
   onInspectEvent?: (event: string) => void;
   onOpenProject?: (project: string) => void;
+  revivalStepClient?: RevivalStepClient;
 }>) {
   const [tab, setTab] = useState<DetailTab>("overview");
+  const [activatingStep, setActivatingStep] = useState<number | null>(null);
+  const [activationFailed, setActivationFailed] = useState(false);
   const decisions = project.knowledge.filter((item) => item.type === "decision");
 
   return (
@@ -191,15 +254,92 @@ export function ProjectDetailPanel({
                 <Empty>{t(locale, "library.overview.brief.empty")}</Empty>
               )}
             </section>
-            {project.state === "paused" && project.dormantDays >= 30 ? (
+            {project.revival ? (
               <section className={styles.revival}>
-                <span>✦</span>
-                <div>
-                  <h3>{t(locale, "library.overview.revival")}</h3>
-                  <p>
-                    {project.dormantDays} {t(locale, "library.time.daysDormant")}
-                  </p>
+                <header>
+                  <span>✦</span>
+                  <div>
+                    <h3>{t(locale, "library.overview.revival")}</h3>
+                    <p>
+                      {project.dormantDays} {t(locale, "library.time.daysDormant")}
+                    </p>
+                  </div>
+                </header>
+                <div className={styles.revivalStats}>
+                  <span>
+                    {t(locale, "library.revival.built")}{" "}
+                    <strong>{project.revival.built.length}</strong>
+                  </span>
+                  <span>
+                    {t(locale, "library.revival.unfinished")}{" "}
+                    <strong>{project.revival.unfinished.length}</strong>
+                  </span>
+                  <span>
+                    {t(locale, "library.revival.issues")}{" "}
+                    <strong>{project.revival.issues.length}</strong>
+                  </span>
+                  <span>
+                    {t(locale, "library.revival.decisions")}{" "}
+                    <strong>{project.revival.decisions.length}</strong>
+                  </span>
                 </div>
+                <p className={styles.revivalCurrent}>
+                  {t(locale, "library.revival.current")} ·{" "}
+                  {project.revival.current.progress}% ·{" "}
+                  {t(locale, `library.health.${project.revival.current.health}`)}
+                </p>
+                {project.revival.issues.map((issue) => (
+                  <p className={styles.revivalIssue} key={`${issue.task}-${issue.kind}`}>
+                    <strong>{issue.title}</strong> · {issue.reason}
+                  </p>
+                ))}
+                <h4>{t(locale, "library.revival.plan")}</h4>
+                {project.revival.plan.length === 0 ? (
+                  <Empty>{t(locale, "library.overview.nextSteps.empty")}</Empty>
+                ) : (
+                  <ol className={styles.revivalPlan}>
+                    {project.revival.plan.map((step, index) => (
+                      <li key={`${index}-${step.title}`}>
+                        <div>
+                          <strong>{step.title}</strong>
+                          <span>
+                            {step.estimateMinutes} {t(locale, "library.time.minutes")}
+                          </span>
+                          <p>{step.detail}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={
+                            revivalStepClient === undefined ||
+                            project.agents.length === 0 ||
+                            activatingStep !== null
+                          }
+                          aria-label={`${t(locale, "library.revival.activate")} ${step.title}`}
+                          onClick={async () => {
+                            setActivatingStep(index);
+                            setActivationFailed(false);
+                            try {
+                              await revivalStepClient?.createAndAssignStep(
+                                createRevivalStepActivationIntent(project, index),
+                              );
+                            } catch {
+                              setActivationFailed(true);
+                            } finally {
+                              setActivatingStep(null);
+                            }
+                          }}
+                        >
+                          ▶
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {activationFailed ? (
+                  <p className={styles.revivalIssue}>
+                    {t(locale, "library.revival.activateError")}
+                  </p>
+                ) : null}
               </section>
             ) : null}
             <section>
@@ -355,11 +495,13 @@ export function ProjectLibraryView({
   locale,
   onInspectEvent,
   onOpenProject,
+  revivalStepClient,
 }: Readonly<{
   library: ProjectLibraryViewModel | null;
   locale: Locale;
   onInspectEvent?: (event: string) => void;
   onOpenProject?: (project: string) => void;
+  revivalStepClient?: RevivalStepClient;
 }>) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [selected, setSelected] = useState<string | null>(null);
@@ -500,6 +642,7 @@ export function ProjectLibraryView({
           onClose={() => setSelected(null)}
           {...(onInspectEvent ? { onInspectEvent } : {})}
           {...(onOpenProject ? { onOpenProject } : {})}
+          {...(revivalStepClient ? { revivalStepClient } : {})}
         />
       ) : null}
     </div>
