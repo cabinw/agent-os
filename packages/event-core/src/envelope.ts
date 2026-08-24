@@ -50,7 +50,9 @@ export type EventSubject<Type extends EventType> = Type extends `agent.${string}
                 ? SubjectOf<"measurement">
                 : Type extends `pulse.${string}`
                   ? SubjectOf<"pulse">
-                  : never;
+                  : Type extends `negotiation.${string}`
+                    ? SubjectOf<"negotiation">
+                    : never;
 
 type EventFields<Type extends EventType> = DeepReadonly<{
   type: Type;
@@ -181,6 +183,10 @@ const EVENT_SUBJECT_KINDS = {
   "artifact.derived": ["artifact"],
   "measurement.recorded": ["measurement"],
   "pulse.story.generated": ["pulse"],
+  "negotiation.opened": ["negotiation"],
+  "negotiation.objected": ["negotiation"],
+  "negotiation.escalated": ["negotiation"],
+  "negotiation.resolved": ["negotiation"],
 } as const satisfies Record<EventType, readonly SubjectKind[]>;
 
 type CrossFieldEvent = {
@@ -276,6 +282,28 @@ function validateSubject(event: CrossFieldEvent, context: z.RefinementCtx): void
       message: "human participation can only be configured by a human",
       path: ["actor", "kind"],
     });
+  }
+
+  if (event.type.startsWith("negotiation.")) {
+    const by =
+      event.type === "negotiation.opened"
+        ? (event.payload as EventPayload<"negotiation.opened">).proposedBy
+        : (
+            event.payload as EventPayload<
+              "negotiation.objected" | "negotiation.escalated" | "negotiation.resolved"
+            >
+          ).by;
+    const validKind =
+      event.type === "negotiation.resolved"
+        ? event.actor.kind === "agent" || event.actor.kind === "human"
+        : event.actor.kind === "agent";
+    if (event.actor.id !== by || !validKind) {
+      context.addIssue({
+        code: "custom",
+        message: "negotiation actor must match its authenticated participant",
+        path: ["actor"],
+      });
+    }
   }
 
   if (

@@ -100,6 +100,20 @@ triggered the execution; it may differ from `replyTo`, and caller-supplied
 `replyTo` never controls causal budgets. If `task` is present, the envelope
 subject is exactly that task; otherwise it is exactly the envelope project.
 
+## negotiation.*
+
+| Event | V1 payload | Emitted when |
+| --- | --- | --- |
+| `negotiation.opened` | `{ topic, proposal, rationale, proposedBy, participants: NonEmptyUnique<EntityId> (min 2), task?, architectureChange: boolean }` | A registered agent opens a proposal |
+| `negotiation.objected` | `{ by, reason, alternative }` | A non-proposer participant records one objection |
+| `negotiation.escalated` | `{ by, reason, to }` | An objected negotiation is addressed to a human |
+| `negotiation.resolved` | `{ by, decision, rationale }` | Agent consensus or the addressed human records the result |
+
+Negotiation subjects use kind `negotiation`. Agent actor identity must match
+`proposedBy` / `by`; a resolved event may instead have a matching human actor.
+Every event after open is caused by the immediately prior negotiation event.
+Architecture-changing objections require escalation and human resolution.
+
 ## approval.*
 
 | Event | V1 payload | Emitted when |

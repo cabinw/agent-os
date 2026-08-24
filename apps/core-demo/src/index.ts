@@ -416,6 +416,10 @@ export async function runCoreDemo(options: CoreDemoOptions): Promise<CoreDemoEvi
         state: memory.get(context.project),
         query: input,
       }),
+    openNegotiation: () => neverTool("negotiation opening"),
+    objectNegotiation: () => neverTool("negotiation objection"),
+    escalateNegotiation: () => neverTool("negotiation escalation"),
+    resolveNegotiation: () => neverTool("negotiation resolution"),
   };
   const router = createMcpToolRouter(runtime, authorization);
 

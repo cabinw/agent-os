@@ -19,7 +19,7 @@ The router owns one fixed matrix:
 | Tools | Additional requirement |
 | --- | --- |
 | `register_agent` | Body id equals principal; no prior registration |
-| `find_agent`, `create_task`, `send_message`, `request_approval`, `get_context`, `write_memory`, `query_memory` | Same `(project, agent, host)` is registered |
+| `find_agent`, `create_task`, `send_message`, `request_approval`, `get_context`, `write_memory`, `query_memory`, negotiation tools | Same `(project, agent, host)` is registered |
 | `assign_task` | Registered caller is the task owner |
 | `update_task`, `notify_blocked`, `report_result` | Registered caller is the task executor |
 
@@ -40,6 +40,10 @@ The task lifecycle still decides whether an authorized operation is legal.
 Event envelopes, task status mutation and approval decisions remain absent from
 all tool schemas and Runtime Port methods. `request_approval` asks; only the
 human control plane can grant or reject.
+
+Negotiation participant and lifecycle checks remain Runtime admission facts.
+The MCP resolver is structurally limited to un-escalated agent consensus;
+escalated human resolution has no agent tool path.
 
 ## Alternatives
 

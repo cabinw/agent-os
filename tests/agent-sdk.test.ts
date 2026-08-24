@@ -213,13 +213,29 @@ describe("RM-1.4a · strict Agent SDK contracts", () => {
     await expect(client.reportProgress({ task: "TASK-001" })).resolves.toBe(
       "update_task",
     );
+    await expect(client.openNegotiation({ negotiation: "N-001" })).resolves.toBe(
+      "open_negotiation",
+    );
+    await expect(client.objectNegotiation({ negotiation: "N-001" })).resolves.toBe(
+      "object_negotiation",
+    );
+    await expect(client.escalateNegotiation({ negotiation: "N-001" })).resolves.toBe(
+      "escalate_negotiation",
+    );
+    await expect(client.resolveNegotiation({ negotiation: "N-001" })).resolves.toBe(
+      "resolve_negotiation",
+    );
     expect(Object.keys(client).sort()).toEqual([
       "call",
       "close",
+      "escalateNegotiation",
+      "objectNegotiation",
+      "openNegotiation",
       "register",
       "reportProgress",
       "reportResult",
       "requestApproval",
+      "resolveNegotiation",
       "sendMessage",
     ]);
     await expect(client.call("write_event" as never, {})).rejects.toBeInstanceOf(

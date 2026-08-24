@@ -79,6 +79,30 @@ const validInputs: ToolInputMap = {
     alternatives: ["Maintain two schemas"],
   },
   query_memory: { q: "why strict schema", type: "decision" },
+  open_negotiation: {
+    negotiation: "negotiation-001" as never,
+    topic: "Event admission boundary",
+    proposal: "Keep one runtime-owned event writer.",
+    rationale: "It preserves authority and replay.",
+    participants: ["codex", "reviewer"] as never,
+    task: "TASK-001" as never,
+    architectureChange: true,
+  },
+  object_negotiation: {
+    negotiation: "negotiation-001" as never,
+    reason: "The failure boundary is underspecified.",
+    alternative: "Add transactional admission.",
+  },
+  escalate_negotiation: {
+    negotiation: "negotiation-001" as never,
+    reason: "Architecture options remain incompatible.",
+    to: "human-owner" as never,
+  },
+  resolve_negotiation: {
+    negotiation: "negotiation-001" as never,
+    decision: "Use transactional admission.",
+    rationale: "It preserves one writer with explicit failure semantics.",
+  },
 };
 
 const methodByTool = {
@@ -94,6 +118,10 @@ const methodByTool = {
   get_context: "getContext",
   write_memory: "writeMemory",
   query_memory: "queryMemory",
+  open_negotiation: "openNegotiation",
+  object_negotiation: "objectNegotiation",
+  escalate_negotiation: "escalateNegotiation",
+  resolve_negotiation: "resolveNegotiation",
 } as const satisfies Record<ToolName, keyof RuntimePort>;
 
 type RecordedCall = Readonly<{
@@ -125,6 +153,10 @@ function harness(
     getContext: record("getContext"),
     writeMemory: record("writeMemory"),
     queryMemory: record("queryMemory"),
+    openNegotiation: record("openNegotiation"),
+    objectNegotiation: record("objectNegotiation"),
+    escalateNegotiation: record("escalateNegotiation"),
+    resolveNegotiation: record("resolveNegotiation"),
     ...overrides,
   } as RuntimePort;
   const authorization: AuthorizationPort = {
@@ -141,11 +173,11 @@ function harness(
 }
 
 describe("RM-1.3a · canonical MCP tool surface", () => {
-  it("lists exactly twelve tools from strict runtime schemas", () => {
+  it("lists exactly sixteen tools from strict runtime schemas", () => {
     const { router } = harness();
     const definitions = router.list();
     expect(definitions.map((item) => item.name)).toEqual(TOOL_NAMES);
-    expect(definitions).toHaveLength(12);
+    expect(definitions).toHaveLength(16);
     for (const definition of definitions) {
       expect(definition.description.length).toBeGreaterThan(0);
       expect(definition.inputSchema.additionalProperties).toBe(false);
@@ -206,6 +238,10 @@ describe("RM-1.3a · canonical MCP tool surface", () => {
   it.each([
     ["register_agent", { ...validInputs.register_agent, id: "grok" }],
     ["send_message", { ...validInputs.send_message, from: "grok" }],
+    [
+      "open_negotiation",
+      { ...validInputs.open_negotiation, participants: ["architect", "reviewer"] },
+    ],
   ] as const)("binds %s identity to the authenticated principal", async (name, input) => {
     const { router, calls } = harness();
     await expect(router.call(name, input, context())).rejects.toMatchObject({

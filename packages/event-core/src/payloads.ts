@@ -331,6 +331,42 @@ const pulseStoryGeneratedSchema = z.strictObject({
   sourceEvents: nonEmptyUniqueArray(eventIdSchema),
 });
 
+const negotiationOpenedSchema = z
+  .strictObject({
+    topic: nonEmptyStringSchema,
+    proposal: nonEmptyStringSchema,
+    rationale: nonEmptyStringSchema,
+    proposedBy: entityIdSchema,
+    participants: nonEmptyUniqueArray(entityIdSchema).refine(
+      (participants) => participants.length >= 2,
+      { error: "negotiation requires at least two participants" },
+    ),
+    task: taskIdSchema.optional(),
+    architectureChange: z.boolean(),
+  })
+  .refine((payload) => payload.participants.includes(payload.proposedBy), {
+    error: "negotiation participants must include the proposer",
+    path: ["participants"],
+  });
+
+const negotiationObjectedSchema = z.strictObject({
+  by: entityIdSchema,
+  reason: nonEmptyStringSchema,
+  alternative: nonEmptyStringSchema,
+});
+
+const negotiationEscalatedSchema = z.strictObject({
+  by: entityIdSchema,
+  reason: nonEmptyStringSchema,
+  to: entityIdSchema,
+});
+
+const negotiationResolvedSchema = z.strictObject({
+  by: entityIdSchema,
+  decision: nonEmptyStringSchema,
+  rationale: nonEmptyStringSchema,
+});
+
 export const EVENT_TYPES = Object.freeze([
   "agent.registered",
   "agent.status.changed",
@@ -346,6 +382,10 @@ export const EVENT_TYPES = Object.freeze([
   "task.failed",
   "task.cancelled",
   "message.sent",
+  "negotiation.opened",
+  "negotiation.objected",
+  "negotiation.escalated",
+  "negotiation.resolved",
   "approval.requested",
   "approval.granted",
   "approval.rejected",
@@ -400,6 +440,10 @@ export const eventPayloadSchemas = Object.freeze({
   "task.failed": immutableSchema(taskFailedSchema),
   "task.cancelled": immutableSchema(taskCancelledSchema),
   "message.sent": immutableSchema(messageSentSchema),
+  "negotiation.opened": immutableSchema(negotiationOpenedSchema),
+  "negotiation.objected": immutableSchema(negotiationObjectedSchema),
+  "negotiation.escalated": immutableSchema(negotiationEscalatedSchema),
+  "negotiation.resolved": immutableSchema(negotiationResolvedSchema),
   "approval.requested": immutableSchema(approvalRequestedSchema),
   "approval.granted": immutableSchema(approvalGrantedSchema),
   "approval.rejected": immutableSchema(approvalRejectedSchema),

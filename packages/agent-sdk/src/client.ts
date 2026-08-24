@@ -13,6 +13,10 @@ export const AGENT_TOOL_NAMES = Object.freeze([
   "get_context",
   "write_memory",
   "query_memory",
+  "open_negotiation",
+  "object_negotiation",
+  "escalate_negotiation",
+  "resolve_negotiation",
 ] as const);
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 export interface AgentToolTransport {
@@ -33,6 +37,10 @@ export interface AgentClient {
   reportResult(input: unknown): Promise<unknown>;
   sendMessage(input: unknown): Promise<unknown>;
   requestApproval(input: unknown): Promise<unknown>;
+  openNegotiation(input: unknown): Promise<unknown>;
+  objectNegotiation(input: unknown): Promise<unknown>;
+  escalateNegotiation(input: unknown): Promise<unknown>;
+  resolveNegotiation(input: unknown): Promise<unknown>;
   close(): void;
 }
 export function createAgentClient(transport: AgentToolTransport): AgentClient {
@@ -61,6 +69,10 @@ export function createAgentClient(transport: AgentToolTransport): AgentClient {
     reportResult: (input: unknown) => call("report_result", input),
     sendMessage: (input: unknown) => call("send_message", input),
     requestApproval: (input: unknown) => call("request_approval", input),
+    openNegotiation: (input: unknown) => call("open_negotiation", input),
+    objectNegotiation: (input: unknown) => call("object_negotiation", input),
+    escalateNegotiation: (input: unknown) => call("escalate_negotiation", input),
+    resolveNegotiation: (input: unknown) => call("resolve_negotiation", input),
     close: () => {
       closed = true;
     },

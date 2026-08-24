@@ -61,6 +61,22 @@ export interface RuntimePort {
     input: ToolInputMap["query_memory"],
     context: McpCallContext,
   ): Awaitable<unknown>;
+  openNegotiation(
+    input: ToolInputMap["open_negotiation"],
+    context: McpCallContext,
+  ): Awaitable<unknown>;
+  objectNegotiation(
+    input: ToolInputMap["object_negotiation"],
+    context: McpCallContext,
+  ): Awaitable<unknown>;
+  escalateNegotiation(
+    input: ToolInputMap["escalate_negotiation"],
+    context: McpCallContext,
+  ): Awaitable<unknown>;
+  resolveNegotiation(
+    input: ToolInputMap["resolve_negotiation"],
+    context: McpCallContext,
+  ): Awaitable<unknown>;
 }
 
 const RUNTIME_METHODS = Object.freeze([
@@ -76,6 +92,10 @@ const RUNTIME_METHODS = Object.freeze([
   "getContext",
   "writeMemory",
   "queryMemory",
+  "openNegotiation",
+  "objectNegotiation",
+  "escalateNegotiation",
+  "resolveNegotiation",
 ] as const satisfies readonly (keyof RuntimePort)[]);
 
 export type McpToolDefinition = Readonly<{
@@ -153,6 +173,15 @@ function assertInputPrincipal<Name extends ToolName>(
     assertPrincipal(name, (input as ToolInputMap["register_agent"]).id, context);
   } else if (name === "send_message") {
     assertPrincipal(name, (input as ToolInputMap["send_message"]).from, context);
+  } else if (name === "open_negotiation") {
+    const participants = (input as ToolInputMap["open_negotiation"]).participants;
+    if (!participants.includes(context.principal.id)) {
+      throw new McpToolError(
+        "PRINCIPAL_MISMATCH",
+        name,
+        "open_negotiation participants must include the authenticated proposer",
+      );
+    }
   }
 }
 
@@ -169,6 +198,13 @@ const DISPATCHERS: DispatcherMap = {
   get_context: (runtime, input, context) => runtime.getContext(input, context),
   write_memory: (runtime, input, context) => runtime.writeMemory(input, context),
   query_memory: (runtime, input, context) => runtime.queryMemory(input, context),
+  open_negotiation: (runtime, input, context) => runtime.openNegotiation(input, context),
+  object_negotiation: (runtime, input, context) =>
+    runtime.objectNegotiation(input, context),
+  escalate_negotiation: (runtime, input, context) =>
+    runtime.escalateNegotiation(input, context),
+  resolve_negotiation: (runtime, input, context) =>
+    runtime.resolveNegotiation(input, context),
 };
 
 function dispatch<Name extends ToolName>(

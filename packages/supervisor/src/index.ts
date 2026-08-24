@@ -16,6 +16,30 @@ export {
   SupervisorPlanner,
   createSupervisorPlanner,
 } from "./planner.js";
+export {
+  NEGOTIATION_STATUSES,
+  NegotiationProjectionError,
+  emptyNegotiationProjectState,
+  reduceNegotiationProject,
+  registerNegotiationReducer,
+} from "./negotiation.js";
+export {
+  NegotiationResolutionError,
+  createNegotiationResolutionService,
+} from "./negotiation-resolution.js";
+export type {
+  HumanNegotiationResolutionRequest,
+  NegotiationResolutionCommand,
+  NegotiationResolutionPort,
+} from "./negotiation-resolution.js";
+export type {
+  NegotiationEscalation,
+  NegotiationObjection,
+  NegotiationProjectState,
+  NegotiationResolution,
+  NegotiationState,
+  NegotiationStatus,
+} from "./negotiation.js";
 export type {
   AdmittedDecision,
   AdmittedTask,

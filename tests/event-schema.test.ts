@@ -76,6 +76,29 @@ const VALID_PAYLOADS: Record<EventType, unknown> = {
     type: "instruction",
     content: "Implement the schema contract",
   },
+  "negotiation.opened": {
+    topic: "Event admission boundary",
+    proposal: "Keep one runtime-owned event writer",
+    rationale: "This preserves deterministic authority.",
+    proposedBy: "agent-architect",
+    participants: ["agent-architect", "agent-reviewer"],
+    architectureChange: true,
+  },
+  "negotiation.objected": {
+    by: "agent-reviewer",
+    reason: "The failure boundary is underspecified.",
+    alternative: "Add a transactional admission port.",
+  },
+  "negotiation.escalated": {
+    by: "agent-reviewer",
+    reason: "The architecture options remain incompatible.",
+    to: "human-owner",
+  },
+  "negotiation.resolved": {
+    by: "agent-architect",
+    decision: "Use the transactional admission port.",
+    rationale: "It preserves one writer and explicit failure semantics.",
+  },
   "approval.requested": {
     action: "Publish the schema",
     risk: "medium",
@@ -175,13 +198,23 @@ function subjectFor(type: EventType, payload: unknown = VALID_PAYLOADS[type]) {
 
 function inputFor(type: EventType) {
   const payload = clone(VALID_PAYLOADS[type]);
+  const negotiationActor = type.startsWith("negotiation.")
+    ? {
+        kind: "agent" as const,
+        id:
+          type === "negotiation.opened"
+            ? (payload as { proposedBy: string }).proposedBy
+            : (payload as { by: string }).by,
+      }
+    : undefined;
   return {
     type,
     project: "proj_test",
     actor:
-      type === "project.human.participation.configured"
+      negotiationActor ??
+      (type === "project.human.participation.configured"
         ? { kind: "human", id: "human-owner" }
-        : { kind: "system", id: "runtime" },
+        : { kind: "system", id: "runtime" }),
     subject: subjectFor(type, payload),
     causedBy: CAUSE_ID,
     payload,
@@ -199,13 +232,13 @@ function draftFor(type: EventType) {
 }
 
 describe("RM-1.1a · versioned strict event contract", () => {
-  it("exports exactly the 31 canonical event types in catalog order", () => {
+  it("exports exactly the 35 canonical event types in catalog order", () => {
     const catalog = readFileSync("docs/protocol/event-catalog.md", "utf8");
     const catalogTypes = [...catalog.matchAll(/^\| `([a-z]+(?:\.[a-z]+)+)`/gmu)].map(
       (match) => match[1],
     );
 
-    expect(EVENT_TYPES).toHaveLength(31);
+    expect(EVENT_TYPES).toHaveLength(35);
     expect([...EVENT_TYPES]).toEqual(catalogTypes);
     expect(Object.isFrozen(EVENT_TYPES)).toBe(true);
     expect(Object.isFrozen(eventPayloadSchemas)).toBe(true);
@@ -313,6 +346,31 @@ describe("RM-1.1a · versioned strict event contract", () => {
         /only be configured by a human/,
       );
     }
+  });
+
+  it("binds negotiation identity and excludes system actors", () => {
+    const opened = inputFor("negotiation.opened");
+    expect(() =>
+      parseEventInput({
+        ...opened,
+        actor: { kind: "agent", id: "agent-reviewer" },
+      }),
+    ).toThrow(/negotiation actor/);
+
+    const resolved = inputFor("negotiation.resolved");
+    expect(parseEventInput(resolved).actor.kind).toBe("agent");
+    expect(() =>
+      parseEventInput({
+        ...resolved,
+        actor: { kind: "system", id: "agent-architect" },
+      }),
+    ).toThrow(/negotiation actor/);
+    expect(
+      parseEventInput({
+        ...resolved,
+        actor: { kind: "human", id: "agent-architect" },
+      }).actor.kind,
+    ).toBe("human");
   });
 
   it("rejects task self-dependency before draft construction", () => {

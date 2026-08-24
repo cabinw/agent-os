@@ -78,6 +78,11 @@ The Supervisor escalates to a human when:
 It never escalates by silently stopping. Every escalation is an event and appears
 in Pulse and the menu bar.
 
+Architecture disagreement uses the negotiation state machine in ADR-036. The
+Supervisor may route and escalate, but an addressed human is the only actor that
+can resolve an escalated architecture proposal. Resolution and its decision
+Memory are admitted together by the trusted control plane.
+
 ## Constraint
 
 The Supervisor plans and coordinates. It does not execute project work — no

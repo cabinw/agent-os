@@ -180,6 +180,33 @@ export const toolInputSchemas = {
         Date.parse(input.after) <= Date.parse(input.before),
       { error: "after must not be later than before", path: ["after"] },
     ),
+  open_negotiation: z.strictObject({
+    negotiation: entityIdInputSchema,
+    topic: nonEmptyStringSchema,
+    proposal: nonEmptyStringSchema,
+    rationale: nonEmptyStringSchema,
+    participants: nonEmptyUniqueArray(entityIdInputSchema).refine(
+      (participants) => participants.length >= 2,
+      { error: "negotiation requires at least two participants" },
+    ),
+    task: taskIdInputSchema.optional(),
+    architectureChange: z.boolean(),
+  }),
+  object_negotiation: z.strictObject({
+    negotiation: entityIdInputSchema,
+    reason: nonEmptyStringSchema,
+    alternative: nonEmptyStringSchema,
+  }),
+  escalate_negotiation: z.strictObject({
+    negotiation: entityIdInputSchema,
+    reason: nonEmptyStringSchema,
+    to: entityIdInputSchema,
+  }),
+  resolve_negotiation: z.strictObject({
+    negotiation: entityIdInputSchema,
+    decision: nonEmptyStringSchema,
+    rationale: nonEmptyStringSchema,
+  }),
 } as const satisfies Record<ToolName, z.ZodType>;
 
 export type ToolInputMap = {
@@ -199,5 +226,10 @@ export const TOOL_DESCRIPTIONS = Object.freeze({
   get_context: "Load prior decisions, outputs and related context for a task.",
   write_memory: "Admit a sourced durable knowledge item through Memory Core.",
   query_memory: "Query durable project knowledge by text and optional type.",
+  open_negotiation: "Open a sourced proposal between registered agent participants.",
+  object_negotiation: "Object to an open proposal with a reason and alternative.",
+  escalate_negotiation: "Escalate an objected negotiation to the human control plane.",
+  resolve_negotiation:
+    "Resolve only an un-escalated agent negotiation; human resolution stays outside MCP.",
 } as const satisfies Record<ToolName, string>);
 import { AGENT_TOOL_NAMES } from "@agent-os/agent-sdk";

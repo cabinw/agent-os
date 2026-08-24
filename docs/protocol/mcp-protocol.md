@@ -352,6 +352,18 @@ are stored events and its only causal edges are derived from backward
 `causedBy`. Explicit `knowledge.linked` payloads are semantic relations returned
 separately; they never masquerade as causal edges.
 
+### open_negotiation / object_negotiation / escalate_negotiation / resolve_negotiation
+
+Agent tools accept proposal content and stable negotiation ids, never actor or
+event-envelope authority. `open_negotiation.participants` must include the
+authenticated proposer. Runtime admission owns participant and transition
+checks through the negotiation projection.
+
+`resolve_negotiation` is only for un-escalated agent consensus. Once escalated,
+the addressed human resolves through the trusted control plane, which atomically
+admits the resolution and decision Memory. Architecture-changing objections
+cannot be resolved by this MCP tool.
+
 ## Rules for implementers
 
 - An agent may never write an event directly. Tools request; the runtime decides
@@ -371,5 +383,5 @@ separately; they never masquerade as causal edges.
 
 ## Planned
 
-Agent negotiation, multi-agent planning proposals, autonomous task routing,
-agent performance analytics.
+Multi-agent planning proposals, autonomous task routing and agent performance
+analytics.

@@ -92,6 +92,29 @@ const PAYLOADS: Record<EventType, unknown> = {
     type: "report",
     content: "The evidence supports option A.",
   },
+  "negotiation.opened": {
+    topic: "Memory storage",
+    proposal: "Use option A.",
+    rationale: "It has lower write amplification.",
+    proposedBy: "agent-memory",
+    participants: ["agent-memory", "agent-reviewer"],
+    architectureChange: false,
+  },
+  "negotiation.objected": {
+    by: "agent-reviewer",
+    reason: "Recovery behavior needs evidence.",
+    alternative: "Use option B.",
+  },
+  "negotiation.escalated": {
+    by: "agent-reviewer",
+    reason: "The evidence is inconclusive.",
+    to: "human-owner",
+  },
+  "negotiation.resolved": {
+    by: "agent-memory",
+    decision: "Use option A.",
+    rationale: "Benchmarks and recovery tests support it.",
+  },
   "approval.requested": {
     action: "Adopt option A",
     risk: "medium",
@@ -176,6 +199,7 @@ function subjectFor(type: EventType, payload: unknown) {
     artifact: "artifact-memory",
     measurement: "measurement-memory",
     pulse: "pulse-memory",
+    negotiation: "negotiation-memory",
   };
   return { kind: domain, id: ids[domain ?? ""] };
 }
@@ -190,8 +214,15 @@ function eventFor<Type extends EventType>(
     seq: 1,
     type,
     project: PROJECT,
-    actor:
-      type === "project.human.participation.configured"
+    actor: type.startsWith("negotiation.")
+      ? {
+          kind: "agent",
+          id:
+            type === "negotiation.opened"
+              ? (payload as EventPayload<"negotiation.opened">).proposedBy
+              : (payload as EventPayload<"negotiation.objected">).by,
+        }
+      : type === "project.human.participation.configured"
         ? { kind: "human", id: "human-owner" }
         : { kind: "system", id: "memory-runtime" },
     subject: subjectFor(type, payload),
@@ -297,10 +328,11 @@ describe("RM-2.1 · structural extraction triggers", () => {
     "artifact.derived",
     "measurement.recorded",
     "project.environment.checked",
+    "negotiation.resolved",
   ]);
 
   it("classifies every canonical event type without an unowned gap", () => {
-    expect(EVENT_TYPES).toHaveLength(31);
+    expect(EVENT_TYPES).toHaveLength(35);
     for (const type of EVENT_TYPES) {
       const classified = classifyKnowledgeEvent(eventFor(type));
       expect(classified.kind, type).toBe(
@@ -313,6 +345,7 @@ describe("RM-2.1 · structural extraction triggers", () => {
 
   it.each([
     ["approval.granted", "decision-recorded", ["decision", "discussion"]],
+    ["negotiation.resolved", "decision-recorded", ["decision", "discussion"]],
     [
       "task.completed",
       "result-recorded",

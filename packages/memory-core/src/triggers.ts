@@ -171,6 +171,23 @@ const RULES = Object.freeze({
     kind: "noise",
     reason: "derived-output",
   }),
+  "negotiation.opened": Object.freeze({
+    kind: "noise",
+    reason: "unresolved-context",
+  }),
+  "negotiation.objected": Object.freeze({
+    kind: "noise",
+    reason: "unresolved-context",
+  }),
+  "negotiation.escalated": Object.freeze({
+    kind: "noise",
+    reason: "unresolved-context",
+  }),
+  "negotiation.resolved": Object.freeze({
+    kind: "candidate",
+    trigger: "decision-recorded",
+    possibleTypes: DECISION_TYPES,
+  }),
 } as const satisfies Readonly<Record<EventType, Rule>>);
 
 function candidate(
