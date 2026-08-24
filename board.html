@@ -133,13 +133,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
       <section class="overall-progress" id="overview" aria-labelledby="overall-title">
         <div class="overall-meters">
-          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:80.41%">
-            <div class="overall-number"><strong id="overall-percent">80.41%</strong><small>总体实际完成度</small></div>
+          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:82.00%">
+            <div class="overall-number"><strong id="overall-percent">82.00%</strong><small>总体实际完成度</small></div>
           </div>
           <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 29%">
             <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">29%</strong></div>
             <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:29%"></span></div>
-            <small id="current-live-detail">RM-4.1 · 0/8 已完成 · canonical复活契约审计启动</small>
+            <small id="current-live-detail">RM-4.2 · 0/7 已完成 · 推测与事实边界审计启动</small>
           </div>
         </div>
         <div class="overall-copy">
@@ -240,10 +240,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 263,
-  "updatedAt": "2026-08-24 18:30 CST",
+  "revision": 269,
+  "updatedAt": "2026-08-24 19:00 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "RM-4.1",
+  "currentTaskId": "RM-4.2",
   "verification": {"testsPassed":799,"testsTotal":799,"filesPassed":41,"filesTotal":41,"gatePassed":9,"gateTotal":9,"lintErrors":0,"checkedAt":"2026-08-24 18:01 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":30,"eventSchemaTotal":30,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
@@ -306,8 +306,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"RM-3.8","scope":"roadmap","phase":"Phase 3","title":"任务详情内嵌会话与跨会话搜索","status":"completed","progress":100,"priority":"P1","owner":"Codex","dependsOn":["RM-3.7"],"acceptance":"复用同一组件，支持参与者筛选和全局搜索。","source":"todo.html#p3","summary":"同一ThreadsReader完成task/embedded scope、跨会话query与participant filter；Task Detail复用完整renderer。41文件799/799及全门禁绿色，cbefa72已推送原仓库。","progressBasis":[{"label":"Task/Threads现状与canonical审计","earned":15,"total":15},{"label":"可复用组件与scope契约","earned":15,"total":15},{"label":"Task detail内嵌会话","earned":25,"total":25},{"label":"跨会话搜索与参与者筛选","earned":25,"total":25},{"label":"专项/视觉/负向测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Task detail / Threads canonical对照","status":"done"},{"label":"同一ThreadsReader复用边界","status":"done"},{"label":"task scope嵌入","status":"done"},{"label":"参与者筛选","status":"done"},{"label":"跨会话搜索定位","status":"done"},{"label":"专项与视觉验证","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
     {"id":"RM-3.9","scope":"roadmap","phase":"Phase 3","title":"人工发言（按项目可关闭）","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":["RM-3.7","RM-3.4"],"acceptance":"存在待审批时，会话操作都不能满足审批。","source":"todo.html#p3","summary":"协议、策略、message-only命令服务、UI client与Composer均已实现；261项专项、视觉交互、42文件817项全仓测试和macOS原生构建绿色。253213f、13b1c3e、a5dfb6a已推送原仓库。","progressBasis":[{"label":"Message/approval/授权canonical审计","earned":15,"total":15},{"label":"人工发言policy与command契约","earned":15,"total":15},{"label":"消息写入client与项目开关","earned":25,"total":25},{"label":"Composer UI与错误恢复","earned":25,"total":25},{"label":"审批隔离/专项/视觉测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Message / approval / auth canonical对照","status":"done"},{"label":"项目级human participation policy","status":"done"},{"label":"message-only command client","status":"done"},{"label":"Composer与send状态","status":"done"},{"label":"pending approval不可由消息满足","status":"done"},{"label":"专项与视觉验证","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
 
-    {"id":"RM-4.1","scope":"roadmap","phase":"Phase 4","title":"复活报告与重启计划","status":"running","progress":0,"priority":"P1","owner":"Codex","dependsOn":["RM-2.4","RM-3.5"],"acceptance":"全部从事件与知识查询得出，不采新数据。","source":"todo.html#p4","summary":"让休眠项目可低成本恢复；先对照project.revived、事件历史、知识与任务依赖的canonical来源，再实现纯派生报告和重启计划。","progressBasis":[{"label":"复活事件/知识/任务canonical审计","earned":0,"total":15},{"label":"sourced复活报告projection","earned":0,"total":25},{"label":"依赖有序重启计划","earned":0,"total":25},{"label":"macOS Revival UX","earned":0,"total":15},{"label":"专项与视觉验证","earned":0,"total":15},{"label":"全仓集成验证","earned":0,"total":3},{"label":"逻辑提交与交付","earned":0,"total":2}],"checkpoints":[{"label":"canonical来源与现有实现审计","status":"running"},{"label":"复活报告数据契约","status":"pending"},{"label":"纯事件/知识projection","status":"pending"},{"label":"依赖有序重启计划","status":"pending"},{"label":"macOS Revival界面","status":"pending"},{"label":"专项与视觉验证","status":"pending"},{"label":"全仓验证门禁","status":"pending"},{"label":"逻辑提交与远端交付","status":"pending"}]},
-    {"id":"RM-4.2","scope":"roadmap","phase":"Phase 4","title":"失效推测标注","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-4.1"],"acceptance":"未知状态标为可能失效，由环境检查转成事实。","source":"todo.html#p4","summary":"明确区分推测和已验证问题。"},
+    {"id":"RM-4.1","scope":"roadmap","phase":"Phase 4","title":"复活报告与重启计划","status":"completed","progress":100,"priority":"P1","owner":"Codex","dependsOn":["RM-2.4","RM-3.5"],"acceptance":"全部从事件与知识查询得出，不采新数据。","source":"todo.html#p4","summary":"六部分sourced报告、休眠时钟修正、有序计划、窄激活接口与macOS Revival UI完成；819项全仓测试及原生构建绿色。0597c3e、14f4175已推送原仓库。","progressBasis":[{"label":"复活事件/知识/任务canonical审计","earned":15,"total":15},{"label":"sourced复活报告projection","earned":25,"total":25},{"label":"依赖有序重启计划","earned":25,"total":25},{"label":"macOS Revival UX","earned":15,"total":15},{"label":"专项与视觉验证","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"canonical来源与现有实现审计","status":"done"},{"label":"复活报告数据契约","status":"done"},{"label":"纯事件/知识projection","status":"done"},{"label":"依赖有序重启计划","status":"done"},{"label":"macOS Revival界面","status":"done"},{"label":"专项与视觉验证","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
+    {"id":"RM-4.2","scope":"roadmap","phase":"Phase 4","title":"失效推测标注","status":"running","progress":0,"priority":"P1","owner":"Codex","dependsOn":["RM-4.1"],"acceptance":"未知状态标为可能失效，由环境检查转成事实。","source":"todo.html#p4","summary":"明确区分推测和已验证问题；先审计依赖、API、凭据的现有事件证据与UI措辞，再设计likely-stale到verified的单向转换。","progressBasis":[{"label":"推测/事实canonical审计","earned":0,"total":20},{"label":"sourced staleness契约与投影","earned":0,"total":30},{"label":"环境检查事实转换","earned":0,"total":25},{"label":"macOS标注与解释UI","earned":0,"total":20},{"label":"全仓集成验证","earned":0,"total":3},{"label":"逻辑提交与交付","earned":0,"total":2}],"checkpoints":[{"label":"依赖/API/凭据证据审计","status":"running"},{"label":"likely-stale sourced契约","status":"pending"},{"label":"环境检查事实转换","status":"pending"},{"label":"macOS推测标注UI","status":"pending"},{"label":"专项与视觉验证","status":"pending"},{"label":"全仓验证门禁","status":"pending"},{"label":"逻辑提交与远端交付","status":"pending"}]},
     {"id":"RM-4.3","scope":"roadmap","phase":"Phase 4","title":"项目快照捕获与胶片条","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.5"],"acceptance":"在里程碑事件上捕获可回看的项目快照。","source":"todo.html#p4","summary":"形成项目演进的视觉历史。"},
     {"id":"RM-4.4","scope":"roadmap","phase":"Phase 4","title":"Canvas 三个缩放级别","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-3.1"],"acceptance":"缩放改变细节层级，边由 causedBy 派生。","source":"todo.html#p4","summary":"空间化呈现任务与因果关系。"},
     {"id":"RM-4.5","scope":"roadmap","phase":"Phase 4","title":"记忆中的知识图谱视图","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-2.5"],"acceptance":"列表与图谱是一等切换，不增加新目的地。","source":"todo.html#p4","summary":"按 ADR-003 在 Memory 内呈现知识图。"},
@@ -404,6 +404,12 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 19:00","kind":"completed","entity":"RM-4.1","title":"复活报告与重启计划交付完成，任务达到100%","detail":"0597c3e sourced report与14f4175 macOS Revival已推送origin/codex/project-control；最后2分结清，总体从81.97%升至82.00%，当前切换RM-4.2。"},
+    {"at":"2026-08-24 18:56","kind":"progress","entity":"RM-4.1","title":"全仓与macOS原生门禁完成，进度即时升至98%","detail":"42文件819项测试、类型、格式、层级、原生边界、Vite、Cargo与Tauri debug build全部绿色。总体从81.92%升至81.97%，仅逻辑提交与远端推送未计。"},
+    {"at":"2026-08-24 18:52","kind":"progress","entity":"RM-4.1","title":"Revival视觉与交互验收完成，进度即时升至95%","detail":"1280×720无页面溢出；六部分报告与▶在抽屉内完整可达，成功回调不制造虚假状态。总体从81.76%升至81.92%，全仓门禁与交付未计。"},
+    {"at":"2026-08-24 18:48","kind":"progress","entity":"RM-4.1","title":"六部分Revival UI与窄激活接口完成，进度即时升至85%","detail":"▶固定计划ordinal并选择首个connected executor；缺client/执行者禁用，失败不乐观更新。42项相关测试绿色；总体从81.24%升至81.76%，视觉、全仓门禁与交付未计。"},
+    {"at":"2026-08-24 18:42","kind":"progress","entity":"RM-4.1","title":"六部分sourced报告投影完成，进度即时升至52%","detail":"built/current/decisions/unfinished/issues/plan均由既有历史派生，derived revival不再重置休眠期；11项Library测试绿色。总体从80.65%升至81.24%，▶转任务、UI与交付未计。"},
+    {"at":"2026-08-24 18:36","kind":"progress","entity":"RM-4.1","title":"Revival canonical审计完成，进度即时升至15%","detail":"确认project.revived已有严格有序计划，无需新增采集；识别六部分报告、▶转任务及derived事件导致休眠归零三个缺口。总体从80.41%升至80.65%，实现与交付未计。"},
     {"at":"2026-08-24 18:30","kind":"completed","entity":"RM-3.9","title":"人工发言与审批隔离交付完成，任务达到100%","detail":"253213f协议事件、13b1c3e服务边界、a5dfb6a macOS Composer已推送origin/codex/project-control；最后2分结清，总体从80.38%升至80.41%，当前切换RM-4.1。"},
     {"at":"2026-08-24 18:27","kind":"progress","entity":"RM-3.9","title":"全仓与macOS原生门禁完成，进度即时升至98%","detail":"42文件817项测试、类型、格式、层级、原生边界、Vite、Cargo与Tauri debug build全部绿色。总体从80.33%升至80.38%，仅逻辑提交与远端推送未计。"},
     {"at":"2026-08-24 18:25","kind":"progress","entity":"RM-3.9","title":"Composer视觉与交互验收完成，进度即时升至95%","detail":"1280×720无溢出；待审批分隔符与Composer同时显示但无批准/驳回控件，成功发送后草稿清空。总体从80.29%升至80.33%，全仓门禁与交付仍未计。"},
