@@ -12,6 +12,7 @@
     "./conversation-contract.ts",
     "./core-demo-contract.ts",
     "./event-core-contract.ts",
+    "./memory-core-contract.ts",
     "./mcp-server-contract.ts",
     "./sqlite-event-store-contract.ts",
     "./supervisor-contract.ts",
