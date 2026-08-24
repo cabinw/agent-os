@@ -72,6 +72,10 @@
   --approval-mobile-list-height: 220px;
   --rejection-field-height: 96px;
   --menu-rejection-height: 72px;
+  --project-drawer-width: 520px;
+  --snapshot-card-width: 140px;
+  --progress-height: 8px;
+  --font-size-number: 30px;
   --backdrop-blur: 6px;
   --disabled-opacity: 0.46;
   --density-card-padding: var(--space-5);

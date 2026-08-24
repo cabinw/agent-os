@@ -6,6 +6,7 @@ import {
   type ApprovalSurfaceClient,
 } from "./ApprovalCenter.js";
 import { Icon } from "./Icon.js";
+import { ProjectLibraryView, type ProjectLibraryViewModel } from "./ProjectLibrary.js";
 import { ProjectPulseView, type ProjectPulseViewModel } from "./Pulse.js";
 import { type Locale, t } from "./i18n.js";
 import {
@@ -25,10 +26,12 @@ type Density = "comfortable" | "compact";
 
 export function App({
   pulse = null,
+  library = null,
   approvals = null,
   approvalClient,
 }: Readonly<{
   pulse?: ProjectPulseViewModel | null;
+  library?: ProjectLibraryViewModel | null;
   approvals?: ApprovalCenterViewModel | null;
   approvalClient?: ApprovalSurfaceClient;
 }>) {
@@ -153,6 +156,8 @@ export function App({
 
         {route === "project-pulse" ? (
           <ProjectPulseView pulse={pulse} locale={locale} />
+        ) : route === "project-library" ? (
+          <ProjectLibraryView library={library} locale={locale} />
         ) : (
           <div className={styles.content}>
             <section className={styles.hero}>
