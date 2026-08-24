@@ -67,6 +67,23 @@ export type {
   LivePlacement,
   NoEligiblePlacementReason,
 } from "./routing.js";
+export {
+  PROJECT_THREAD_KEY,
+  ConversationProjectionError,
+  emptyConversationProjectState,
+  parseConversationProjectState,
+  reduceConversationProject,
+  registerConversationReducer,
+} from "./conversation.js";
+export type {
+  ConversationApprovalIndex,
+  ConversationDivider,
+  ConversationItem,
+  ConversationMessage,
+  ConversationProgressRun,
+  ConversationProjectState,
+  ConversationThread,
+} from "./conversation.js";
 export type TaskRef = Readonly<{
   project: import("@agent-os/event-core").ProjectId;
   id: import("@agent-os/event-core").TaskId;
