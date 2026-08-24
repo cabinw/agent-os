@@ -63,3 +63,6 @@ events.
 The one durable output is `pulse.story.generated`: headline prose is
 non-deterministic and therefore recorded with non-empty `sourceEvents`. KPI
 values and headline ranking remain projections.
+
+The executable sourcing, day-window, consequence threshold and empty-state
+contract is [ADR-027](../decisions/ADR-027-sourced-project-pulse.md).
