@@ -79,6 +79,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-012](decisions/ADR-012-event-catalog-live-routing.md) | Event-derived Agent Catalog joins live placement telemetry for deterministic routing |
 | [ADR-013](decisions/ADR-013-mcp-call-admission-boundary.md) | Authenticated call context and strict schemas feed one transport-neutral Runtime Port |
 | [ADR-014](decisions/ADR-014-mcp-agent-authorization-matrix.md) | MCP uses a fixed registered/owner/executor matrix; role never grants authority |
+| [ADR-015](decisions/ADR-015-blocking-approval-gate.md) | Approval calls block behind atomic event groups; timeout only expires and never grants |
 
 ## Assets
 

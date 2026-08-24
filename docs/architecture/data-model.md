@@ -34,7 +34,7 @@ are operational runtime records; see [agent-runtime](agent-runtime.md).
 | **Thread** | `project, task?` | **Derived, not stored.** One per task plus one project thread. See [ADR-006](../decisions/ADR-006-threads-as-a-view-in-agents.md) |
 | **Event** | see [event-core](event-core.md) and [event-catalog](../protocol/event-catalog.md) | Versioned strict record; the only writable object |
 | **Knowledge** | see [memory](memory.md) | Typed, sourced, supersedable |
-| **Approval** | request event `id`; `action, detail, requestedBy, risk, status` | status ∈ pending / granted / rejected / expired |
+| **Approval** | opaque approval subject `id`; `action, detail, requestedBy, risk, status` | status ∈ pending / granted / rejected / expired; request envelope id is separate |
 
 ## Ownership
 

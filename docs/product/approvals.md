@@ -36,6 +36,11 @@ agent ── request_approval ──▶ Approval Gate ──▶ approval.request
 The calling agent blocks. Its task moves to `blocked` with `needs: human`, so a
 pending approval is visible as project state, not just a notification.
 
+The Approval has an opaque subject id allocated before append; it is not the
+request event's envelope id. Task-scoped admission is one atomic command:
+`approval.requested + task.blocked`. Grant/reject atomically include
+`task.unblocked`; expiration does not, so the task stays blocked. See ADR-015.
+
 ## Rules
 
 1. **No auto-grant.** An unanswered request expires; it never proceeds by
@@ -53,6 +58,11 @@ pending approval is visible as project state, not just a notification.
 `approval.requested` always includes `detail`; omission is not a lower-risk
 request, it is invalid. `approval.expired.after` is the planned RFC3339 deadline,
 while envelope `at` is when the expiration was recorded.
+
+V1 does not store that deadline on the request, so the Phase 1 CLI Gate schedules
+it only for the current process. Restarted requests remain pending and blocked;
+they are never granted or assigned a reconstructed deadline. Durable timer
+recovery requires a future event version.
 
 ## Presentation
 

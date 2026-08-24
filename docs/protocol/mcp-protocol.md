@@ -270,6 +270,11 @@ request expires as `approval.expired` and the task stays blocked. The expiration
 payload records the planned RFC3339 deadline as `after`; envelope `at` records
 when the expiration fact was admitted.
 
+The Phase 1 Gate blocks the tool promise and linearizes human decision against
+timeout. A task-scoped request/decision uses the atomic event groups in ADR-015.
+Because v1 does not store the deadline on `approval.requested`, process restart
+leaves pending requests fail-closed rather than inventing a replacement timer.
+
 ### get_context
 
 Retrieve the shared context for a task: related documents, prior decisions,

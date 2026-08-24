@@ -535,7 +535,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-1-10"><label for="t-1-10" class="tb">
     <span class="tt"><span class="tid">1.3c</span>审批闸门接口（占位实现）</span>
-    <span class="td">Phase 3 才做 UI，但<b>现在就要留好能阻塞调用方的接口</b>。此阶段用 CLI 提示代替界面。超时发 <code>approval.expired</code>，绝不自动放行。</span>
+    <span class="td">Phase 3 才做 UI，但<b>现在就要留好能阻塞调用方的接口</b>。独立approval subject id；task范围的request+blocked、grant/reject+unblocked由命令端口原子提交。此阶段用可注入CLI prompt；进程内超时只发 <code>approval.expired</code> 并保持task blocked，重启后的v1 pending不猜deadline、更不自动放行。</span>
     <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.3b</span><span class="tag sz">2 天</span></span>
   </label></li>
 
