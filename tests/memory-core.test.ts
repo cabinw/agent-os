@@ -111,6 +111,7 @@ const PAYLOADS: Record<EventType, unknown> = {
   "knowledge.linked": { from: "KN-001", to: "TASK-001", relation: "informs" },
   "knowledge.superseded": { old: "KN-001", new: "KN-002" },
   "project.created": { name: "Memory Project", stack: ["TypeScript"] },
+  "project.human.participation.configured": { enabled: true },
   "project.state.changed": { from: "paused", to: "active" },
   "project.snapshot.captured": {
     label: "Memory baseline",
@@ -180,7 +181,10 @@ function eventFor<Type extends EventType>(
     seq: 1,
     type,
     project: PROJECT,
-    actor: { kind: "system", id: "memory-runtime" },
+    actor:
+      type === "project.human.participation.configured"
+        ? { kind: "human", id: "human-owner" }
+        : { kind: "system", id: "memory-runtime" },
     subject: subjectFor(type, payload),
     at: AT,
     payload,
@@ -286,7 +290,7 @@ describe("RM-2.1 · structural extraction triggers", () => {
   ]);
 
   it("classifies every canonical event type without an unowned gap", () => {
-    expect(EVENT_TYPES).toHaveLength(29);
+    expect(EVENT_TYPES).toHaveLength(30);
     for (const type of EVENT_TYPES) {
       const classified = classifyKnowledgeEvent(eventFor(type));
       expect(classified.kind, type).toBe(

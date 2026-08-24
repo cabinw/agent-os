@@ -172,6 +172,7 @@ const EVENT_SUBJECT_KINDS = {
   "knowledge.linked": ["knowledge"],
   "knowledge.superseded": ["knowledge"],
   "project.created": ["project"],
+  "project.human.participation.configured": ["project"],
   "project.state.changed": ["project"],
   "project.snapshot.captured": ["project"],
   "project.revived": ["project"],
@@ -184,6 +185,7 @@ const EVENT_SUBJECT_KINDS = {
 type CrossFieldEvent = {
   readonly type: EventType;
   readonly project: ProjectId;
+  readonly actor: Actor;
   readonly subject: Subject;
   readonly payload: EventPayload;
   readonly causedBy?: EventId | undefined;
@@ -261,6 +263,17 @@ function validateSubject(event: CrossFieldEvent, context: z.RefinementCtx): void
       code: "custom",
       message: "project event subject id must match envelope.project",
       path: ["subject", "id"],
+    });
+  }
+
+  if (
+    event.type === "project.human.participation.configured" &&
+    event.actor.kind !== "human"
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "human participation can only be configured by a human",
+      path: ["actor", "kind"],
     });
   }
 

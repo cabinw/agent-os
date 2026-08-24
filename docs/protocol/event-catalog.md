@@ -130,6 +130,7 @@ measurement may validate a knowledge item.
 | Event | V1 payload | Emitted when |
 | --- | --- | --- |
 | `project.created` | `{ name, stack: Unique<NonEmptyString> }` | New project |
+| `project.human.participation.configured` | `{ enabled: boolean }` | A human enables or disables posting in project threads |
 | `project.state.changed` | `{ from: ProjectState, to: ProjectState }` | Project state changes; `from != to` |
 | `project.snapshot.captured` | `{ label, image, at: RFC3339 }` | A visual checkpoint is recorded |
 | `project.revived` | `{ dormantDays: PositiveInt, plan: NonEmptyArray<PlanStep> }` | Revival Mode generates a restart plan |

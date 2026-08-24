@@ -247,6 +247,10 @@ const projectCreatedSchema = z.strictObject({
   stack: uniqueArray(nonEmptyStringSchema),
 });
 
+const projectHumanParticipationConfiguredSchema = z.strictObject({
+  enabled: z.boolean(),
+});
+
 const projectStateChangedSchema = z
   .strictObject({ from: projectStateSchema, to: projectStateSchema })
   .refine((payload) => payload.from !== payload.to, {
@@ -325,6 +329,7 @@ export const EVENT_TYPES = Object.freeze([
   "knowledge.linked",
   "knowledge.superseded",
   "project.created",
+  "project.human.participation.configured",
   "project.state.changed",
   "project.snapshot.captured",
   "project.revived",
@@ -377,6 +382,9 @@ export const eventPayloadSchemas = Object.freeze({
   "knowledge.linked": immutableSchema(knowledgeLinkedSchema),
   "knowledge.superseded": immutableSchema(knowledgeSupersededSchema),
   "project.created": immutableSchema(projectCreatedSchema),
+  "project.human.participation.configured": immutableSchema(
+    projectHumanParticipationConfiguredSchema,
+  ),
   "project.state.changed": immutableSchema(projectStateChangedSchema),
   "project.snapshot.captured": immutableSchema(projectSnapshotCapturedSchema),
   "project.revived": immutableSchema(projectRevivedSchema),

@@ -134,6 +134,10 @@ const RULES = Object.freeze({
     reason: "derived-output",
   }),
   "project.created": Object.freeze({ kind: "noise", reason: "administrative" }),
+  "project.human.participation.configured": Object.freeze({
+    kind: "noise",
+    reason: "administrative",
+  }),
   "project.state.changed": Object.freeze({
     kind: "noise",
     reason: "administrative",

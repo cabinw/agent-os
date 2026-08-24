@@ -95,6 +95,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-028](decisions/ADR-028-approval-surfaces-and-menu-bar-boundary.md) | Approval surfaces submit intents through one trusted client; high-risk decisions stay in app |
 | [ADR-029](decisions/ADR-029-sourced-project-library-read-model.md) | Project Library derives cross-project rows from independently sourced histories |
 | [ADR-030](decisions/ADR-030-sourced-tasks-and-agents-views.md) | Tasks and Agents join durable projections with authenticated live placement facts |
+| [ADR-031](decisions/ADR-031-human-thread-posting-is-message-only.md) | Human thread posting is project-gated and structurally cannot decide approvals |
 
 ## Assets
 

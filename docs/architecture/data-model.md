@@ -26,7 +26,7 @@ are operational runtime records; see [agent-runtime](agent-runtime.md).
 
 | Object | Key fields | Notes |
 | --- | --- | --- |
-| **Project** | `id, name, gitRemote, state, stack, cover, lastActivity` | Hub metadata; working-copy paths belong to Runner hosts |
+| **Project** | `id, name, state, stack, humanParticipation, lastActivity` | Hub metadata; thread posting defaults off and changes only through its project event |
 | **Goal** | `id, project, statement, status` | Decomposed by the Supervisor into tasks |
 | **Task** | see [task-schema](../protocol/task-schema.md) | The unit routing and progress attach to |
 | **Agent** | see [agent-schema](../protocol/agent-schema.md) | Logical identity is per project; capability is per `(agent, host)` placement |

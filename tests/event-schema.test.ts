@@ -100,6 +100,7 @@ const VALID_PAYLOADS: Record<EventType, unknown> = {
   },
   "knowledge.superseded": { old: "KN-001", new: "KN-002" },
   "project.created": { name: "Agent OS", stack: ["TypeScript", "SQLite"] },
+  "project.human.participation.configured": { enabled: true },
   "project.state.changed": { from: "paused", to: "active" },
   "project.snapshot.captured": {
     label: "Event Core baseline",
@@ -168,7 +169,10 @@ function inputFor(type: EventType) {
   return {
     type,
     project: "proj_test",
-    actor: { kind: "system", id: "runtime" },
+    actor:
+      type === "project.human.participation.configured"
+        ? { kind: "human", id: "human-owner" }
+        : { kind: "system", id: "runtime" },
     subject: subjectFor(type, payload),
     causedBy: CAUSE_ID,
     payload,
@@ -186,13 +190,13 @@ function draftFor(type: EventType) {
 }
 
 describe("RM-1.1a · versioned strict event contract", () => {
-  it("exports exactly the 29 canonical event types in catalog order", () => {
+  it("exports exactly the 30 canonical event types in catalog order", () => {
     const catalog = readFileSync("docs/protocol/event-catalog.md", "utf8");
     const catalogTypes = [...catalog.matchAll(/^\| `([a-z]+(?:\.[a-z]+)+)`/gmu)].map(
       (match) => match[1],
     );
 
-    expect(EVENT_TYPES).toHaveLength(29);
+    expect(EVENT_TYPES).toHaveLength(30);
     expect([...EVENT_TYPES]).toEqual(catalogTypes);
     expect(Object.isFrozen(EVENT_TYPES)).toBe(true);
     expect(Object.isFrozen(eventPayloadSchemas)).toBe(true);
@@ -286,6 +290,19 @@ describe("RM-1.1a · versioned strict event contract", () => {
           subject: { kind: "agent", id: "different-agent" },
         }),
       ).toThrow();
+    }
+  });
+
+  it("allows only a human to configure project thread participation", () => {
+    const configuration = inputFor("project.human.participation.configured");
+    expect(parseEventInput(configuration).actor.kind).toBe("human");
+    for (const actor of [
+      { kind: "agent", id: "codex-developer" },
+      { kind: "system", id: "runtime" },
+    ]) {
+      expect(() => parseEventInput({ ...configuration, actor })).toThrow(
+        /only be configured by a human/,
+      );
     }
   });
 
