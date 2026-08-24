@@ -51,6 +51,19 @@ export type {
   HumanPrincipal,
   PendingApproval,
 } from "./approval-gate.js";
+export {
+  ApprovalCenterError,
+  admitApprovalIntent,
+  buildApprovalCenter,
+} from "./approval-center.js";
+export type {
+  ApprovalCenterItem,
+  ApprovalCenterSource,
+  ApprovalCenterView,
+  ApprovalDecisionClient,
+  ApprovalDecisionIntent,
+  ApprovalMenuAction,
+} from "./approval-center.js";
 export { McpToolError } from "./errors.js";
 export type { McpToolErrorCode } from "./errors.js";
 export { createMcpToolRouter } from "./router.js";
