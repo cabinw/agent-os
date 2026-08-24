@@ -7,6 +7,7 @@ import {
   nonEmptyStringSchema,
   positiveIntegerSchema,
   prioritySchema,
+  rfc3339Schema,
 } from "@agent-os/event-core";
 import type {
   DeepReadonly,
@@ -162,10 +163,23 @@ export const toolInputSchemas = {
       error: "decision memory must preserve its rationale",
       path: ["rationale"],
     }),
-  query_memory: z.strictObject({
-    q: nonEmptyStringSchema,
-    type: knowledgeTypeSchema.optional(),
-  }),
+  query_memory: z
+    .strictObject({
+      q: nonEmptyStringSchema.optional(),
+      type: knowledgeTypeSchema.optional(),
+      after: rfc3339Schema.optional(),
+      before: rfc3339Schema.optional(),
+      relatedTo: entityIdInputSchema.optional(),
+      relation: nonEmptyStringSchema.optional(),
+      status: z.enum(["active", "superseded", "all"]).optional(),
+    })
+    .refine(
+      (input) =>
+        input.after === undefined ||
+        input.before === undefined ||
+        Date.parse(input.after) <= Date.parse(input.before),
+      { error: "after must not be later than before", path: ["after"] },
+    ),
 } as const satisfies Record<ToolName, z.ZodType>;
 
 export type ToolInputMap = {

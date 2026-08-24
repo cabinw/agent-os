@@ -36,7 +36,10 @@ import type {
   RuntimePort,
   ToolInputMap,
 } from "@agent-os/mcp-server";
-import { registerKnowledgeReducer } from "@agent-os/memory-core";
+import {
+  queryMemory as readMemory,
+  registerKnowledgeReducer,
+} from "@agent-os/memory-core";
 import { createSupervisorPlanner } from "@agent-os/supervisor";
 import type {
   SupervisorAdmissionCommand,
@@ -407,7 +410,12 @@ export async function runCoreDemo(options: CoreDemoOptions): Promise<CoreDemoEvi
         "memory",
       );
     },
-    queryMemory: () => Object.freeze([]),
+    queryMemory: (input, context) =>
+      readMemory({
+        project: context.project,
+        state: memory.get(context.project),
+        query: input,
+      }),
   };
   const router = createMcpToolRouter(runtime, authorization);
 

@@ -1,5 +1,6 @@
 import {
   actorSchema,
+  entityIdSchema,
   eventIdSchema,
   knowledgeIdSchema,
   knowledgeTypeSchema,
@@ -12,6 +13,7 @@ import {
 import type {
   Actor,
   DeepReadonly,
+  EntityId,
   EventBus,
   EventId,
   KnowledgeId,
@@ -87,6 +89,19 @@ const knowledgeItemSchema = z
 
 const knowledgeProjectStateSchema = z.strictObject({
   items: z.record(knowledgeIdSchema, knowledgeItemSchema),
+  relations: z.record(
+    eventIdSchema,
+    z.strictObject({
+      event: eventIdSchema,
+      eventSeq: positiveIntegerSchema,
+      knowledge: knowledgeIdSchema,
+      from: entityIdSchema,
+      to: entityIdSchema,
+      relation: nonEmptyStringSchema,
+      at: rfc3339Schema,
+      actor: actorSchema,
+    }),
+  ),
 });
 
 type MutableKnowledgeItem = z.output<typeof knowledgeItemSchema>;
@@ -100,13 +115,27 @@ export type KnowledgeItem = DeepReadonly<
 
 export type KnowledgeProjectState = DeepReadonly<{
   items: Readonly<Record<string, KnowledgeItem>>;
+  relations: Readonly<Record<string, KnowledgeRelation>>;
+}>;
+
+export type KnowledgeRelation = DeepReadonly<{
+  event: EventId;
+  eventSeq: number;
+  knowledge: KnowledgeId;
+  from: EntityId;
+  to: EntityId;
+  relation: string;
+  at: string;
+  actor: Actor;
 }>;
 
 export type KnowledgeProjectionErrorCode =
   | "BRANCH"
   | "DUPLICATE_KNOWLEDGE"
+  | "DUPLICATE_RELATION"
   | "INVALID_IDENTITY"
   | "INVALID_ORDER"
+  | "INVALID_RELATION"
   | "INVALID_STATE"
   | "INVALID_TYPE"
   | "MISSING_KNOWLEDGE";
@@ -137,7 +166,7 @@ function freeze<Value>(value: Value): DeepReadonly<Value> {
 }
 
 export function emptyKnowledgeProjectState(): KnowledgeProjectState {
-  return freeze({ items: {} });
+  return freeze({ items: {}, relations: {} });
 }
 
 function createdItem(event: StoredEvent<"knowledge.created">): KnowledgeItem {
@@ -240,7 +269,55 @@ export function reduceKnowledgeProject(
         item.id,
       );
     }
-    return { items: { ...state.items, [item.id]: item } };
+    return { items: { ...state.items, [item.id]: item }, relations: state.relations };
+  }
+  if (event.type === "knowledge.linked") {
+    if (state.relations[event.id] !== undefined) {
+      throw new KnowledgeProjectionError(
+        "DUPLICATE_RELATION",
+        `knowledge relation event ${event.id} already exists`,
+        event.subject.id,
+      );
+    }
+    const subject = knowledgeIdSchema.safeParse(event.subject.id);
+    if (!subject.success) {
+      throw new KnowledgeProjectionError(
+        "INVALID_RELATION",
+        "knowledge.linked subject must be a canonical knowledge id",
+        event.subject.id,
+        { cause: subject.error },
+      );
+    }
+    const subjectId = subject.data;
+    const item = state.items[subjectId];
+    const endpoint = subjectId as unknown as EntityId;
+    if (
+      item === undefined ||
+      (event.payload.from !== endpoint && event.payload.to !== endpoint) ||
+      item.createdSeq >= event.seq
+    ) {
+      throw new KnowledgeProjectionError(
+        "INVALID_RELATION",
+        "knowledge.linked subject must be an existing endpoint created earlier",
+        event.subject.id,
+      );
+    }
+    return {
+      items: state.items,
+      relations: {
+        ...state.relations,
+        [event.id]: freeze({
+          event: event.id,
+          eventSeq: event.seq,
+          knowledge: subjectId,
+          from: event.payload.from,
+          to: event.payload.to,
+          relation: event.payload.relation,
+          at: event.at,
+          actor: event.actor,
+        }),
+      },
+    };
   }
   if (event.type !== "knowledge.superseded") return state;
   const subject = knowledgeIdSchema.safeParse(event.subject.id);
@@ -263,6 +340,7 @@ export function reduceKnowledgeProject(
       [old.id]: { ...old, supersededBy: next.id },
       [next.id]: { ...next, supersedes: old.id },
     },
+    relations: state.relations,
   };
 }
 
@@ -319,6 +397,38 @@ function assertSnapshotLinks(state: KnowledgeProjectState): void {
       }
     }
   }
+  for (const [key, relation] of Object.entries(state.relations)) {
+    if (relation.event !== key || creationEvents.has(relation.event)) {
+      throw new KnowledgeProjectionError(
+        "INVALID_STATE",
+        `knowledge relation map key ${key} has invalid event identity`,
+        relation.knowledge,
+      );
+    }
+    if (creationSeqs.has(relation.eventSeq)) {
+      throw new KnowledgeProjectionError(
+        "INVALID_STATE",
+        `knowledge relation ${key} repeats a projection sequence`,
+        relation.knowledge,
+      );
+    }
+    creationEvents.add(relation.event);
+    creationSeqs.add(relation.eventSeq);
+    const item = state.items[relation.knowledge];
+    const endpoint = relation.knowledge as unknown as EntityId;
+    if (
+      item === undefined ||
+      (relation.from !== endpoint && relation.to !== endpoint) ||
+      relation.from === relation.to ||
+      item.createdSeq >= relation.eventSeq
+    ) {
+      throw new KnowledgeProjectionError(
+        "INVALID_STATE",
+        `knowledge relation ${key} has invalid endpoints or order`,
+        relation.knowledge,
+      );
+    }
+  }
 }
 
 export function parseKnowledgeProjectState(
@@ -357,6 +467,6 @@ export function registerKnowledgeReducer(
     "memory",
     emptyKnowledgeProjectState,
     reduceKnowledgeProject,
-    { version: "1", parseState: parseKnowledgeProjectState },
+    { version: "2", parseState: parseKnowledgeProjectState },
   );
 }

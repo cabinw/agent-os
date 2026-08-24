@@ -61,6 +61,7 @@ export {
 } from "./projection.js";
 export type {
   KnowledgeItem,
+  KnowledgeRelation,
   KnowledgeProjectState,
   KnowledgeProjectionErrorCode,
 } from "./projection.js";
@@ -69,6 +70,26 @@ export {
   KnowledgeSupersessionError,
   createKnowledgeSuperseder,
 } from "./supersession.js";
+export {
+  MEMORY_QUERY_STATUSES,
+  MemoryQueryError,
+  queryMemory,
+} from "./query.js";
+export type {
+  MemoryQuery,
+  MemoryQueryErrorCode,
+  MemoryQueryResult,
+  MemoryQueryStatus,
+  MemoryRelationDescriptor,
+  QueryMemorySource,
+} from "./query.js";
+export { MemoryGraphError, buildMemoryGraph } from "./graph.js";
+export type {
+  MemoryGraph,
+  MemoryGraphEdge,
+  MemoryGraphErrorCode,
+  MemoryGraphSource,
+} from "./graph.js";
 export type {
   KnowledgeSupersederOptions,
   KnowledgeSupersessionCommand,
