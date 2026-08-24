@@ -1524,6 +1524,10 @@ describe("C-REMOTE-01 · outbound Remote Runner transport", () => {
     expect(peak).toBe(2);
     expect(executions).toBe(requests.length);
     expect(remote.requests.size).toBeLessThanOrEqual(2);
+    // Hub resolves dispatch as soon as it accepts /complete. The Worker trims
+    // its hot cache only after that HTTP acknowledgement reaches the caller,
+    // so observe the bounded post-ack state instead of the network race window.
+    await waitFor(() => worker.executions.size <= 2);
     expect(worker.executions.size).toBeLessThanOrEqual(2);
 
     const replayEvents: RunnerEvent[] = [];
