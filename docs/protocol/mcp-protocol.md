@@ -323,12 +323,34 @@ alone.
 ```
 
 ```json
-{ "method": "query_memory", "params": { "q": "why postgres", "type": "decision" } }
+{
+  "method": "query_memory",
+  "params": {
+    "q": "why postgres",
+    "type": "decision",
+    "after": "2026-01-01T00:00:00Z",
+    "relatedTo": "TASK-014",
+    "status": "all"
+  }
+}
 ```
+
+Every field is optional; empty input lists all knowledge. `after` / `before`
+are inclusive RFC3339 bounds. `relatedTo` and `relation` query canonical task,
+supersession and explicit `knowledge.linked` relations. `status` is `active`,
+`superseded` or `all` and defaults to `all`, so historical decisions remain
+readable. Predicates are ANDed, output is creation-sequence ordered and no
+hidden result limit is applied. See
+[ADR-024](../decisions/ADR-024-memory-query-and-causal-graph.md).
 
 Emits `knowledge.created`. `rationale` and `alternatives` are preserved in that
 event; the runtime adds auditable `sourceEvents` from the admitted causal
 context rather than writing a second knowledge table.
+
+The graph API is a pure Memory Core read over complete project history. Nodes
+are stored events and its only causal edges are derived from backward
+`causedBy`. Explicit `knowledge.linked` payloads are semantic relations returned
+separately; they never masquerade as causal edges.
 
 ## Rules for implementers
 

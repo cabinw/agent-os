@@ -109,6 +109,20 @@ The old item and its sources stay readable. "We used to do X, then changed to Y
 in month N, here is why" is a first-class query, and the reason Revival Mode can
 explain a project's drift.
 
+## Query and graph
+
+Memory queries compose optional text, type, inclusive creation-time, relation
+and active/superseded predicates. Empty input lists all items, superseded items
+remain visible by default and results are ordered by creation sequence. Relation
+matches cover task attribution, supersession and explicit `knowledge.linked`
+records. There is no default result count.
+
+The graph read uses complete contiguous project event history. Every event is a
+node and every valid backward `causedBy` is one derived causal edge. Explicit
+`knowledge.linked` records are returned separately as semantic relations, not
+causal edges. See
+[ADR-024](../decisions/ADR-024-memory-query-and-causal-graph.md).
+
 ## Consumption
 
 | Consumer | Uses memory for |
