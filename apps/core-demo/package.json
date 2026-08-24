@@ -18,6 +18,7 @@
     "@agent-os/event-core": "workspace:*",
     "@agent-os/event-store-sqlite": "workspace:*",
     "@agent-os/mcp-server": "workspace:*",
+    "@agent-os/memory-core": "workspace:*",
     "@agent-os/supervisor": "workspace:*",
     "@agent-os/task-engine": "workspace:*"
   }

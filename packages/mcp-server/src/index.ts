@@ -15,12 +15,18 @@
  */
 
 export {
+  CONTEXT_INCLUDE_KINDS,
   TOOL_DESCRIPTIONS,
   TOOL_NAMES,
   mcpCallContextSchema,
   toolInputSchemas,
 } from "./schemas.js";
-export type { McpCallContext, ToolInputMap, ToolName } from "./schemas.js";
+export type {
+  ContextIncludeKind,
+  McpCallContext,
+  ToolInputMap,
+  ToolName,
+} from "./schemas.js";
 export type { AuthorizationPort, AuthorizedTask } from "./authorization.js";
 export {
   ApprovalProjectionError,
@@ -53,5 +59,14 @@ export type {
   McpToolRouter,
   RuntimePort,
 } from "./router.js";
+export { TaskContextError, buildTaskContext } from "./context.js";
+export type {
+  ContextDecision,
+  ContextOutput,
+  ContextTask,
+  TaskContext,
+  TaskContextErrorCode,
+  TaskContextSource,
+} from "./context.js";
 
 export const PACKAGE = "mcp-server" as const;

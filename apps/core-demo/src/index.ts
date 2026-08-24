@@ -24,6 +24,7 @@ import type {
 } from "@agent-os/event-core";
 import { openSqliteEventStore } from "@agent-os/event-store-sqlite";
 import {
+  buildTaskContext,
   createApprovalGate,
   createMcpToolRouter,
   registerApprovalReducer,
@@ -35,6 +36,7 @@ import type {
   RuntimePort,
   ToolInputMap,
 } from "@agent-os/mcp-server";
+import { registerKnowledgeReducer } from "@agent-os/memory-core";
 import { createSupervisorPlanner } from "@agent-os/supervisor";
 import type {
   SupervisorAdmissionCommand,
@@ -118,6 +120,7 @@ export async function runCoreDemo(options: CoreDemoOptions): Promise<CoreDemoEvi
   const catalog = registerAgentCatalogReducer(bus);
   const approvals = registerApprovalReducer(bus);
   const conversations = registerConversationReducer(bus);
+  const memory = registerKnowledgeReducer(bus);
   const observed: StoredEvent[] = [];
   bus.subscribe(
     (event) => {
@@ -376,7 +379,13 @@ export async function runCoreDemo(options: CoreDemoOptions): Promise<CoreDemoEvi
       approvalCause = context.causedBy;
       return gate.request(input, context);
     },
-    getContext: () => Object.freeze({ decisions: [], outputs: [] }),
+    getContext: (input, context) =>
+      buildTaskContext({
+        project: context.project,
+        request: input,
+        tasks: tasks.get(context.project),
+        memory: memory.get(context.project),
+      }),
     writeMemory: (input, context) => {
       if (context.causedBy === undefined) throw new Error("memory requires a cause");
       knowledge += 1;

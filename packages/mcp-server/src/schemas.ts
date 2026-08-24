@@ -78,6 +78,10 @@ export const mcpCallContextSchema = z.strictObject({
 
 export type McpCallContext = DeepReadonly<z.infer<typeof mcpCallContextSchema>>;
 
+export const CONTEXT_INCLUDE_KINDS = Object.freeze(["decisions", "outputs"] as const);
+const contextIncludeKindSchema = z.enum(CONTEXT_INCLUDE_KINDS);
+export type ContextIncludeKind = (typeof CONTEXT_INCLUDE_KINDS)[number];
+
 export const toolInputSchemas = {
   register_agent: z.strictObject({
     id: entityIdInputSchema,
@@ -144,7 +148,7 @@ export const toolInputSchemas = {
   }),
   get_context: z.strictObject({
     task: taskIdInputSchema,
-    include: nonEmptyUniqueArray(nonEmptyStringSchema),
+    include: nonEmptyUniqueArray(contextIncludeKindSchema),
   }),
   write_memory: z
     .strictObject({

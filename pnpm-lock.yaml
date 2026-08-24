@@ -38,6 +38,9 @@ importers:
       '@agent-os/mcp-server':
         specifier: workspace:*
         version: link:../../packages/mcp-server
+      '@agent-os/memory-core':
+        specifier: workspace:*
+        version: link:../../packages/memory-core
       '@agent-os/supervisor':
         specifier: workspace:*
         version: link:../../packages/supervisor
