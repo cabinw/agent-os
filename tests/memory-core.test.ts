@@ -13,17 +13,26 @@ import type {
 import {
   KNOWLEDGE_TRIGGER_KINDS,
   KnowledgeExtractionError,
+  KnowledgeProjectionError,
+  KnowledgeSupersessionError,
   KnowledgeWindowError,
+  assertKnowledgeSupersession,
   buildKnowledgeWindow,
   classifyKnowledgeEvent,
   createKnowledgeExtractor,
+  createKnowledgeSuperseder,
+  emptyKnowledgeProjectState,
   knowledgeDraftSchema,
   parseKnowledgeDraft,
+  parseKnowledgeProjectState,
+  reduceKnowledgeProject,
 } from "../packages/memory-core/src/index.js";
 import type {
   KnowledgeAdmissionCommand,
   KnowledgeExtractionRequest,
+  KnowledgeProjectState,
   KnowledgeSummarizerInput,
+  KnowledgeSupersessionCommand,
 } from "../packages/memory-core/src/index.js";
 
 const PROJECT = "proj_memory";
@@ -898,6 +907,366 @@ describe("RM-2.2 · sourced summarization and admission", () => {
     expect(error).toMatchObject({
       name: "KnowledgeExtractionError",
       code: "MODEL_FAILURE",
+    });
+  });
+});
+
+function createdKnowledge(
+  seq: number,
+  id: `KN-${string}`,
+  options: {
+    type?: EventPayload<"knowledge.created">["type"];
+    title?: string;
+    project?: string;
+  } = {},
+) {
+  const type = options.type ?? "decision";
+  return parseStoredEvent({
+    schemaVersion: 1,
+    id: newEventId(),
+    seq,
+    type: "knowledge.created",
+    project: options.project ?? PROJECT,
+    actor: { kind: "agent", id: "agent-memory" },
+    subject: { kind: "knowledge", id },
+    at: AT,
+    payload: {
+      type,
+      title: options.title ?? `Decision ${id}`,
+      summary: `${id} is the selected direction.`,
+      sourceEvents: [SOURCE],
+      ...(type === "decision" ? { rationale: `${id} has stronger evidence.` } : {}),
+      alternatives: ["Option A", "Option B"],
+      relatedTasks: ["TASK-001"],
+    },
+  }) as StoredEvent<"knowledge.created">;
+}
+
+function supersededKnowledge(
+  seq: number,
+  old: `KN-${string}`,
+  next: `KN-${string}`,
+  subject: string = old,
+) {
+  return parseStoredEvent({
+    schemaVersion: 1,
+    id: newEventId(),
+    seq,
+    type: "knowledge.superseded",
+    project: PROJECT,
+    actor: { kind: "human", id: "human-owner" },
+    subject: { kind: "knowledge", id: subject },
+    at: AT,
+    payload: { old, new: next },
+  }) as StoredEvent<"knowledge.superseded">;
+}
+
+function foldKnowledge(events: readonly StoredEvent[]): KnowledgeProjectState {
+  return events.reduce(reduceKnowledgeProject, emptyKnowledgeProjectState());
+}
+
+describe("RM-2.3 · immutable knowledge projection", () => {
+  it("derives complete immutable items from knowledge.created envelope authority", () => {
+    const event = createdKnowledge(1, "KN-001");
+    const state = reduceKnowledgeProject(emptyKnowledgeProjectState(), event);
+    expect(state.items["KN-001"]).toEqual({
+      id: "KN-001",
+      project: PROJECT,
+      type: "decision",
+      title: "Decision KN-001",
+      summary: "KN-001 is the selected direction.",
+      rationale: "KN-001 has stronger evidence.",
+      alternatives: ["Option A", "Option B"],
+      sourceEvents: [SOURCE],
+      relatedTasks: ["TASK-001"],
+      author: { kind: "agent", id: "agent-memory" },
+      at: AT,
+      createdEvent: event.id,
+      createdSeq: 1,
+    });
+    expect(Object.isFrozen(state.items["KN-001"])).toBe(true);
+    expect(Object.isFrozen(state.items["KN-001"]?.author)).toBe(true);
+  });
+
+  it("builds A → B → C with reciprocal links while preserving old content", () => {
+    const a = createdKnowledge(1, "KN-001", { title: "Use SQLite" });
+    const b = createdKnowledge(2, "KN-002", { title: "Use PostgreSQL" });
+    const ab = supersededKnowledge(3, "KN-001", "KN-002");
+    const c = createdKnowledge(4, "KN-003", { title: "Use distributed SQL" });
+    const bc = supersededKnowledge(5, "KN-002", "KN-003");
+    const state = foldKnowledge([a, b, ab, c, bc]);
+    expect(state.items["KN-001"]).toMatchObject({
+      title: "Use SQLite",
+      supersededBy: "KN-002",
+    });
+    expect(state.items["KN-002"]).toMatchObject({
+      title: "Use PostgreSQL",
+      supersedes: "KN-001",
+      supersededBy: "KN-003",
+    });
+    expect(state.items["KN-003"]).toMatchObject({
+      title: "Use distributed SQL",
+      supersedes: "KN-002",
+    });
+    expect(state.items["KN-001"]?.summary).toBe("KN-001 is the selected direction.");
+  });
+
+  it("ignores unrelated and graph-link events", () => {
+    const state = foldKnowledge([createdKnowledge(1, "KN-001")]);
+    const linked = historyEvent(2, "knowledge.linked", {
+      from: "KN-001" as never,
+      to: "TASK-001" as never,
+      relation: "informs",
+    });
+    expect(reduceKnowledgeProject(state, linked)).toBe(state);
+    expect(reduceKnowledgeProject(state, eventFor("task.progress.updated"))).toBe(state);
+  });
+
+  it("rejects noncanonical/duplicate subjects, missing endpoints and wrong subject", () => {
+    const invalid = parseStoredEvent({
+      ...createdKnowledge(1, "KN-001"),
+      subject: { kind: "knowledge", id: "memory-one" },
+    });
+    expect(() =>
+      reduceKnowledgeProject(emptyKnowledgeProjectState(), invalid),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_IDENTITY" }));
+    const a = createdKnowledge(1, "KN-001");
+    const state = foldKnowledge([a]);
+    expect(() =>
+      reduceKnowledgeProject(state, createdKnowledge(2, "KN-001")),
+    ).toThrowError(expect.objectContaining({ code: "DUPLICATE_KNOWLEDGE" }));
+    expect(() =>
+      reduceKnowledgeProject(state, supersededKnowledge(2, "KN-001", "KN-999")),
+    ).toThrowError(expect.objectContaining({ code: "MISSING_KNOWLEDGE" }));
+    const b = createdKnowledge(2, "KN-002");
+    const both = foldKnowledge([a, b]);
+    expect(() =>
+      reduceKnowledgeProject(both, supersededKnowledge(3, "KN-001", "KN-002", "KN-002")),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_IDENTITY" }));
+  });
+
+  it("rejects non-decisions, reverse time, forks and merges", () => {
+    const note = createdKnowledge(1, "KN-001", { type: "technical-note" });
+    const decision = createdKnowledge(2, "KN-002");
+    expect(() =>
+      reduceKnowledgeProject(
+        foldKnowledge([note, decision]),
+        supersededKnowledge(3, "KN-001", "KN-002"),
+      ),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_TYPE" }));
+
+    const later = createdKnowledge(1, "KN-002");
+    const earlier = createdKnowledge(2, "KN-001");
+    const reversedState: KnowledgeProjectState = {
+      items: {
+        "KN-001": { ...foldKnowledge([earlier]).items["KN-001"], createdSeq: 1 },
+        "KN-002": { ...foldKnowledge([later]).items["KN-002"], createdSeq: 2 },
+      } as never,
+    };
+    expect(() =>
+      assertKnowledgeSupersession(reversedState, "KN-002" as never, "KN-001" as never),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_ORDER" }));
+
+    const a = createdKnowledge(1, "KN-001");
+    const b = createdKnowledge(2, "KN-002");
+    const c = createdKnowledge(4, "KN-003");
+    const afterAB = foldKnowledge([a, b, supersededKnowledge(3, "KN-001", "KN-002"), c]);
+    expect(() =>
+      reduceKnowledgeProject(afterAB, supersededKnowledge(5, "KN-001", "KN-003")),
+    ).toThrowError(expect.objectContaining({ code: "BRANCH" }));
+    const d = createdKnowledge(1, "KN-010");
+    const chainA = createdKnowledge(2, "KN-001");
+    const chainB = createdKnowledge(3, "KN-002");
+    const attachedB = foldKnowledge([
+      d,
+      chainA,
+      chainB,
+      supersededKnowledge(4, "KN-001", "KN-002"),
+    ]);
+    expect(() =>
+      reduceKnowledgeProject(attachedB, supersededKnowledge(5, "KN-010", "KN-002")),
+    ).toThrowError(expect.objectContaining({ code: "BRANCH" }));
+  });
+
+  it("strictly parses valid snapshots and rejects malformed or one-sided chains", () => {
+    const state = foldKnowledge([
+      createdKnowledge(1, "KN-001"),
+      createdKnowledge(2, "KN-002"),
+      supersededKnowledge(3, "KN-001", "KN-002"),
+    ]);
+    const parsed = parseKnowledgeProjectState(
+      JSON.parse(JSON.stringify(state)),
+      PROJECT as never,
+    );
+    expect(parsed).toEqual(state);
+    expect(Object.isFrozen(parsed)).toBe(true);
+    expect(Object.isFrozen(parsed.items)).toBe(true);
+
+    expect(() =>
+      parseKnowledgeProjectState({ ...state, injected: true }, PROJECT as never),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_STATE" }));
+    expect(() =>
+      parseKnowledgeProjectState(
+        { items: { "KN-999": state.items["KN-001"] } },
+        PROJECT as never,
+      ),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_STATE" }));
+    expect(() =>
+      parseKnowledgeProjectState(
+        {
+          items: {
+            ...state.items,
+            "KN-001": { ...state.items["KN-001"], supersededBy: undefined },
+          },
+        },
+        PROJECT as never,
+      ),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_STATE" }));
+    expect(() =>
+      parseKnowledgeProjectState(
+        {
+          items: {
+            ...state.items,
+            "KN-002": { ...state.items["KN-002"], supersedes: "KN-999" },
+          },
+        },
+        PROJECT as never,
+      ),
+    ).toThrowError(expect.objectContaining({ code: "INVALID_STATE" }));
+  });
+
+  it("full replay equals the incremental projection", () => {
+    const events = [
+      createdKnowledge(1, "KN-001"),
+      createdKnowledge(2, "KN-002"),
+      supersededKnowledge(3, "KN-001", "KN-002"),
+      createdKnowledge(4, "KN-003"),
+      supersededKnowledge(5, "KN-002", "KN-003"),
+    ];
+    const incremental = foldKnowledge(events);
+    const replayed = events.reduce(reduceKnowledgeProject, emptyKnowledgeProjectState());
+    expect(replayed).toEqual(incremental);
+  });
+
+  it("exports stable projection errors", () => {
+    const error = new KnowledgeProjectionError("BRANCH", "branch", "KN-001");
+    expect(error).toMatchObject({
+      name: "KnowledgeProjectionError",
+      code: "BRANCH",
+      knowledgeId: "KN-001",
+    });
+  });
+});
+
+describe("RM-2.3 · strict supersession admission", () => {
+  function supersessionState() {
+    const old = createdKnowledge(1, "KN-001");
+    const next = createdKnowledge(2, "KN-002");
+    return { old, next, state: foldKnowledge([old, next]) };
+  }
+
+  function supersederHarness(state = supersessionState().state) {
+    const admitted: KnowledgeSupersessionCommand[] = [];
+    const port = {
+      current: vi.fn(() => state),
+      admit: vi.fn((command: KnowledgeSupersessionCommand) => {
+        admitted.push(command);
+      }),
+    };
+    return { superseder: createKnowledgeSuperseder({ port }), port, admitted };
+  }
+
+  const REQUEST = Object.freeze({
+    project: PROJECT as never,
+    old: "KN-001" as never,
+    new: "KN-002" as never,
+    causedBy: SOURCE as never,
+    operationToken: "supersede-001",
+  });
+
+  it("admits one frozen command with optimistic creation fences and no event authority", async () => {
+    const { old, next, state } = supersessionState();
+    const harness = supersederHarness(state);
+    const command = await harness.superseder.supersede(REQUEST);
+    expect(command).toEqual({
+      ...REQUEST,
+      oldCreatedEvent: old.id,
+      newCreatedEvent: next.id,
+    });
+    expect(Object.isFrozen(command)).toBe(true);
+    expect(command).not.toHaveProperty("actor");
+    expect(command).not.toHaveProperty("subject");
+    expect(command).not.toHaveProperty("seq");
+    expect(harness.port.current).toHaveBeenCalledWith(PROJECT);
+    expect(harness.port.admit).toHaveBeenCalledOnce();
+    expect(harness.admitted).toEqual([command]);
+  });
+
+  it.each([
+    ["same id", { new: "KN-001" }],
+    ["bad old id", { old: "memory-old" }],
+    ["bad cause", { causedBy: "evt_bad" }],
+    ["blank token", { operationToken: " " }],
+    ["unknown authority", { actor: "caller" }],
+  ])("rejects %s before reading state", async (_label, override) => {
+    const harness = supersederHarness();
+    await expect(
+      harness.superseder.supersede({ ...REQUEST, ...override } as never),
+    ).rejects.toMatchObject({ code: "INVALID_REQUEST" });
+    expect(harness.port.current).not.toHaveBeenCalled();
+    expect(harness.port.admit).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid projection state with zero admission", async () => {
+    const missing = supersederHarness(emptyKnowledgeProjectState());
+    await expect(missing.superseder.supersede(REQUEST)).rejects.toMatchObject({
+      code: "INVALID_STATE",
+    });
+    expect(missing.port.admit).not.toHaveBeenCalled();
+
+    const { state } = supersessionState();
+    const malformed = supersederHarness({
+      items: { ...state.items, "KN-001": { ...state.items["KN-001"], injected: true } },
+    } as never);
+    await expect(malformed.superseder.supersede(REQUEST)).rejects.toMatchObject({
+      code: "INVALID_STATE",
+    });
+    expect(malformed.port.admit).not.toHaveBeenCalled();
+  });
+
+  it("maps current and admission failures without claiming success", async () => {
+    const currentFailure = createKnowledgeSuperseder({
+      port: {
+        current: vi.fn(() => Promise.reject(new Error("projection unavailable"))),
+        admit: vi.fn(),
+      },
+    });
+    await expect(currentFailure.supersede(REQUEST)).rejects.toMatchObject({
+      code: "INVALID_STATE",
+    });
+
+    const { state } = supersessionState();
+    const admissionFailure = createKnowledgeSuperseder({
+      port: {
+        current: () => state,
+        admit: () => Promise.reject(new Error("fence conflict")),
+      },
+    });
+    await expect(admissionFailure.supersede(REQUEST)).rejects.toMatchObject({
+      code: "ADMISSION_FAILURE",
+    });
+  });
+
+  it("rejects invalid options and exposes stable service errors", () => {
+    expect(() => createKnowledgeSuperseder(null as never)).toThrowError(
+      expect.objectContaining({ code: "INVALID_OPTIONS" }),
+    );
+    expect(() => createKnowledgeSuperseder({ port: {} as never })).toThrowError(
+      expect.objectContaining({ code: "INVALID_OPTIONS" }),
+    );
+    expect(new KnowledgeSupersessionError("INVALID_STATE", "bad")).toMatchObject({
+      name: "KnowledgeSupersessionError",
+      code: "INVALID_STATE",
     });
   });
 });
