@@ -5,6 +5,7 @@ import {
   type ApprovalCenterViewModel,
   type ApprovalSurfaceClient,
 } from "./ApprovalCenter.js";
+import { CanvasView, type ProjectCanvasViewModel } from "./Canvas.js";
 import { Icon } from "./Icon.js";
 import {
   ProjectLibraryView,
@@ -44,6 +45,7 @@ export function App({
   postingClient,
   revivalStepClient,
   approvalClient,
+  canvas = null,
 }: Readonly<{
   pulse?: ProjectPulseViewModel | null;
   library?: ProjectLibraryViewModel | null;
@@ -54,6 +56,7 @@ export function App({
   postingClient?: HumanPostingClient;
   revivalStepClient?: RevivalStepClient;
   approvalClient?: ApprovalSurfaceClient;
+  canvas?: ProjectCanvasViewModel | null;
 }>) {
   const [locale, setLocale] = useState<Locale>("zh-CN");
   const [density, setDensity] = useState<Density>("comfortable");
@@ -198,6 +201,8 @@ export function App({
             {...(postingClient === undefined ? {} : { postingClient })}
             locale={locale}
           />
+        ) : route === "canvas" ? (
+          <CanvasView canvas={canvas} locale={locale} />
         ) : (
           <div className={styles.content}>
             <section className={styles.hero}>
