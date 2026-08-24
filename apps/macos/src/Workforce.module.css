@@ -1,0 +1,312 @@
+.surface {
+  padding: 26px 28px 40px;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.surfaceHeader {
+  display: flex;
+  justify-content: space-between;
+}
+.surfaceHeader span {
+  color: var(--accent);
+  font: 600 11px / 1.4 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+.surfaceHeader h2 {
+  font: 650 28px / 1.1 var(--font-sans);
+  margin: 6px 0;
+}
+.surfaceHeader p {
+  color: var(--text-muted);
+  margin: 0;
+}
+.filters,
+.modeSwitch {
+  display: flex;
+  gap: 6px;
+  overflow: auto;
+  padding-bottom: 3px;
+}
+.filters button,
+.modeSwitch button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 7px 11px;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+.filters button[aria-current="page"],
+.modeSwitch button[aria-current="page"] {
+  background: var(--text);
+  color: var(--surface);
+  border-color: transparent;
+}
+.filters b {
+  margin-left: 5px;
+}
+.taskList,
+.agentList {
+  display: grid;
+  gap: 10px;
+}
+.taskCard,
+.agentCard,
+.coverage,
+.metrics article,
+.pending {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+.taskCard {
+  padding: 17px 18px;
+  border-left: 3px solid var(--border);
+}
+.taskCard[data-status="blocked"] {
+  border-left-color: var(--risk);
+}
+.taskCard[data-status="review"] {
+  border-left-color: var(--warn);
+}
+.taskCard[data-status="running"] {
+  border-left-color: var(--accent);
+}
+.taskTop,
+.taskCard footer,
+.agentCard header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.status,
+.availability {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text-muted);
+}
+.taskCard h3 {
+  margin: 11px 0 4px;
+  font-size: 16px;
+}
+.taskCard p {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.progressLine {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.progressLine > div {
+  height: 6px;
+  background: var(--surface-subtle);
+  border-radius: 4px;
+  flex: 1;
+  overflow: hidden;
+}
+.progressLine > div span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+.reviewNotice,
+.blocker {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.reviewNotice {
+  background: color-mix(in srgb, var(--warn) 13%, transparent);
+  color: var(--warn);
+}
+.blocker {
+  background: color-mix(in srgb, var(--risk) 10%, transparent);
+  color: var(--risk);
+}
+.taskCard footer {
+  border-top: 1px solid var(--border);
+  margin-top: 13px;
+  padding-top: 11px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.metrics article {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.metrics strong {
+  font: 650 25px / 1 var(--font-sans);
+}
+.metrics span {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+.agentLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 12px;
+  align-items: start;
+}
+.agentCard {
+  padding: 16px;
+}
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+}
+.agentCard header > div {
+  margin-right: auto;
+}
+.agentCard h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.agentCard small {
+  color: var(--text-muted);
+}
+.availability[data-state="available"] {
+  color: var(--ok);
+}
+.availability[data-state="offline"],
+.availability[data-state="unavailable"] {
+  color: var(--risk);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 13px 0;
+}
+.chips span {
+  font-size: 10px;
+  border: 1px solid var(--border);
+  padding: 3px 6px;
+  border-radius: 5px;
+}
+.agentCard dl {
+  display: flex;
+  gap: 24px;
+  margin: 12px 0;
+}
+.agentCard dl div {
+  display: flex;
+  gap: 6px;
+}
+.agentCard dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.agentCard dd {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.placements {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+.placements > div {
+  display: grid;
+  grid-template-columns: 8px minmax(80px, 1fr) auto;
+  align-items: center;
+  font-size: 11px;
+}
+.online,
+.offline {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.online {
+  background: var(--ok);
+}
+.offline {
+  background: var(--risk);
+}
+.coverage {
+  padding: 16px;
+  position: sticky;
+  top: 16px;
+}
+.coverage h3 {
+  margin: 0;
+}
+.coverage > p {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.coverage > div {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 3px 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+.coverage > div small {
+  grid-column: 2;
+  color: var(--text-muted);
+}
+.covered {
+  color: var(--ok);
+}
+.gap {
+  color: var(--risk);
+}
+.pending {
+  padding: 28px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.pending > span {
+  font-size: 28px;
+  color: var(--accent);
+}
+.pending h3 {
+  margin: 0 0 5px;
+}
+.pending p,
+.empty {
+  margin: 0;
+  color: var(--text-muted);
+}
+@media (max-width: 900px) {
+  .agentLayout {
+    grid-template-columns: 1fr;
+  }
+  .coverage {
+    position: static;
+  }
+  .metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

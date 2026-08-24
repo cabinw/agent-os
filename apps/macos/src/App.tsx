@@ -8,6 +8,7 @@ import {
 import { Icon } from "./Icon.js";
 import { ProjectLibraryView, type ProjectLibraryViewModel } from "./ProjectLibrary.js";
 import { ProjectPulseView, type ProjectPulseViewModel } from "./Pulse.js";
+import { AgentsView, type ProjectWorkforceViewModel, TasksView } from "./Workforce.js";
 import { type Locale, t } from "./i18n.js";
 import {
   listenForMenuBarIntents,
@@ -28,11 +29,13 @@ export function App({
   pulse = null,
   library = null,
   approvals = null,
+  workforce = null,
   approvalClient,
 }: Readonly<{
   pulse?: ProjectPulseViewModel | null;
   library?: ProjectLibraryViewModel | null;
   approvals?: ApprovalCenterViewModel | null;
+  workforce?: ProjectWorkforceViewModel | null;
   approvalClient?: ApprovalSurfaceClient;
 }>) {
   const [locale, setLocale] = useState<Locale>("zh-CN");
@@ -158,6 +161,10 @@ export function App({
           <ProjectPulseView pulse={pulse} locale={locale} />
         ) : route === "project-library" ? (
           <ProjectLibraryView library={library} locale={locale} />
+        ) : route === "tasks" ? (
+          <TasksView workforce={workforce} locale={locale} />
+        ) : route === "agents" ? (
+          <AgentsView workforce={workforce} locale={locale} />
         ) : (
           <div className={styles.content}>
             <section className={styles.hero}>
