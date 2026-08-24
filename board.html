@@ -133,13 +133,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
       <section class="overall-progress" id="overview" aria-labelledby="overall-title">
         <div class="overall-meters">
-          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:54.98%">
-            <div class="overall-number"><strong id="overall-percent">54.98%</strong><small>总体实际完成度</small></div>
+          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:55.02%">
+            <div class="overall-number"><strong id="overall-percent">55.02%</strong><small>总体实际完成度</small></div>
           </div>
-          <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 29%">
-            <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">29%</strong></div>
-            <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:29%"></span></div>
-            <small id="current-live-detail">RM-1.5a · 7/8 已验证 · 逻辑提交与交付中</small>
+          <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 0%">
+            <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">0%</strong></div>
+            <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:0%"></span></div>
+            <small id="current-live-detail">RM-1.5b · 0/7 已验证 · canonical 审计待开始</small>
           </div>
         </div>
         <div class="overall-copy">
@@ -159,9 +159,9 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
           <p class="lede">这里不把“跑通的实验原型”误写成“正式产品已完成”。进度按验证原型、当前执行路线和 canonical Roadmap 分轨计算；所有任务状态来自 ADR-002，问题保留开放与已解决历史。</p>
         </div>
         <aside class="hero-status" aria-label="当前安排">
-          <div class="status-head"><b>当前安排</b><span class="status-chip running">执行中 · SVR-03</span></div>
-          <p>RM-1.1a Event Core 严格事件契约已完成并通过 323/323 全仓验证；当前继续独立验收服务器工程师的 Hub runtime、受信部署工具、事务安装和候选隔离。</p>
-          <div class="next-chain"><span>RM-1.1a ✓</span><i>·</i><span>SVR-02</span><i>→</i><span>SVR-03</span><i>→</i><span>SVR-04</span><i>→</i><span>SVR-05/06</span></div>
+          <div class="status-head"><b>当前安排</b><span class="status-chip running">执行中 · RM-1.5b</span></div>
+          <p>RM-1.5a Supervisor 已按设计、实现、测试和交付分阶段计分并完成；当前进入会话 reducer，先审计 canonical 线程事件与 Task 生命周期，再实现可重放投影。</p>
+          <div class="next-chain"><span>RM-1.5a ✓</span><i>→</i><span>RM-1.5b</span><i>→</i><span>RM-1.5c</span><i>·</i><span>服务器路线并行验收</span></div>
         </aside>
       </header>
 
@@ -173,7 +173,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
       </section>
 
       <section id="current" aria-labelledby="current-title">
-        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">SVR-03 正在执行；SVR-02 的 HTTPS 现场项等待 FQDN/证书，右侧继续展示完整依赖路线。</p></div>
+        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">RM-1.5b 已接棒；每个审计、契约、实现和验证里程碑完成后即时更新，服务器路线继续在右侧保留。</p></div>
         <div class="current-layout">
           <article class="current-card" id="current-task"></article>
           <div class="todo-panel" id="route-list" aria-label="推荐任务顺序"></div>
@@ -240,10 +240,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 158,
-  "updatedAt": "2026-08-24 17:37 CST",
+  "revision": 159,
+  "updatedAt": "2026-08-24 17:45 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "RM-1.5a",
+  "currentTaskId": "RM-1.5b",
   "verification": {"testsPassed":566,"testsTotal":566,"filesPassed":25,"filesTotal":25,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-24 17:37 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":29,"eventSchemaTotal":29,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
@@ -286,8 +286,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"RM-1.3b","scope":"roadmap","phase":"Phase 1","title":"授权边界：Agent 不能写事件、设状态或审批","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":["RM-1.3a"],"acceptance":"Agent 不能写事件、设置任务状态、审批或冒充身份。","source":"todo.html#p1","summary":"ADR-014固定矩阵、只读AuthorizationPort与fail-closed错误完成：register self-only，其余11工具须同placement注册，assign限owner，update/blocked/result限executor；专项69/69及全仓521/521通过。bc94c46文档、6132b68实现、29dc430测试与97aee11看板已推送原GitHub仓库。","progressBasis":[{"label":"Canonical / Spike / attack surface审计","earned":15,"total":15},{"label":"授权矩阵与policy契约","earned":15,"total":15},{"label":"逐工具authorization实现","earned":30,"total":30},{"label":"结构性不存在边界","earned":20,"total":20},{"label":"负向与冒充测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Canonical / Spike / RuntimePort攻击面对照","status":"done"},{"label":"逐工具授权矩阵与错误契约","status":"done"},{"label":"registration与caller identity policy","status":"done"},{"label":"task ownership/executor policy","status":"done"},{"label":"event/status/approval结构性不存在","status":"done"},{"label":"负向专项与全仓验证","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
     {"id":"RM-1.3c","scope":"roadmap","phase":"Phase 1","title":"审批闸门接口（CLI 占位）","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":["RM-1.3b"],"acceptance":"审批可阻塞调用；超时只 expired，绝不自动放行。","source":"todo.html#p1","summary":"Approval projection与blocking Gate已实现；16项审批专项及54项MCP回归通过。完整仓库门禁23文件537/537全绿；2f40b4f文档、c666e1a实现、0b8df67测试和5bd80d3看板已推送原GitHub仓库。","progressBasis":[{"label":"Canonical / product / event审计","earned":15,"total":15},{"label":"Approval Gate ADR/API契约","earned":15,"total":15},{"label":"pending/wait/resolve实现","earned":30,"total":30},{"label":"timeout expired与绝不放行","earned":20,"total":20},{"label":"专项与并发测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Canonical / product / event对照","status":"done"},{"label":"Approval Gate ADR/API","status":"done"},{"label":"request pending与阻塞caller","status":"done"},{"label":"human grant/reject resolve","status":"done"},{"label":"timeout仅expired","status":"done"},{"label":"专项并发与负向测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
     {"id":"RM-1.4a","scope":"roadmap","phase":"Phase 1","title":"Agent SDK + 第一个适配器","status":"completed","progress":100,"priority":"P1","owner":"Codex","dependsOn":["RM-1.3a"],"acceptance":"两个不同厂商执行同类任务，核心代码零改动。","source":"todo.html#p1","summary":"双JSONL厂商、MCP AgentClient与负向专项通过，完整门禁24文件549/549全绿；cb86a20文档、1e2d013实现、54abcaa测试和28460a0看板已推送原GitHub仓库。","progressBasis":[{"label":"Canonical / Spike / Runner审计","earned":15,"total":15},{"label":"SDK与adapter ADR/API契约","earned":15,"total":15},{"label":"厂商中立SDK核心实现","earned":25,"total":25},{"label":"首个正式adapter实现","earned":25,"total":25},{"label":"多厂商契约与负向测试","earned":15,"total":15},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Canonical / Spike / Runner对照","status":"done"},{"label":"SDK与adapter ADR/API","status":"done"},{"label":"厂商中立SDK核心","status":"done"},{"label":"首个正式adapter","status":"done"},{"label":"多厂商同类任务契约测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
-    {"id":"RM-1.5a","scope":"roadmap","phase":"Phase 1","title":"Supervisor：目标拆解成任务图","status":"running","progress":98,"priority":"P1","owner":"Codex","dependsOn":["RM-1.2c"],"acceptance":"Supervisor 输出合法任务图，选方案时记录决策。","source":"todo.html#p1","summary":"Supervisor专项通过；完整仓库门禁25文件566/566，build、全类型契约、Biome、7包/4条分层规则及native filtered-deploy全部绿色。首次全门禁发现并修正supervisor tsconfig格式后从头复跑通过；只余逻辑提交与原仓库推送。","progressBasis":[{"label":"Canonical / Task / MCP审计","earned":15,"total":15},{"label":"Supervisor ADR/API契约","earned":15,"total":15},{"label":"Structured task graph schema","earned":20,"total":20},{"label":"目标拆解与图admission实现","earned":25,"total":25},{"label":"方案决策记忆实现","earned":10,"total":10},{"label":"专项与负向测试","earned":10,"total":10},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":0,"total":2}],"checkpoints":[{"label":"Canonical / Task / MCP对照","status":"done"},{"label":"Supervisor ADR/API","status":"done"},{"label":"Structured task graph schema","status":"done"},{"label":"目标拆解与图admission","status":"done"},{"label":"方案决策写入memory","status":"done"},{"label":"专项与负向测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"running"}]},
-    {"id":"RM-1.5b","scope":"roadmap","phase":"Phase 1","title":"会话 reducer：按任务分组并织入生命周期","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.1c","RM-1.2a"],"acceptance":"会话重放结果与增量投影一致。","source":"todo.html#p1","summary":"把线程变成可重放的任务投影。"},
+    {"id":"RM-1.5a","scope":"roadmap","phase":"Phase 1","title":"Supervisor：目标拆解成任务图","status":"completed","progress":100,"priority":"P1","owner":"Codex","dependsOn":["RM-1.2c"],"acceptance":"Supervisor 输出合法任务图，选方案时记录决策。","source":"todo.html#p1","summary":"ADR-017、strict local-key plan、系统TaskId映射、Task Engine整图先验和decision+tasks原子admission完成；完整仓库门禁25文件566/566全绿。2273def文档、8f1d46b实现、1fcb1b5测试与a6e4ab4看板已推送原GitHub仓库。","progressBasis":[{"label":"Canonical / Task / MCP审计","earned":15,"total":15},{"label":"Supervisor ADR/API契约","earned":15,"total":15},{"label":"Structured task graph schema","earned":20,"total":20},{"label":"目标拆解与图admission实现","earned":25,"total":25},{"label":"方案决策记忆实现","earned":10,"total":10},{"label":"专项与负向测试","earned":10,"total":10},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":2,"total":2}],"checkpoints":[{"label":"Canonical / Task / MCP对照","status":"done"},{"label":"Supervisor ADR/API","status":"done"},{"label":"Structured task graph schema","status":"done"},{"label":"目标拆解与图admission","status":"done"},{"label":"方案决策写入memory","status":"done"},{"label":"专项与负向测试","status":"done"},{"label":"全仓验证门禁","status":"done"},{"label":"逻辑提交与远端交付","status":"done"}]},
+    {"id":"RM-1.5b","scope":"roadmap","phase":"Phase 1","title":"会话 reducer：按任务分组并织入生命周期","status":"running","progress":0,"priority":"P1","owner":"Codex","dependsOn":["RM-1.1c","RM-1.2a"],"acceptance":"会话重放结果与增量投影一致。","source":"todo.html#p1","summary":"已接棒，正在审计 canonical 线程事件、Task 生命周期与现有 reducer；尚无完成证据，因此当前保持0%。","progressBasis":[{"label":"Canonical / event / thread审计","earned":0,"total":15},{"label":"Conversation reducer ADR/API","earned":0,"total":15},{"label":"会话投影模型实现","earned":0,"total":25},{"label":"Task生命周期织入与增量折叠","earned":0,"total":25},{"label":"重放/增量/负向测试","earned":0,"total":15},{"label":"全仓集成验证","earned":0,"total":3},{"label":"逻辑提交与交付","earned":0,"total":2}],"checkpoints":[{"label":"Canonical event与现有projection对照","status":"running"},{"label":"Conversation reducer ADR/API","status":"pending"},{"label":"按task/thread分组模型","status":"pending"},{"label":"Task生命周期织入","status":"pending"},{"label":"replay与incremental等价","status":"pending"},{"label":"负向与全仓门禁","status":"pending"},{"label":"逻辑提交与远端交付","status":"pending"}]},
     {"id":"RM-1.5c","scope":"roadmap","phase":"Phase 1","title":"端到端 Demo 脚本","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.5a","RM-1.4a"],"acceptance":"完整循环以事件日志断言，不以截图验收。","source":"todo.html#p1","summary":"Phase 1 的正式验收。"},
 
     {"id":"RM-2.1","scope":"roadmap","phase":"Phase 2","title":"知识项模型与抽取触发规则","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.5c"],"acceptance":"六类知识和噪声筛选规则可测试。","source":"todo.html#p2","summary":"从事件中提取有价值的持久知识。"},
@@ -392,6 +392,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 17:45","kind":"completed","entity":"RM-1.5a","title":"Supervisor原仓库交付完成，任务达到100%","detail":"2273def文档、8f1d46b实现、1fcb1b5测试与a6e4ab4看板已推送origin/codex/project-control；交付只补最后2分，总体从54.98%升至55.02%，当前任务切换RM-1.5b。"},
     {"at":"2026-08-24 17:37","kind":"progress","entity":"RM-1.5a","title":"完整仓库566/566通过，进度即时升至98%","detail":"25个测试文件以及build、类型契约、Biome、7包分层和native filtered-deploy全部绿色；首次格式失败修正后全门禁从头复跑通过。总体从54.94%升至54.98%，交付仅占最后2分。"},
     {"at":"2026-08-24 17:27","kind":"progress","entity":"RM-1.5a","title":"Supervisor与Task Graph专项27/27，进度即时升至95%","detail":"strict schema、authority拒绝、local refs、cycle/id冲突、stable topo、decision source和三类fail-closed通过；深冻结负例同步修复。build/type/layers绿色，总体从54.78%升至54.94%。"},
     {"at":"2026-08-24 17:18","kind":"progress","entity":"RM-1.5a","title":"Supervisor schema、图admission与决策原子命令完成，进度即时升至85%","detail":"正式supervisor包、strict JSON Schema、一次模型调用、local key映射、稳定拓扑、完整图先验、trusted source和decision+tasks原子command落地；包构建与7包分层绿色。总体从53.90%升至54.78%，测试尚未计分。"},
