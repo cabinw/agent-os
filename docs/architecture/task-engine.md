@@ -80,6 +80,11 @@ find_agent(capabilities) ──▶ `(agent, host)` candidates ranked by
 If no candidate exists the task stays `created` and the Supervisor is notified —
 it never silently sits unassigned.
 
+The human Tasks/Agents surface follows
+[ADR-030](../decisions/ADR-030-sourced-tasks-and-agents-views.md). It preserves
+the exact routing diagnosis (`no-capability`, `unreachable`, `unavailable` or
+`saturated`) and keeps dependency waiting distinct from runtime assignment.
+
 The durable Agent Catalog and live routing inputs are separate:
 
 ```
@@ -122,6 +127,9 @@ any dependency is not `completed`. See
 Progress is agent-reported and advisory. It drives UI only — never state
 transitions. A task at 100% progress is still `running` until `report_result`
 arrives, because the agent, not the percentage, declares completion.
+
+The Tasks view renders lifecycle and progress as separate fields. In
+particular, 100% in `review` is waiting for human review, not complete.
 
 ## Approval coupling
 

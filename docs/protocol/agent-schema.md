@@ -157,3 +157,9 @@ must join catalog facts with its authenticated Runner snapshot before routing;
 otherwise a pre-restart registration could look reachable. Same-host reconnect
 updates that live snapshot and emits no duplicate registration event. See
 [ADR-012](../decisions/ADR-012-event-catalog-live-routing.md).
+
+The Agents roster uses the same join. Its current live DTO can support
+connected/accepting state and active dispatch count, but not heartbeat age or a
+throughput rate. Those values remain absent until the authenticated snapshot
+gains timestamps and an observation interval; see
+[ADR-030](../decisions/ADR-030-sourced-tasks-and-agents-views.md).
