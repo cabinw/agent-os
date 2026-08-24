@@ -77,8 +77,8 @@ Mechanically checked by `pnpm check:layers`.
 
 | Package | Exports | Owns |
 | --- | --- | --- |
-| `event-core` | v1 event schemas and types; then `subscribe`, `replay`, `registerReducer` in RM-1.1c | Permanent record contract and projection semantics |
-| `event-store-sqlite` | `openSqliteEventStore`, transactional `append`, online `backup` | Hub-only durable log, ordering and idempotency |
+| `event-core` | v1 event schemas and types; `createEventBus`, `append`, `subscribe`, `replay`, `registerReducer` | Permanent record contract and deterministic projection semantics |
+| `event-store-sqlite` | `openSqliteEventStore`, transactional `append`, ordered `read`, online `backup` | Hub-only durable log, ordering and idempotency |
 | `task-engine` | `createTask`, `assignTask`, `transition`, `taskState` | Legal transitions, dependencies |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
 | `agent-sdk` | strict `dispatch`, normalized result / event / error shapes, `cancel`, adapter `send` | Shared Local / Remote Runner and adapter contract |

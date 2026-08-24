@@ -123,7 +123,7 @@ The v1 database is identified by a fixed SQLite `application_id` and
 
 ```sql
 event_store_meta(format_version, created_at)
-project_sequences(project PRIMARY KEY, next_seq)
+project_sequences(project PRIMARY KEY, last_seq)
 events(
   project, seq,
   id UNIQUE,
@@ -170,6 +170,45 @@ replacement remains the deployment layer's responsibility.
 
 A reducer is a pure function `(state, event) → state`. Registering one is how a
 feature gets a view without adding a table anyone writes to.
+
+RM-1.1c composes any conforming store through the dependency-free Event Core
+surface:
+
+```ts
+createEventBus({ store, onSubscriberError? }) → EventBus
+bus.append(input, { token })                  → StoredEvent
+bus.subscribe(handler, { project? })          → unsubscribe
+bus.replay(project)                           → ReplayEvidence
+bus.registerReducer(name, initialState, fn)   → ReducerHandle<State>
+handle.get(project)                           → DeepReadonly<State>
+
+store.read(project, { afterSeq? })             → readonly StoredEvent[]
+```
+
+`initialState` is a factory, so projects never share a mutable initial object.
+Reducer names are unique for the lifetime of a bus. Registration after a
+project has been observed synchronously replays that project's complete log for
+the new reducer; a failed registration publishes neither the reducer nor a
+partial state.
+
+The bus initializes a project by replaying its stored log before accepting a
+new append. After the store durably appends, the bus reads every sequence after
+its last projected sequence and reduces them in order. This tail catch-up makes
+an append safe when another connection committed first. An idempotent retry
+whose sequence is already projected is returned without a second reduction or
+notification.
+
+For each event, every reducer computes a candidate state before any candidate
+is published. A thrown or asynchronous reducer faults that event visibly and
+leaves all projections at the preceding sequence. `replay(project)` rebuilds
+all registered projections from fresh initial states and never calls live
+subscribers. Reducer inputs and published outputs are recursively frozen.
+
+Subscribers run only after durable append and successful reduction. One
+subscriber cannot fail an append, another subscriber, or a later event;
+`onSubscriberError` receives the failure. Reentrant appends are allowed, but
+their notifications queue behind all subscribers for the current sequence, so
+every subscriber observes project order. Unsubscribing is idempotent.
 
 ```
 taskReducer      → task status, progress, assignment, dependency readiness
