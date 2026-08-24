@@ -10,6 +10,7 @@ agent-os/
 ├── apps/
 │   ├── hub/            server composition root; dispatch only
 │   ├── runner/         Local / Remote Runner composition root
+│   ├── core-demo/      deterministic Phase 1 acceptance composition
 │   └── macos/          native client: Pulse, Canvas, Library, menu bar
 ├── packages/
 │   ├── event-core/     kernel

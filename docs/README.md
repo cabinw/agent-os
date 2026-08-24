@@ -83,6 +83,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-016](decisions/ADR-016-agent-sdk-boundaries.md) | AgentClient, Runner and Adapter are separate one-way contracts; no generic event append exists |
 | [ADR-017](decisions/ADR-017-supervisor-plan-admission.md) | Supervisor maps local plan keys to Task ids and atomically admits decisions with the graph |
 | [ADR-018](decisions/ADR-018-thread-projection-attribution.md) | Thread projection derives cross-event attribution and keeps progress runs lossless |
+| [ADR-019](decisions/ADR-019-phase-one-demo-composition.md) | Phase 1 acceptance is an offline formal-package composition with atomic event groups |
 
 ## Assets
 

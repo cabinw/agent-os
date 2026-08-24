@@ -49,7 +49,11 @@ milestones:
 
 Demo scenario: a supervisor creates a task, Agent OS routes it by capability, the
 executing agent reports progress and a result, and project status updates — all
-observable as events.
+observable as events. `apps/core-demo` uses deterministic scripted Planner and
+Runner fixtures around the formal packages, persists to SQLite, crosses MCP for
+agent participation, keeps human grant/accept outside MCP, and requires live and
+replayed projections to match. See
+[ADR-019](../decisions/ADR-019-phase-one-demo-composition.md).
 
 ## Phase 2 — Memory
 
