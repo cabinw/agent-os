@@ -39,6 +39,7 @@ const ALLOWED_DEPS = {
   "task-engine": ["event-core"],
   "memory-core": ["event-core"],
   "agent-sdk": ["event-core"],
+  supervisor: ["event-core", "task-engine"],
   "mcp-server": ["event-core", "task-engine", "memory-core", "agent-sdk"],
 };
 
@@ -53,6 +54,7 @@ const VENDOR_FREE_PACKAGES = [
   "event-store-sqlite",
   "task-engine",
   "memory-core",
+  "supervisor",
 ];
 
 const violations = [];
