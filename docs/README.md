@@ -96,6 +96,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-029](decisions/ADR-029-sourced-project-library-read-model.md) | Project Library derives cross-project rows from independently sourced histories |
 | [ADR-030](decisions/ADR-030-sourced-tasks-and-agents-views.md) | Tasks and Agents join durable projections with authenticated live placement facts |
 | [ADR-031](decisions/ADR-031-human-thread-posting-is-message-only.md) | Human thread posting is project-gated and structurally cannot decide approvals |
+| [ADR-032](decisions/ADR-032-revival-is-a-sourced-read-model.md) | Revival derives six sourced sections and emits only narrow step intents |
 
 ## Assets
 

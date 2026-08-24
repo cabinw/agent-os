@@ -50,6 +50,14 @@ estimates, front-loading the work that unblocks everything else:
 Each step has a ▶ control that turns it into real tasks and assigns them.
 The durable `project.revived` plan is an ordered, non-empty array of strict
 `{ title, estimateMinutes, detail }` steps; array order is execution order.
+The view sends only a narrow `createAndAssignStep` intent for a persisted plan
+position and connected executor. It does not expose generic task commands and
+does not optimistically change the report when creation or assignment fails.
+
+The six report sections are one sourced read model. Each task, issue, decision
+and plan step retains the event ids that support it. `project.revived` is
+derived output and therefore does not reset the dormancy clock that triggered
+the report.
 
 ## Staleness
 

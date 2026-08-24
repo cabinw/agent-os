@@ -223,9 +223,52 @@ describe("RM-3.5 sourced Project Library", () => {
       title: "Check environment",
       sourceEvents: [revival.id],
     });
+    expect(item?.revival).toMatchObject({
+      built: [],
+      current: { state: "paused", progress: 60, health: "blocked" },
+      decisions: [{ title: "Use SQLite" }],
+      unfinished: [{ task: "TASK-001", status: "blocked" }],
+      issues: [
+        {
+          task: "TASK-001",
+          kind: "blocked",
+          reason: "Owner decision required",
+          sourceEvents: [blocker.id],
+        },
+      ],
+      plan: [{ title: "Check environment", sourceEvents: [revival.id] }],
+    });
     expect(item?.knowledge[0]?.sourceEvents).toEqual([decision.id, blocker.id]);
     expect(item?.files[0]?.sourceEvents).toEqual([file.id]);
     expect(item?.timeline[0]?.type).toBe("project.state.changed");
+  });
+
+  it("does not let the derived revival event erase measured dormancy", () => {
+    const target = stream("proj_revival_now", "Dormant Project");
+    add(target, "project.state.changed", subject("project", target.project), {
+      from: "active",
+      to: "paused",
+    });
+    add(
+      target,
+      "project.revived",
+      subject("project", target.project),
+      {
+        dormantDays: 54,
+        plan: [
+          {
+            title: "Check environment",
+            estimateMinutes: 30,
+            detail: "Verify the existing toolchain.",
+          },
+        ],
+      },
+      NOW,
+    );
+    const item = library().projects[0];
+    expect(item?.dormantDays).toBe(54);
+    expect(item?.revival?.plan).toHaveLength(1);
+    expect(item?.lastActivity.type).toBe("project.revived");
   });
 
   it("ranks blocked work before review, running and created work", () => {

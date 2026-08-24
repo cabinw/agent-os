@@ -68,6 +68,34 @@ export type LibraryTimelineItem = DeepReadonly<
     at: string;
   }
 >;
+export type LibraryRevivalTask = DeepReadonly<
+  Sourced & {
+    task: string;
+    title: string;
+    status: string;
+    priority: "low" | "medium" | "high" | "critical";
+  }
+>;
+export type LibraryRevivalIssue = DeepReadonly<
+  Sourced & {
+    task: string;
+    title: string;
+    kind: "blocked" | "failed";
+    reason: string;
+  }
+>;
+export type LibraryRevivalReport = DeepReadonly<{
+  built: readonly LibraryRevivalTask[];
+  current: Sourced & {
+    state: ProjectState;
+    progress: number;
+    health: "healthy" | "attention" | "blocked";
+  };
+  decisions: readonly LibraryKnowledge[];
+  unfinished: readonly LibraryRevivalTask[];
+  issues: readonly LibraryRevivalIssue[];
+  plan: readonly LibraryNextStep[];
+}>;
 export type ProjectLibraryItem = DeepReadonly<{
   project: ProjectId;
   name: string;
@@ -91,6 +119,7 @@ export type ProjectLibraryItem = DeepReadonly<{
     type: StoredEvent["type"];
   };
   dormantDays: number;
+  revival: LibraryRevivalReport | null;
   snapshots: readonly LibrarySnapshot[];
   nextSteps: readonly LibraryNextStep[];
   timeline: readonly LibraryTimelineItem[];
@@ -338,7 +367,80 @@ function buildProject(
   }
 
   const last = history.at(-1) ?? created;
-  const inactivity = Math.max(0, now - Date.parse(last.at));
+  const lastDormancyActivity =
+    [...history].reverse().find((event) => event.type !== "project.revived") ?? created;
+  const inactivity = Math.max(0, now - Date.parse(lastDormancyActivity.at));
+  const dormantDays = Math.floor(inactivity / 86_400_000);
+  const nextSteps =
+    revivalEvent?.payload.plan.map((step) => ({
+      ...step,
+      sourceEvents: [revivalEvent.id],
+    })) ?? [];
+  const orderedKnowledge = knowledge.reverse();
+  const rankedTasks = [...taskStates].sort(
+    (left, right) =>
+      (WORK_STATUS_RANK[right.status as keyof typeof WORK_STATUS_RANK] ?? 0) -
+        (WORK_STATUS_RANK[left.status as keyof typeof WORK_STATUS_RANK] ?? 0) ||
+      PRIORITY_RANK[right.priority] - PRIORITY_RANK[left.priority] ||
+      left.createdAt.localeCompare(right.createdAt) ||
+      left.id.localeCompare(right.id),
+  );
+  const revivalIssues: LibraryRevivalIssue[] = rankedTasks.flatMap<LibraryRevivalIssue>(
+    (task) =>
+      task.blocker
+        ? [
+            {
+              task: task.id,
+              title: task.title,
+              kind: "blocked",
+              reason: task.blocker.reason,
+              sourceEvents: eventIds(latestTaskEvent.get(task.id)),
+            },
+          ]
+        : task.failure
+          ? [
+              {
+                task: task.id,
+                title: task.title,
+                kind: "failed",
+                reason: task.failure.reason,
+                sourceEvents: eventIds(latestTaskEvent.get(task.id)),
+              },
+            ]
+          : [],
+  );
+  const revival: LibraryRevivalReport | null =
+    state === "paused" && dormantDays >= 30
+      ? {
+          built: rankedTasks
+            .filter((task) => task.status === "completed")
+            .map((task) => ({
+              task: task.id,
+              title: task.title,
+              status: task.status,
+              priority: task.priority,
+              sourceEvents: eventIds(latestTaskEvent.get(task.id)),
+            })),
+          current: {
+            state,
+            progress,
+            health: health.status,
+            sourceEvents: [...new Set([stateEvent.id, ...health.sourceEvents])],
+          },
+          decisions: orderedKnowledge.filter((item) => item.type === "decision"),
+          unfinished: rankedTasks
+            .filter((task) => !TERMINAL_TASKS.has(task.status))
+            .map((task) => ({
+              task: task.id,
+              title: task.title,
+              status: task.status,
+              priority: task.priority,
+              sourceEvents: eventIds(latestTaskEvent.get(task.id)),
+            })),
+          issues: revivalIssues,
+          plan: nextSteps,
+        }
+      : null;
   return freeze({
     project,
     name: created.payload.name,
@@ -370,13 +472,10 @@ function buildProject(
       type: last.type,
       sourceEvents: [last.id],
     },
-    dormantDays: Math.floor(inactivity / 86_400_000),
+    dormantDays,
+    revival,
     snapshots: snapshots.reverse(),
-    nextSteps:
-      revivalEvent?.payload.plan.map((step) => ({
-        ...step,
-        sourceEvents: [revivalEvent.id],
-      })) ?? [],
+    nextSteps,
     timeline: history
       .slice(-50)
       .reverse()
@@ -388,7 +487,7 @@ function buildProject(
         at: event.at,
         sourceEvents: [event.id],
       })),
-    knowledge: knowledge.reverse(),
+    knowledge: orderedKnowledge,
     files: files.reverse(),
   });
 }
