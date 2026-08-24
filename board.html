@@ -133,13 +133,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
       <section class="overall-progress" id="overview" aria-labelledby="overall-title">
         <div class="overall-meters">
-          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:39.14%">
-            <div class="overall-number"><strong id="overall-percent">39.14%</strong><small>总体实际完成度</small></div>
+          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:40.70%">
+            <div class="overall-number"><strong id="overall-percent">40.70%</strong><small>总体实际完成度</small></div>
           </div>
           <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 60%">
             <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">60%</strong></div>
             <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:60%"></span></div>
-            <small id="current-live-detail">RM-1.1c · Canonical 文档与现有 reducer 审计启动</small>
+            <small id="current-live-detail">RM-1.1c · 7/8 已验证 · 逻辑提交与交付中</small>
           </div>
         </div>
         <div class="overall-copy">
@@ -240,8 +240,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 110,
-  "updatedAt": "2026-08-24 11:04 CST",
+  "revision": 113,
+  "updatedAt": "2026-08-24 11:22 CST",
   "updatedBy": "Codex",
   "currentTaskId": "RM-1.1c",
   "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-24 02:46 CST"},
@@ -277,7 +277,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
     {"id":"RM-1.1a","scope":"roadmap","phase":"Phase 1","title":"事件信封 + 29 个 strict schema + ULID","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"未知 version/type 或任何多余字段在 parse 时被拒绝。","source":"todo.html#p1","summary":"version-first parser、type↔subject、深冻结、精确 RFC3339、自引用防线与安全类型收窄已落实；323/323 全仓验证通过。"},
     {"id":"RM-1.1b","scope":"roadmap","phase":"Phase 1","title":"SQLite 事件存储：append-only + 幂等","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":["RM-1.1a"],"acceptance":"并发 append 无重复 seq；同一 token 重试只落一条。","source":"todo.html#p1","summary":"独立adapter、稳定错误/类型边界、精确DDL与在线备份实现完成；16/16专项测试及全仓339/339通过，build/type/Biome/layer/native filtered-deploy全部绿色。架构、实现、测试和看板4个逻辑提交已推送原GitHub仓库。","progressBasis":[{"label":"Canonical 契约与反方设计审计","earned":15,"total":15},{"label":"Native 依赖隔离实证","earned":5,"total":5},{"label":"API、DDL 与运维文档","earned":10,"total":10},{"label":"SQLite adapter 实现","earned":35,"total":35},{"label":"并发、耐久与备份测试","earned":25,"total":25},{"label":"全仓集成验证","earned":5,"total":5},{"label":"逻辑提交与交付","earned":5,"total":5}],"checkpoints":[{"label":"Canonical 文档与现有代码对照","status":"done"},{"label":"EventInput / project token 幂等边界","status":"done"},{"label":"Native filtered-deploy 隔离实验","status":"done"},{"label":"API / DDL / 初始化 / 备份契约","status":"done"},{"label":"独立包骨架 / exact pin / layer guard","status":"done"},{"label":"SQLite adapter 事务实现","status":"done"},{"label":"幂等与真实多连接并发测试","status":"done"},{"label":"WAL 在线备份与恢复测试","status":"done"},{"label":"pnpm verify 全仓门禁","status":"done"},{"label":"逻辑提交与交付","status":"done"}]},
-    {"id":"RM-1.1c","scope":"roadmap","phase":"Phase 1","title":"事件总线、重放与 reducer 注册","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1b"],"acceptance":"从首条事件重放与增量归约状态完全一致。","source":"todo.html#p1","summary":"把 ADR-005 变成机器守住的性质。"},
+    {"id":"RM-1.1c","scope":"roadmap","phase":"Phase 1","title":"事件总线、重放与 reducer 注册","status":"running","progress":98,"priority":"P0","owner":"Codex","dependsOn":["RM-1.1b"],"acceptance":"从首条事件重放与增量归约状态完全一致。","source":"todo.html#p1","summary":"Canonical/ADR/Spike审计与正式API冻结完成；SQLite ordered read、Reducer registry、全reducer候选原子发布、async拒绝、subscriber失败隔离、重入通知按seq排队、跨连接tail catch-up和幂等retry去重已实现。12项总线测试与全仓351/351通过，全部静态/架构/native门禁绿色；仅余逻辑提交与远端交付2分。","progressBasis":[{"label":"Canonical 与现有代码审计","earned":15,"total":15},{"label":"API、顺序与失败契约","earned":10,"total":10},{"label":"Store ordered read","earned":15,"total":15},{"label":"Event Bus / reducer 实现","earned":30,"total":30},{"label":"重放、故障与重入测试","earned":25,"total":25},{"label":"全仓集成验证","earned":3,"total":3},{"label":"逻辑提交与交付","earned":0,"total":2}],"checkpoints":[{"label":"Canonical / ADR / Spike 对照","status":"done"},{"label":"总线顺序、失败与重入契约","status":"done"},{"label":"SQLite ordered read API","status":"done"},{"label":"Reducer registry 与状态发布","status":"done"},{"label":"Subscriber 队列与错误隔离","status":"done"},{"label":"增量归约 === 全量重放测试","status":"done"},{"label":"全仓 verify","status":"done"},{"label":"逻辑提交与远端交付","status":"pending"}]},
     {"id":"RM-1.1d","scope":"roadmap","phase":"Phase 1","title":"快照与恢复","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.1c"],"acceptance":"删除全部快照后重启，状态不变。","source":"todo.html#p1","summary":"快照只是缓存，不能成为真相来源。"},
     {"id":"RM-1.2a","scope":"roadmap","phase":"Phase 1","title":"任务状态转移矩阵与穷举测试","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1c"],"acceptance":"8 状态 × 10 事件全覆盖；progress 不触发状态转移。","source":"todo.html#p1","summary":"实现 ADR-002 的完整生命周期。"},
     {"id":"RM-1.2b","scope":"roadmap","phase":"Phase 1","title":"依赖图、环检测与就绪重算","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.2a"],"acceptance":"未满足依赖不能离开 created；创建时拒绝环。","source":"todo.html#p1","summary":"让任务图的可执行性可证明。"},
@@ -341,6 +341,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"PROB-LAYERS","status":"resolved","severity":"medium","title":"分层守卫绕过已封住","detail":"守卫改用 TypeScript AST 识别 static/dynamic/require/import-type；空 catalog hard fail，同一行 import 文本不再隐藏未知事件。新增 3 项回归。","next":"正式 Event Core 增加 schema 时继续由 catalog-first 守卫保护。","affects":["GATE-01","RM-1.1a"],"source":"tests/layering.test.ts"},
     {"id":"PROB-SESSION","status":"resolved","severity":"medium","title":"本地 vendor session 已可持久恢复","detail":"Opaque session id 由 Runner 按 (user, project, agent) 原子落盘；仅同 host、adapter、canonical workspace 可恢复，不匹配即冷启动。","next":"Remote Runner 复用同一逻辑 session placement 与恢复规则。","affects":["SESSION-01"],"source":"tests/local-runner.test.ts"},
     {"id":"PROB-STORE","status":"resolved","severity":"critical","title":"正式 SQLite Event Store 已通过实现与对抗验收","detail":"独立event-store-sqlite包守住Runner native边界；EventInput fingerprint、(project,token)、UNIQUE(id)、foreign DB零污染、COMMIT后ACK、append-only guard、FULL WAL和在线备份均已实现。真实多进程、同token竞争、两种SIGKILL窗口、DDL篡改与全仓339项测试通过。","next":"保持exact native pin和filtered-deploy门禁；后续event bus/replay只通过公开adapter API消费，不放宽DDL或幂等契约。","affects":["SVR-03","RM-1.1b"],"source":"docs/architecture/event-core.md"},
+    {"id":"PROB-EVENT-BUS","status":"resolved","severity":"high","title":"正式 Event Bus 已隔离旧 Spike 的宽松重放语义","detail":"正式总线二次严格解析Store输出，拒绝unknown/错project/seq gap；候选状态原子发布、async reducer拒绝、notification queue、subscriber error sink、幂等去重与全量重放等价均由12项专项测试覆盖。","next":"保留Spike为历史执行验证，不把其unknown-event safe no-op迁入正式Event Core；新增事件继续catalog/schema/reducer/replay-test顺序。","affects":["RM-1.1c"],"source":"tests/event-bus.test.ts"},
     {"id":"PROB-DOC","status":"resolved","severity":"medium","title":"文档状态、计数与 Runner 拓扑已同步","detail":"README、HANDOFF、CLAUDE、canonical docs、doc/next/todo 页面已统一到 12 个 MCP 工具、无 hosted CI、Server Hub 与 Local-first Runner 路线；固定旧测试数已移除。","next":"功能改动继续在同一提交更新关联文档和看板，不再复制第二份规范。","affects":["ADR-008","GATE-01"],"source":"docs/development/roadmap.md"},
     {"id":"PROB-SUPPLY","status":"open","severity":"medium","title":"依赖审计仍有 1 critical / 3 high 等告警","detail":"Vitest、Vite、nanoid 与生产链 fast-uri 均有已知 advisory；当前配置未发现可利用数据流，但版本需要升级或 override。","next":"固定 packageManager / Node，并在独立任务中升级后复跑 verify 与 audit。","affects":["GATE-01"],"source":"pnpm-lock.yaml"},
     {"id":"PROB-RUNNER-IDEMP","status":"resolved","severity":"high","title":"Runner requestId 已具备跨重启 at-most-once 语义","detail":"0600 原子 request ledger 持久化 SHA-256 fingerprint、规范事件与终态，不保存 prompt；completed / failed 可重放，崩溃遗留 queued / running 明确恢复为 UNAVAILABLE。","next":"正式 Event Store 的写入幂等由 RM-1.1b 独立实现，不与 Runner request ledger 混用。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"apps/chat-spike/src/runners/request-store.mjs"},
@@ -381,6 +382,9 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 11:22","kind":"progress","entity":"RM-1.1c","title":"全仓351/351通过，进度即时升至98%","detail":"17个测试文件以及build/type/Biome/layer/native filtered-deploy全部绿色；12项正式总线专项关闭旧Spike语义风险。功能与验收98分全部计入，总体从40.49%升至40.70%，提交交付只占最后2分。"},
+    {"at":"2026-08-24 11:18","kind":"progress","entity":"RM-1.1c","title":"Event Bus实现与专项26/26，进度升至85%","detail":"ordered read、reducer原子发布、async拒绝、subscriber隔离、reentrant通知顺序、跨连接tail catch-up、幂等不重复通知及全量重放等价落地；build/type与10项总线+16项Store测试全绿。总体从39.46%升至40.49%。"},
+    {"at":"2026-08-24 11:11","kind":"progress","entity":"RM-1.1c","title":"总线设计审计与失败契约冻结，进度升至20%","detail":"完成Canonical/ADR/Spike对照，识别旧Spike unknown-event行为违反ADR-009；append后归约、全reducer原子发布、async拒绝、subscriber隔离、reentrant顺序和tail catch-up写入canonical docs。总体从39.14%升至39.46%。"},
     {"at":"2026-08-24 11:04","kind":"completed","entity":"RM-1.1b","title":"原仓库推送确认，RM-1.1b 达到100%","detail":"77a0502、99f42a3、26d6c23与看板373439f已推送origin/codex/project-control；最后2分只在远端确认后计入。总体从39.11%升至39.14%，当前任务切换RM-1.1c文档/代码审计。"},
     {"at":"2026-08-24 11:02","kind":"progress","entity":"RM-1.1b","title":"3个逻辑提交完成，进度升至98%","detail":"77a0502冻结架构契约、99f42a3实现SQLite adapter、26d6c23记录并发/崩溃/备份测试；提交仅计3分，总体从39.06%升至39.11%，远端尚未确认所以不计最后2分。"},
     {"at":"2026-08-24 10:59","kind":"progress","entity":"RM-1.1b","title":"全仓339/339通过，进度即时升至95%","detail":"构建、类型、Biome、4条分层规则、native filtered-deploy和16个测试文件全部绿色；PROB-STORE由NO-GO关闭。功能/测试95分已全部计入，总体从39.00%升至39.06%，提交仍只占最后5分。"},
