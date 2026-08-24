@@ -87,6 +87,10 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-020](decisions/ADR-020-knowledge-candidate-classification.md) | Memory extraction opens only from exhaustive structural anchors; strict drafts reuse Event Core |
 | [ADR-021](decisions/ADR-021-causal-knowledge-windows.md) | Memory derives complete causal/task/artifact windows and keeps source authority outside the model |
 | [ADR-022](decisions/ADR-022-linear-knowledge-supersession.md) | Decision replacement derives reciprocal links in immutable, non-branching chains |
+| [ADR-023](decisions/ADR-023-relevance-bounded-task-context.md) | Task context includes only causally relevant active knowledge and accepted upstream outputs |
+| [ADR-024](decisions/ADR-024-memory-query-and-causal-graph.md) | Semantic memory relations and causedBy graph edges are separate query surfaces |
+| [ADR-025](decisions/ADR-025-macos-shell-and-navigation.md) | macOS uses one native shell, seven route ids and one design-token authority |
+| [ADR-026](decisions/ADR-026-typed-json-i18n-catalogs.md) | UI copy comes from strict typed zh-CN/en JSON catalogs through `t()` |
 
 ## Assets
 
