@@ -9,6 +9,7 @@
   },
   "include": [
     "./agent-sdk-contract.ts",
+    "./conversation-contract.ts",
     "./event-core-contract.ts",
     "./mcp-server-contract.ts",
     "./sqlite-event-store-contract.ts",
