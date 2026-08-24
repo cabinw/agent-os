@@ -225,12 +225,14 @@ describe("RM-1.4a · strict Agent SDK contracts", () => {
     await expect(client.resolveNegotiation({ negotiation: "N-001" })).resolves.toBe(
       "resolve_negotiation",
     );
+    await expect(client.proposePlan({ proposal: "P-001" })).resolves.toBe("propose_plan");
     expect(Object.keys(client).sort()).toEqual([
       "call",
       "close",
       "escalateNegotiation",
       "objectNegotiation",
       "openNegotiation",
+      "proposePlan",
       "register",
       "reportProgress",
       "reportResult",

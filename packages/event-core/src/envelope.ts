@@ -52,7 +52,9 @@ export type EventSubject<Type extends EventType> = Type extends `agent.${string}
                   ? SubjectOf<"pulse">
                   : Type extends `negotiation.${string}`
                     ? SubjectOf<"negotiation">
-                    : never;
+                    : Type extends `plan.${string}`
+                      ? SubjectOf<"plan">
+                      : never;
 
 type EventFields<Type extends EventType> = DeepReadonly<{
   type: Type;
@@ -187,6 +189,9 @@ const EVENT_SUBJECT_KINDS = {
   "negotiation.objected": ["negotiation"],
   "negotiation.escalated": ["negotiation"],
   "negotiation.resolved": ["negotiation"],
+  "plan.proposed": ["plan"],
+  "plan.accepted": ["plan"],
+  "plan.rejected": ["plan"],
 } as const satisfies Record<EventType, readonly SubjectKind[]>;
 
 type CrossFieldEvent = {
@@ -301,6 +306,20 @@ function validateSubject(event: CrossFieldEvent, context: z.RefinementCtx): void
       context.addIssue({
         code: "custom",
         message: "negotiation actor must match its authenticated participant",
+        path: ["actor"],
+      });
+    }
+  }
+
+  if (event.type.startsWith("plan.")) {
+    const by =
+      event.type === "plan.proposed"
+        ? (event.payload as EventPayload<"plan.proposed">).proposedBy
+        : (event.payload as EventPayload<"plan.accepted" | "plan.rejected">).by;
+    if (event.actor.kind !== "agent" || event.actor.id !== by) {
+      context.addIssue({
+        code: "custom",
+        message: "plan actor must match its authenticated agent",
         path: ["actor"],
       });
     }

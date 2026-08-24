@@ -99,6 +99,43 @@ const VALID_PAYLOADS: Record<EventType, unknown> = {
     decision: "Use the transactional admission port.",
     rationale: "It preserves one writer and explicit failure semantics.",
   },
+  "plan.proposed": {
+    title: "Add recovery verification",
+    summary: "Add an implementation task followed by verification.",
+    rationale: "The current plan does not prove recovery behavior.",
+    proposedBy: "agent-reviewer",
+    goal: "goal-release",
+    tasks: [
+      {
+        key: "implement-recovery",
+        title: "Implement recovery",
+        requires: ["coding"],
+        priority: "high",
+        dependsOn: [{ kind: "existing", task: "TASK-002" }],
+        requiresApproval: false,
+      },
+      {
+        key: "verify-recovery",
+        title: "Verify recovery",
+        requires: ["testing"],
+        priority: "high",
+        dependsOn: [{ kind: "proposed", key: "implement-recovery" }],
+        requiresApproval: false,
+      },
+    ],
+  },
+  "plan.accepted": {
+    by: "agent-supervisor",
+    rationale: "The added graph closes a verified gap.",
+    tasks: [
+      { key: "implement-recovery", id: "TASK-010" },
+      { key: "verify-recovery", id: "TASK-011" },
+    ],
+  },
+  "plan.rejected": {
+    by: "agent-supervisor",
+    reason: "The proposed work duplicates an existing task.",
+  },
   "approval.requested": {
     action: "Publish the schema",
     risk: "medium",
@@ -207,11 +244,21 @@ function inputFor(type: EventType) {
             : (payload as { by: string }).by,
       }
     : undefined;
+  const planActor = type.startsWith("plan.")
+    ? {
+        kind: "agent" as const,
+        id:
+          type === "plan.proposed"
+            ? (payload as { proposedBy: string }).proposedBy
+            : (payload as { by: string }).by,
+      }
+    : undefined;
   return {
     type,
     project: "proj_test",
     actor:
       negotiationActor ??
+      planActor ??
       (type === "project.human.participation.configured"
         ? { kind: "human", id: "human-owner" }
         : { kind: "system", id: "runtime" }),
@@ -232,13 +279,13 @@ function draftFor(type: EventType) {
 }
 
 describe("RM-1.1a · versioned strict event contract", () => {
-  it("exports exactly the 35 canonical event types in catalog order", () => {
+  it("exports exactly the 38 canonical event types in catalog order", () => {
     const catalog = readFileSync("docs/protocol/event-catalog.md", "utf8");
     const catalogTypes = [...catalog.matchAll(/^\| `([a-z]+(?:\.[a-z]+)+)`/gmu)].map(
       (match) => match[1],
     );
 
-    expect(EVENT_TYPES).toHaveLength(35);
+    expect(EVENT_TYPES).toHaveLength(38);
     expect([...EVENT_TYPES]).toEqual(catalogTypes);
     expect(Object.isFrozen(EVENT_TYPES)).toBe(true);
     expect(Object.isFrozen(eventPayloadSchemas)).toBe(true);

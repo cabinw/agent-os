@@ -54,6 +54,20 @@ const taskIdInputSchema = z
 const eventIdInputSchema = z
   .string()
   .regex(/^evt_[0-7][0-9A-HJKMNP-TV-Z]{25}$/u) as unknown as z.ZodType<EventId>;
+const planLocalKeyInputSchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/u);
+const planDependencyInputSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("existing"), task: taskIdInputSchema }),
+  z.strictObject({ kind: z.literal("proposed"), key: planLocalKeyInputSchema }),
+]);
+const planProposedTaskInputSchema = z.strictObject({
+  key: planLocalKeyInputSchema,
+  title: nonEmptyStringSchema,
+  description: nonEmptyStringSchema.optional(),
+  requires: uniqueArray(capabilitySchema),
+  priority: prioritySchema,
+  dependsOn: z.array(planDependencyInputSchema),
+  requiresApproval: z.boolean(),
+});
 
 function utf8ByteLength(value: string): number {
   let length = 0;
@@ -207,6 +221,56 @@ export const toolInputSchemas = {
     decision: nonEmptyStringSchema,
     rationale: nonEmptyStringSchema,
   }),
+  propose_plan: z
+    .strictObject({
+      proposal: entityIdInputSchema,
+      title: nonEmptyStringSchema,
+      summary: nonEmptyStringSchema,
+      rationale: nonEmptyStringSchema,
+      goal: entityIdInputSchema,
+      tasks: z.array(planProposedTaskInputSchema).min(1).max(100),
+    })
+    .superRefine((proposal, context) => {
+      const keys = new Set(proposal.tasks.map((task) => task.key));
+      if (keys.size !== proposal.tasks.length) {
+        context.addIssue({
+          code: "custom",
+          message: "proposed task keys must be unique",
+          path: ["tasks"],
+        });
+      }
+      for (const [index, task] of proposal.tasks.entries()) {
+        const references = task.dependsOn.map((dependency) =>
+          dependency.kind === "existing"
+            ? `existing:${dependency.task}`
+            : `proposed:${dependency.key}`,
+        );
+        if (new Set(references).size !== references.length) {
+          context.addIssue({
+            code: "custom",
+            message: "proposed task dependencies must be unique",
+            path: ["tasks", index, "dependsOn"],
+          });
+        }
+        for (const dependency of task.dependsOn) {
+          if (dependency.kind !== "proposed") continue;
+          if (!keys.has(dependency.key)) {
+            context.addIssue({
+              code: "custom",
+              message: `unknown proposed dependency ${dependency.key}`,
+              path: ["tasks", index, "dependsOn"],
+            });
+          }
+          if (dependency.key === task.key) {
+            context.addIssue({
+              code: "custom",
+              message: "proposed task cannot depend on itself",
+              path: ["tasks", index, "dependsOn"],
+            });
+          }
+        }
+      }
+    }),
 } as const satisfies Record<ToolName, z.ZodType>;
 
 export type ToolInputMap = {
@@ -231,5 +295,7 @@ export const TOOL_DESCRIPTIONS = Object.freeze({
   escalate_negotiation: "Escalate an objected negotiation to the human control plane.",
   resolve_negotiation:
     "Resolve only an un-escalated agent negotiation; human resolution stays outside MCP.",
+  propose_plan:
+    "Propose an additive task graph for Supervisor review without mutating tasks.",
 } as const satisfies Record<ToolName, string>);
 import { AGENT_TOOL_NAMES } from "@agent-os/agent-sdk";

@@ -103,6 +103,31 @@ const validInputs: ToolInputMap = {
     decision: "Use transactional admission.",
     rationale: "It preserves one writer with explicit failure semantics.",
   },
+  propose_plan: {
+    proposal: "plan-proposal-001" as never,
+    goal: "goal-release" as never,
+    title: "Add recovery verification",
+    summary: "Add implementation and verification tasks.",
+    rationale: "The current graph lacks recovery evidence.",
+    tasks: [
+      {
+        key: "implement-recovery",
+        title: "Implement recovery",
+        requires: ["coding"],
+        priority: "high",
+        dependsOn: [{ kind: "existing", task: "TASK-001" as never }],
+        requiresApproval: false,
+      },
+      {
+        key: "verify-recovery",
+        title: "Verify recovery",
+        requires: ["testing"],
+        priority: "high",
+        dependsOn: [{ kind: "proposed", key: "implement-recovery" }],
+        requiresApproval: false,
+      },
+    ],
+  },
 };
 
 const methodByTool = {
@@ -122,6 +147,7 @@ const methodByTool = {
   object_negotiation: "objectNegotiation",
   escalate_negotiation: "escalateNegotiation",
   resolve_negotiation: "resolveNegotiation",
+  propose_plan: "proposePlan",
 } as const satisfies Record<ToolName, keyof RuntimePort>;
 
 type RecordedCall = Readonly<{
@@ -157,6 +183,7 @@ function harness(
     objectNegotiation: record("objectNegotiation"),
     escalateNegotiation: record("escalateNegotiation"),
     resolveNegotiation: record("resolveNegotiation"),
+    proposePlan: record("proposePlan"),
     ...overrides,
   } as RuntimePort;
   const authorization: AuthorizationPort = {
@@ -173,11 +200,11 @@ function harness(
 }
 
 describe("RM-1.3a · canonical MCP tool surface", () => {
-  it("lists exactly sixteen tools from strict runtime schemas", () => {
+  it("lists exactly seventeen tools from strict runtime schemas", () => {
     const { router } = harness();
     const definitions = router.list();
     expect(definitions.map((item) => item.name)).toEqual(TOOL_NAMES);
-    expect(definitions).toHaveLength(16);
+    expect(definitions).toHaveLength(17);
     for (const definition of definitions) {
       expect(definition.description.length).toBeGreaterThan(0);
       expect(definition.inputSchema.additionalProperties).toBe(false);

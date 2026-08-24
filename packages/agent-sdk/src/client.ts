@@ -17,6 +17,7 @@ export const AGENT_TOOL_NAMES = Object.freeze([
   "object_negotiation",
   "escalate_negotiation",
   "resolve_negotiation",
+  "propose_plan",
 ] as const);
 export type AgentToolName = (typeof AGENT_TOOL_NAMES)[number];
 export interface AgentToolTransport {
@@ -41,6 +42,7 @@ export interface AgentClient {
   objectNegotiation(input: unknown): Promise<unknown>;
   escalateNegotiation(input: unknown): Promise<unknown>;
   resolveNegotiation(input: unknown): Promise<unknown>;
+  proposePlan(input: unknown): Promise<unknown>;
   close(): void;
 }
 export function createAgentClient(transport: AgentToolTransport): AgentClient {
@@ -73,6 +75,7 @@ export function createAgentClient(transport: AgentToolTransport): AgentClient {
     objectNegotiation: (input: unknown) => call("object_negotiation", input),
     escalateNegotiation: (input: unknown) => call("escalate_negotiation", input),
     resolveNegotiation: (input: unknown) => call("resolve_negotiation", input),
+    proposePlan: (input: unknown) => call("propose_plan", input),
     close: () => {
       closed = true;
     },

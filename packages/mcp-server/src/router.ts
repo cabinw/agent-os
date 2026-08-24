@@ -77,6 +77,10 @@ export interface RuntimePort {
     input: ToolInputMap["resolve_negotiation"],
     context: McpCallContext,
   ): Awaitable<unknown>;
+  proposePlan(
+    input: ToolInputMap["propose_plan"],
+    context: McpCallContext,
+  ): Awaitable<unknown>;
 }
 
 const RUNTIME_METHODS = Object.freeze([
@@ -96,6 +100,7 @@ const RUNTIME_METHODS = Object.freeze([
   "objectNegotiation",
   "escalateNegotiation",
   "resolveNegotiation",
+  "proposePlan",
 ] as const satisfies readonly (keyof RuntimePort)[]);
 
 export type McpToolDefinition = Readonly<{
@@ -205,6 +210,7 @@ const DISPATCHERS: DispatcherMap = {
     runtime.escalateNegotiation(input, context),
   resolve_negotiation: (runtime, input, context) =>
     runtime.resolveNegotiation(input, context),
+  propose_plan: (runtime, input, context) => runtime.proposePlan(input, context),
 };
 
 function dispatch<Name extends ToolName>(

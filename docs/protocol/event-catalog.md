@@ -114,6 +114,20 @@ Negotiation subjects use kind `negotiation`. Agent actor identity must match
 Every event after open is caused by the immediately prior negotiation event.
 Architecture-changing objections require escalation and human resolution.
 
+## plan.*
+
+| Event | V1 payload | Emitted when |
+| --- | --- | --- |
+| `plan.proposed` | `{ title, summary, rationale, proposedBy, goal, tasks: ProposedTask[1..100] }` | A registered agent proposes an additive task graph |
+| `plan.accepted` | `{ by, rationale, tasks: NonEmptyUnique<{ key, id: TaskId }> }` | Supervisor atomically accepts the proposal and mapped task creations |
+| `plan.rejected` | `{ by, reason }` | Supervisor rejects the proposal without creating tasks |
+
+`ProposedTask` contains `{ key, title, description?, requires, priority,
+dependsOn, requiresApproval }`. Each dependency is either `{ kind: existing,
+task: TaskId }` or `{ kind: proposed, key }`. Proposal-local keys are unique,
+cannot self-reference and never become permanent ids. Review events are caused
+by the proposal event; the proposing agent cannot review its own proposal.
+
 ## approval.*
 
 | Event | V1 payload | Emitted when |

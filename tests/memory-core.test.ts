@@ -115,6 +115,32 @@ const PAYLOADS: Record<EventType, unknown> = {
     decision: "Use option A.",
     rationale: "Benchmarks and recovery tests support it.",
   },
+  "plan.proposed": {
+    title: "Add recovery verification",
+    summary: "Add one verification task.",
+    rationale: "The plan lacks recovery evidence.",
+    proposedBy: "agent-memory",
+    goal: "goal-memory",
+    tasks: [
+      {
+        key: "verify-recovery",
+        title: "Verify recovery",
+        requires: ["testing"],
+        priority: "high",
+        dependsOn: [{ kind: "existing", task: "TASK-001" }],
+        requiresApproval: false,
+      },
+    ],
+  },
+  "plan.accepted": {
+    by: "agent-supervisor",
+    rationale: "The task closes a coverage gap.",
+    tasks: [{ key: "verify-recovery", id: "TASK-010" }],
+  },
+  "plan.rejected": {
+    by: "agent-supervisor",
+    reason: "The work already exists.",
+  },
   "approval.requested": {
     action: "Adopt option A",
     risk: "medium",
@@ -200,6 +226,7 @@ function subjectFor(type: EventType, payload: unknown) {
     measurement: "measurement-memory",
     pulse: "pulse-memory",
     negotiation: "negotiation-memory",
+    plan: "plan-memory",
   };
   return { kind: domain, id: ids[domain ?? ""] };
 }
@@ -222,9 +249,17 @@ function eventFor<Type extends EventType>(
               ? (payload as EventPayload<"negotiation.opened">).proposedBy
               : (payload as EventPayload<"negotiation.objected">).by,
         }
-      : type === "project.human.participation.configured"
-        ? { kind: "human", id: "human-owner" }
-        : { kind: "system", id: "memory-runtime" },
+      : type.startsWith("plan.")
+        ? {
+            kind: "agent",
+            id:
+              type === "plan.proposed"
+                ? (payload as EventPayload<"plan.proposed">).proposedBy
+                : (payload as EventPayload<"plan.accepted">).by,
+          }
+        : type === "project.human.participation.configured"
+          ? { kind: "human", id: "human-owner" }
+          : { kind: "system", id: "memory-runtime" },
     subject: subjectFor(type, payload),
     at: AT,
     payload,
@@ -329,10 +364,12 @@ describe("RM-2.1 · structural extraction triggers", () => {
     "measurement.recorded",
     "project.environment.checked",
     "negotiation.resolved",
+    "plan.accepted",
+    "plan.rejected",
   ]);
 
   it("classifies every canonical event type without an unowned gap", () => {
-    expect(EVENT_TYPES).toHaveLength(35);
+    expect(EVENT_TYPES).toHaveLength(38);
     for (const type of EVENT_TYPES) {
       const classified = classifyKnowledgeEvent(eventFor(type));
       expect(classified.kind, type).toBe(
@@ -346,6 +383,8 @@ describe("RM-2.1 · structural extraction triggers", () => {
   it.each([
     ["approval.granted", "decision-recorded", ["decision", "discussion"]],
     ["negotiation.resolved", "decision-recorded", ["decision", "discussion"]],
+    ["plan.accepted", "decision-recorded", ["decision", "discussion"]],
+    ["plan.rejected", "decision-recorded", ["decision", "discussion"]],
     [
       "task.completed",
       "result-recorded",

@@ -188,6 +188,20 @@ const RULES = Object.freeze({
     trigger: "decision-recorded",
     possibleTypes: DECISION_TYPES,
   }),
+  "plan.proposed": Object.freeze({
+    kind: "noise",
+    reason: "unresolved-context",
+  }),
+  "plan.accepted": Object.freeze({
+    kind: "candidate",
+    trigger: "decision-recorded",
+    possibleTypes: DECISION_TYPES,
+  }),
+  "plan.rejected": Object.freeze({
+    kind: "candidate",
+    trigger: "decision-recorded",
+    possibleTypes: DECISION_TYPES,
+  }),
 } as const satisfies Readonly<Record<EventType, Rule>>);
 
 function candidate(

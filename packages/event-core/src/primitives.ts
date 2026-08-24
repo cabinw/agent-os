@@ -88,6 +88,7 @@ export const SUBJECT_KINDS = Object.freeze([
   "measurement",
   "pulse",
   "negotiation",
+  "plan",
 ] as const);
 export const subjectKindSchema = z.enum(SUBJECT_KINDS);
 export type SubjectKind = z.infer<typeof subjectKindSchema>;

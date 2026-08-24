@@ -367,6 +367,93 @@ const negotiationResolvedSchema = z.strictObject({
   rationale: nonEmptyStringSchema,
 });
 
+const planLocalKeySchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/u);
+
+const planDependencySchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("existing"), task: taskIdSchema }),
+  z.strictObject({ kind: z.literal("proposed"), key: planLocalKeySchema }),
+]);
+
+const planProposedTaskSchema = z.strictObject({
+  key: planLocalKeySchema,
+  title: nonEmptyStringSchema,
+  description: nonEmptyStringSchema.optional(),
+  requires: uniqueArray(capabilitySchema),
+  priority: prioritySchema,
+  dependsOn: uniqueArray(planDependencySchema),
+  requiresApproval: z.boolean(),
+});
+
+const planProposedSchema = z
+  .strictObject({
+    title: nonEmptyStringSchema,
+    summary: nonEmptyStringSchema,
+    rationale: nonEmptyStringSchema,
+    proposedBy: entityIdSchema,
+    goal: entityIdSchema,
+    tasks: z.array(planProposedTaskSchema).min(1).max(100),
+  })
+  .superRefine((proposal, context) => {
+    const keys = new Set(proposal.tasks.map((task) => task.key));
+    if (keys.size !== proposal.tasks.length) {
+      context.addIssue({
+        code: "custom",
+        message: "proposed task keys must be unique",
+        path: ["tasks"],
+      });
+    }
+    for (const [index, task] of proposal.tasks.entries()) {
+      const references = task.dependsOn.map((dependency) =>
+        dependency.kind === "existing"
+          ? `existing:${dependency.task}`
+          : `proposed:${dependency.key}`,
+      );
+      if (new Set(references).size !== references.length) {
+        context.addIssue({
+          code: "custom",
+          message: "proposed task dependencies must be unique",
+          path: ["tasks", index, "dependsOn"],
+        });
+      }
+      for (const dependency of task.dependsOn) {
+        if (dependency.kind !== "proposed") continue;
+        if (!keys.has(dependency.key)) {
+          context.addIssue({
+            code: "custom",
+            message: `unknown proposed dependency ${dependency.key}`,
+            path: ["tasks", index, "dependsOn"],
+          });
+        }
+        if (dependency.key === task.key) {
+          context.addIssue({
+            code: "custom",
+            message: "proposed task cannot depend on itself",
+            path: ["tasks", index, "dependsOn"],
+          });
+        }
+      }
+    }
+  });
+
+const planAcceptedSchema = z.strictObject({
+  by: entityIdSchema,
+  rationale: nonEmptyStringSchema,
+  tasks: z
+    .array(z.strictObject({ key: planLocalKeySchema, id: taskIdSchema }))
+    .min(1)
+    .refine(
+      (tasks) =>
+        new Set(tasks.map((task) => task.key)).size === tasks.length &&
+        new Set(tasks.map((task) => task.id)).size === tasks.length,
+      { error: "accepted task keys and ids must be unique" },
+    ),
+});
+
+const planRejectedSchema = z.strictObject({
+  by: entityIdSchema,
+  reason: nonEmptyStringSchema,
+});
+
 export const EVENT_TYPES = Object.freeze([
   "agent.registered",
   "agent.status.changed",
@@ -386,6 +473,9 @@ export const EVENT_TYPES = Object.freeze([
   "negotiation.objected",
   "negotiation.escalated",
   "negotiation.resolved",
+  "plan.proposed",
+  "plan.accepted",
+  "plan.rejected",
   "approval.requested",
   "approval.granted",
   "approval.rejected",
@@ -444,6 +534,9 @@ export const eventPayloadSchemas = Object.freeze({
   "negotiation.objected": immutableSchema(negotiationObjectedSchema),
   "negotiation.escalated": immutableSchema(negotiationEscalatedSchema),
   "negotiation.resolved": immutableSchema(negotiationResolvedSchema),
+  "plan.proposed": immutableSchema(planProposedSchema),
+  "plan.accepted": immutableSchema(planAcceptedSchema),
+  "plan.rejected": immutableSchema(planRejectedSchema),
   "approval.requested": immutableSchema(approvalRequestedSchema),
   "approval.granted": immutableSchema(approvalGrantedSchema),
   "approval.rejected": immutableSchema(approvalRejectedSchema),

@@ -364,6 +364,18 @@ the addressed human resolves through the trusted control plane, which atomically
 admits the resolution and decision Memory. Architecture-changing objections
 cannot be resolved by this MCP tool.
 
+### propose_plan
+
+Submits a strict additive task graph for Supervisor review. The caller supplies
+the proposal id, goal, reasoning and local-key tasks, but never `proposedBy`,
+permanent ids, actor or event-envelope fields. Dependencies explicitly identify
+existing Task ids versus proposal-local keys.
+
+The call emits only `plan.proposed`; it never creates tasks. Acceptance and
+rejection are absent from MCP. The trusted Supervisor review service validates
+the graph against current state and atomically admits `plan.accepted` plus all
+`task.created` events, or admits only `plan.rejected`.
+
 ## Rules for implementers
 
 - An agent may never write an event directly. Tools request; the runtime decides
@@ -383,5 +395,4 @@ cannot be resolved by this MCP tool.
 
 ## Planned
 
-Multi-agent planning proposals, autonomous task routing and agent performance
-analytics.
+Autonomous task routing and agent performance analytics.

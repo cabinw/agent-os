@@ -420,6 +420,7 @@ export async function runCoreDemo(options: CoreDemoOptions): Promise<CoreDemoEvi
     objectNegotiation: () => neverTool("negotiation objection"),
     escalateNegotiation: () => neverTool("negotiation escalation"),
     resolveNegotiation: () => neverTool("negotiation resolution"),
+    proposePlan: () => neverTool("plan proposal"),
   };
   const router = createMcpToolRouter(runtime, authorization);
 

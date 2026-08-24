@@ -65,6 +65,11 @@ planning decisions. Model output cannot name an executor/provider, set state or
 construct an event envelope. See
 [ADR-017](../decisions/ADR-017-supervisor-plan-admission.md).
 
+Worker agents may propose an additive graph without mutating tasks. The
+Supervisor reviews the durable proposal, then atomically accepts its complete
+validated graph or rejects it with no task writes. See
+[ADR-037](../decisions/ADR-037-agent-plan-proposals-are-reviewed-additive-graphs.md).
+
 ## Escalation rules
 
 The Supervisor escalates to a human when:

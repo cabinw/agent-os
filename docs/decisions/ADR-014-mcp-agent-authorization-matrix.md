@@ -19,7 +19,7 @@ The router owns one fixed matrix:
 | Tools | Additional requirement |
 | --- | --- |
 | `register_agent` | Body id equals principal; no prior registration |
-| `find_agent`, `create_task`, `send_message`, `request_approval`, `get_context`, `write_memory`, `query_memory`, negotiation tools | Same `(project, agent, host)` is registered |
+| `find_agent`, `create_task`, `send_message`, `request_approval`, `get_context`, `write_memory`, `query_memory`, negotiation tools, `propose_plan` | Same `(project, agent, host)` is registered |
 | `assign_task` | Registered caller is the task owner |
 | `update_task`, `notify_blocked`, `report_result` | Registered caller is the task executor |
 
@@ -45,13 +45,17 @@ Negotiation participant and lifecycle checks remain Runtime admission facts.
 The MCP resolver is structurally limited to un-escalated agent consensus;
 escalated human resolution has no agent tool path.
 
+`propose_plan` is registered-agent input only. Accept and reject remain trusted
+Supervisor operations and have no MCP path; role metadata cannot grant review
+authority.
+
 ## Alternatives
 
 **Authorize by role.** Rejected: role is display metadata supplied at
 registration and is not a credential.
 
 **Let each Runtime Port method authorize itself.** Rejected: policy would be
-duplicated twelve times and a new handler could forget it.
+duplicated across handlers and a new handler could forget it.
 
 **Expose a generic `can(tool)` callback.** Rejected: that moves the matrix out of
 the ingress and makes tests prove a mock policy rather than product policy.
