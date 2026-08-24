@@ -7,5 +7,9 @@
     "noEmit": true,
     "sourceMap": false
   },
-  "include": ["./event-core-contract.ts", "./sqlite-event-store-contract.ts"]
+  "include": [
+    "./event-core-contract.ts",
+    "./sqlite-event-store-contract.ts",
+    "./task-engine-contract.ts"
+  ]
 }
