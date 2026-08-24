@@ -24,6 +24,27 @@ importers:
         specifier: ^1.0.0
         version: 1.30.0(zod@4.4.3)
 
+  apps/core-demo:
+    dependencies:
+      '@agent-os/agent-sdk':
+        specifier: workspace:*
+        version: link:../../packages/agent-sdk
+      '@agent-os/event-core':
+        specifier: workspace:*
+        version: link:../../packages/event-core
+      '@agent-os/event-store-sqlite':
+        specifier: workspace:*
+        version: link:../../packages/event-store-sqlite
+      '@agent-os/mcp-server':
+        specifier: workspace:*
+        version: link:../../packages/mcp-server
+      '@agent-os/supervisor':
+        specifier: workspace:*
+        version: link:../../packages/supervisor
+      '@agent-os/task-engine':
+        specifier: workspace:*
+        version: link:../../packages/task-engine
+
   packages/agent-sdk:
     dependencies:
       '@agent-os/event-core':

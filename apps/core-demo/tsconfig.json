@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../../packages/event-core" },
+    { "path": "../../packages/event-store-sqlite" },
+    { "path": "../../packages/task-engine" },
+    { "path": "../../packages/agent-sdk" },
+    { "path": "../../packages/mcp-server" },
+    { "path": "../../packages/supervisor" }
+  ]
+}

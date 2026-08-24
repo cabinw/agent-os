@@ -1,0 +1,24 @@
+{
+  "name": "@agent-os/core-demo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build"
+  },
+  "dependencies": {
+    "@agent-os/agent-sdk": "workspace:*",
+    "@agent-os/event-core": "workspace:*",
+    "@agent-os/event-store-sqlite": "workspace:*",
+    "@agent-os/mcp-server": "workspace:*",
+    "@agent-os/supervisor": "workspace:*",
+    "@agent-os/task-engine": "workspace:*"
+  }
+}
