@@ -87,6 +87,26 @@ const PROJECT: ProjectLibraryItemViewModel = {
         sourceEvents: ["evt_blocked"],
       },
     ],
+    staleness: [
+      {
+        area: "dependencies",
+        state: "stale",
+        detail: "The lockfile no longer resolves.",
+        sourceEvents: ["evt_environment"],
+      },
+      {
+        area: "apis",
+        state: "likely-stale",
+        detail: null,
+        sourceEvents: ["evt_blocked"],
+      },
+      {
+        area: "credentials",
+        state: "current",
+        detail: "Credential validation succeeded.",
+        sourceEvents: ["evt_environment"],
+      },
+    ],
     plan: [
       {
         title: "Check environment",
@@ -193,6 +213,11 @@ describe("RM-3.5 Project Library macOS surface", () => {
     expect(html).toContain("Past decisions");
     expect(html).toContain("Current state");
     expect(html).toContain("Recommended restart plan");
+    expect(html).toContain("Environment status");
+    expect(html).toContain("Verified stale");
+    expect(html).toContain("Likely stale");
+    expect(html).toContain("Verified current");
+    expect(html).toContain("no environment check has verified it");
     expect(html).toContain("Check environment");
     expect(html).toContain("Create and assign restart step Check environment");
     expect(html).toContain("Visual checkpoints");

@@ -57,6 +57,12 @@ export type ProjectLibraryItemViewModel = Readonly<{
         kind: "blocked" | "failed";
         reason: string;
       }>)[];
+    staleness: readonly (Source &
+      Readonly<{
+        area: "dependencies" | "apis" | "credentials";
+        state: "likely-stale" | "current" | "stale";
+        detail: string | null;
+      }>)[];
     plan: readonly ProjectLibraryItemViewModel["nextSteps"][number][];
   }> | null;
   snapshots: readonly (Source & Readonly<{ label: string; image: string; at: string }>)[];
@@ -293,6 +299,23 @@ export function ProjectDetailPanel({
                     <strong>{issue.title}</strong> · {issue.reason}
                   </p>
                 ))}
+                <h4>{t(locale, "library.revival.staleness")}</h4>
+                <div className={styles.stalenessList}>
+                  {project.revival.staleness.map((item) => (
+                    <article data-state={item.state} key={item.area}>
+                      <div>
+                        <strong>{t(locale, `library.revival.area.${item.area}`)}</strong>
+                        <span>{t(locale, `library.revival.state.${item.state}`)}</span>
+                      </div>
+                      <p>{item.detail ?? t(locale, "library.revival.likelyDetail")}</p>
+                      <Evidence
+                        events={item.sourceEvents}
+                        locale={locale}
+                        onInspect={onInspectEvent}
+                      />
+                    </article>
+                  ))}
+                </div>
                 <h4>{t(locale, "library.revival.plan")}</h4>
                 {project.revival.plan.length === 0 ? (
                   <Empty>{t(locale, "library.overview.nextSteps.empty")}</Empty>

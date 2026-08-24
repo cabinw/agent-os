@@ -405,6 +405,38 @@
   border-left: 2px solid var(--warn);
   background: var(--warn-soft);
 }
+.stalenessList {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.stalenessList article {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.stalenessList article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.stalenessList article span {
+  color: var(--warn);
+  font-size: var(--font-size-meta);
+}
+.stalenessList article[data-state="current"] span {
+  color: var(--ok);
+}
+.stalenessList article[data-state="stale"] span {
+  color: var(--danger);
+}
+.stalenessList article p {
+  color: var(--text-muted);
+  font-size: var(--font-size-meta);
+}
 .revivalPlan {
   display: grid;
   gap: var(--space-2);

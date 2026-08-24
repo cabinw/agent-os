@@ -85,6 +85,26 @@ const base: ProjectLibraryItemViewModel = {
         sourceEvents: ["evt_blocked"],
       },
     ],
+    staleness: [
+      {
+        area: "dependencies",
+        state: "stale",
+        detail: "The lockfile no longer resolves.",
+        sourceEvents: ["evt_environment"],
+      },
+      {
+        area: "apis",
+        state: "likely-stale",
+        detail: null,
+        sourceEvents: ["evt_blocked"],
+      },
+      {
+        area: "credentials",
+        state: "current",
+        detail: "Credential validation succeeded.",
+        sourceEvents: ["evt_environment"],
+      },
+    ],
     plan: [
       {
         title: "Check environment",
