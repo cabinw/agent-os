@@ -52,6 +52,9 @@ distribution across the portfolio, and AI suggestions at portfolio level — for
 example flagging that two projects have been paused past three months and
 should be evaluated for archival.
 
+RM-3.5 renders this strip as unavailable. Portfolio claims need their own
+sourced contract; the Library does not infer them while rendering.
+
 ## Detail panel
 
 Opens beside the grid without leaving the Library. Tabs: Overview, Timeline,
@@ -60,6 +63,15 @@ technology stack, the recommended next steps and the project timeline.
 
 For a dormant project the Overview leads with the Revival Mode card — see
 [revival-mode.md](revival-mode.md).
+
+## Read model
+
+The executable composition follows
+[ADR-029](../decisions/ADR-029-sourced-project-library-read-model.md). Each
+project supplies an independently contiguous history. Status, progress, agents,
+last activity, snapshots, knowledge and files are projections. AI copy comes
+only from `pulse.story.generated`; next steps come only from
+`project.revived.plan`. Missing sourced values stay empty.
 
 ## Snapshots
 

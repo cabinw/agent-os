@@ -93,6 +93,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-026](decisions/ADR-026-typed-json-i18n-catalogs.md) | UI copy comes from strict typed zh-CN/en JSON catalogs through `t()` |
 | [ADR-027](decisions/ADR-027-sourced-project-pulse.md) | Project Pulse is a deterministic cross-projection read model with source-event evidence |
 | [ADR-028](decisions/ADR-028-approval-surfaces-and-menu-bar-boundary.md) | Approval surfaces submit intents through one trusted client; high-risk decisions stay in app |
+| [ADR-029](decisions/ADR-029-sourced-project-library-read-model.md) | Project Library derives cross-project rows from independently sourced histories |
 
 ## Assets
 

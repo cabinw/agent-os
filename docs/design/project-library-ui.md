@@ -26,9 +26,13 @@ Five columns, fixed order so the eye can scan down any one of them:
 
 ```
 [cover 88×64]  name + state badge      进度 ▓▓▓▓░ 72%    技术栈        最后活动
-               AI summary              当前阶段: MVP     Next.js …    2 小时前
+               AI summary              当前工作: TASK-14 Next.js …    2 小时前
                avatars +3  优先级       开发                          Codex 完成 TASK-014
 ```
+
+`当前工作` is derived from the Task projection. Do not relabel it `当前阶段`:
+no canonical phase field exists. Missing sourced summary or next step gets an
+explicit empty state.
 
 ## Detail panel
 
