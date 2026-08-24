@@ -1,5 +1,4 @@
-import type { Locale } from "./i18n.js";
-import { copy } from "./i18n.js";
+import { type Locale, t } from "./i18n.js";
 
 export const ROUTE_IDS = Object.freeze([
   "project-library",
@@ -37,11 +36,11 @@ export const NAVIGATION = Object.freeze([
 ] as const satisfies readonly NavigationItem[]);
 
 export function labelFor(route: RouteId, locale: Locale): string {
-  return copy[locale].nav[route];
+  return t(locale, `nav.${route}.label`);
 }
 
 export function descriptionFor(route: RouteId, locale: Locale): string {
-  return copy[locale].routeDescription[route];
+  return t(locale, `route.${route}.description`);
 }
 
 export function landingRoute(hasActiveProject: boolean): RouteId {

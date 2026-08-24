@@ -1,7 +1,7 @@
 import { useState } from "react";
 import styles from "./App.module.css";
 import { Icon } from "./Icon.js";
-import { type Locale, copy } from "./i18n.js";
+import { type Locale, t } from "./i18n.js";
 import {
   NAVIGATION,
   type RouteId,
@@ -16,8 +16,6 @@ export function App() {
   const [locale, setLocale] = useState<Locale>("zh-CN");
   const [density, setDensity] = useState<Density>("comfortable");
   const [route, setRoute] = useState<RouteId>(() => landingRoute(false));
-  const text = copy[locale];
-
   const toggleLocale = () =>
     setLocale((current) => (current === "zh-CN" ? "en" : "zh-CN"));
   const toggleDensity = () =>
@@ -25,15 +23,12 @@ export function App() {
 
   return (
     <div className={styles.app} data-density={density}>
-      <aside
-        className={styles.sidebar}
-        aria-label={locale === "zh-CN" ? "主导航" : "Main navigation"}
-      >
+      <aside className={styles.sidebar} aria-label={t(locale, "navigation.ariaLabel")}>
         <div className={styles.brand}>
           <span className={styles.brandMark} aria-hidden="true">
             A
           </span>
-          <strong>{text.appName}</strong>
+          <strong>{t(locale, "app.name")}</strong>
         </div>
 
         <section
@@ -41,10 +36,10 @@ export function App() {
           aria-labelledby="project-context-title"
         >
           <span id="project-context-title" className={styles.eyebrow}>
-            {text.projectContext}
+            {t(locale, "project.context.label")}
           </span>
-          <strong>{text.noProject}</strong>
-          <p>{text.noProjectDetail}</p>
+          <strong>{t(locale, "project.context.empty.title")}</strong>
+          <p>{t(locale, "project.context.empty.detail")}</p>
         </section>
 
         <nav className={styles.navigation}>
@@ -64,22 +59,32 @@ export function App() {
 
         <div className={styles.sidebarFooter}>
           <span className={styles.connectionDot} aria-hidden="true" />
-          <span>{text.livePending}</span>
+          <span>{t(locale, "shell.livePending.title")}</span>
         </div>
       </aside>
 
       <main className={styles.main}>
         <header className={styles.topbar}>
           <div>
-            <span className={styles.eyebrow}>Agent OS · RM-3.1</span>
+            <span className={styles.eyebrow}>{t(locale, "shell.milestone")}</span>
             <h1>{labelFor(route, locale)}</h1>
           </div>
           <div className={styles.controls}>
-            <button type="button" onClick={toggleDensity} aria-label={text.switchDensity}>
-              {density === "comfortable" ? text.comfortable : text.compact}
+            <button
+              type="button"
+              onClick={toggleDensity}
+              aria-label={t(locale, "density.switch.ariaLabel")}
+            >
+              {density === "comfortable"
+                ? t(locale, "density.comfortable")
+                : t(locale, "density.compact")}
             </button>
-            <button type="button" onClick={toggleLocale} aria-label={text.switchLanguage}>
-              {locale === "zh-CN" ? "EN" : "中文"}
+            <button
+              type="button"
+              onClick={toggleLocale}
+              aria-label={t(locale, "language.switch.ariaLabel")}
+            >
+              {t(locale, "language.switch.shortLabel")}
             </button>
           </div>
         </header>
@@ -87,9 +92,9 @@ export function App() {
         <div className={styles.content}>
           <section className={styles.hero}>
             <div className={styles.heroCopy}>
-              <span className={styles.readyChip}>{text.statusReady}</span>
-              <h2>{text.shellReady}</h2>
-              <p>{text.shellReadyDetail}</p>
+              <span className={styles.readyChip}>{t(locale, "shell.status.ready")}</span>
+              <h2>{t(locale, "shell.ready.title")}</h2>
+              <p>{t(locale, "shell.ready.detail")}</p>
             </div>
             <div className={styles.routeSummary}>
               <span className={styles.eyebrow}>{labelFor(route, locale)}</span>
@@ -100,23 +105,31 @@ export function App() {
           <section aria-labelledby="foundation-title">
             <div className={styles.sectionHeading}>
               <div>
-                <span className={styles.eyebrow}>RM-3.1</span>
-                <h2 id="foundation-title">{text.currentFoundation}</h2>
+                <span className={styles.eyebrow}>
+                  {t(locale, "shell.foundation.milestone")}
+                </span>
+                <h2 id="foundation-title">{t(locale, "shell.foundation.title")}</h2>
               </div>
-              <span className={styles.pendingChip}>{text.statusPending}</span>
+              <span className={styles.pendingChip}>
+                {t(locale, "shell.status.pending")}
+              </span>
             </div>
             <div className={styles.foundationGrid}>
-              {[text.nativeWindow, text.canonicalNavigation, text.designTokens].map(
-                (title, index) => (
-                  <article className={styles.foundationCard} key={title}>
-                    <span className={styles.cardNumber}>
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <h3>{title}</h3>
-                    <span className={styles.readyState}>{text.statusReady}</span>
-                  </article>
-                ),
-              )}
+              {[
+                t(locale, "shell.foundation.nativeWindow"),
+                t(locale, "shell.foundation.navigation"),
+                t(locale, "shell.foundation.tokens"),
+              ].map((title, index) => (
+                <article className={styles.foundationCard} key={title}>
+                  <span className={styles.cardNumber}>
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <h3>{title}</h3>
+                  <span className={styles.readyState}>
+                    {t(locale, "shell.status.ready")}
+                  </span>
+                </article>
+              ))}
             </div>
           </section>
 
@@ -125,9 +138,9 @@ export function App() {
               ◇
             </div>
             <div>
-              <h2 id="pending-title">{text.livePending}</h2>
-              <p>{text.livePendingDetail}</p>
-              <small>{text.foundationNote}</small>
+              <h2 id="pending-title">{t(locale, "shell.livePending.title")}</h2>
+              <p>{t(locale, "shell.livePending.detail")}</p>
+              <small>{t(locale, "shell.foundation.note")}</small>
             </div>
           </section>
         </div>
