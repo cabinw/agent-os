@@ -133,8 +133,8 @@ describe("RM-3.3 · Project Pulse macOS surface", () => {
     expect(html).not.toMatch(/<strong>[0-9]+<\/strong>/);
   });
 
-  it("keeps both strict catalogs synchronized after adding Pulse copy", () => {
-    expect(CATALOG_KEYS).toHaveLength(60);
+  it("keeps both strict catalogs synchronized as surfaces add copy", () => {
+    expect(CATALOG_KEYS).toHaveLength(113);
     expect(CATALOG_KEYS.filter((key) => key.startsWith("pulse."))).toHaveLength(23);
   });
 });

@@ -126,11 +126,16 @@ describe("RM-3.1 canonical macOS shell", () => {
     );
     expect(config.build.beforeBuildCommand).not.toContain("pnpm");
     const capability = JSON.parse(read("src-tauri/capabilities/default.json"));
+    expect(capability.windows).toEqual(["main", "menu-bar"]);
     expect(capability.permissions).toEqual(["core:default"]);
   });
 
   it("keeps Rust as a minimal Tauri boundary with no domain or SQLite code", () => {
-    const rust = [read("src-tauri/src/lib.rs"), read("src-tauri/src/main.rs")].join("\n");
+    const rust = [
+      read("src-tauri/src/lib.rs"),
+      read("src-tauri/src/main.rs"),
+      read("src-tauri/src/menu_bar.rs"),
+    ].join("\n");
     const cargo = read("src-tauri/Cargo.toml");
     const packageJson = read("package.json");
     expect(rust).toContain("tauri::Builder::default()");
@@ -138,6 +143,7 @@ describe("RM-3.1 canonical macOS shell", () => {
       /better-sqlite3|event-store-sqlite|rusqlite|sqlx/i,
     );
     expect(JSON.parse(packageJson).dependencies).toEqual({
+      "@tauri-apps/api": "2.11.1",
       react: "19.2.8",
       "react-dom": "19.2.8",
     });
