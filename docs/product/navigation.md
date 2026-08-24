@@ -71,3 +71,11 @@ specified in [design/menu-bar.md](../design/menu-bar.md).
 The interface ships bilingual (zh-CN / en) from the first release — both appear
 in the reference renders. Strings are externalized from day one; no literal
 copy in view code.
+
+## Shell contract
+
+The executable route ids and order are frozen by
+[ADR-025](../decisions/ADR-025-macos-shell-and-navigation.md). The sidebar is
+always visible at the supported native window sizes. Initial selection is
+Project Library without an active project and Project Pulse with one; Runtime,
+Project Info and Knowledge Graph are forbidden as top-level route ids.

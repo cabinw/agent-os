@@ -62,6 +62,13 @@ gate: build, compile-time type-contract probes, Biome, architectural layer
 checks and the full Vitest suite. Do not copy a test count into this strategy;
 the command output is authoritative.
 
+### macOS shell
+
+RM-3.1 adds four proportional gates: strict navigation/token contract tests,
+frontend typecheck, Vite production build, and Rust/Tauri debug no-bundle build.
+Browser screenshots at 1440×900 and the 1024×720 minimum verify overflow and
+fixed-sidebar behavior; screenshots never replace semantic and native gates.
+
 ## Replay as a test
 
 Any recorded log can be replayed against current reducers. A production log

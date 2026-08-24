@@ -86,6 +86,11 @@ noticeable in peripheral vision without demanding a look.
 Two modes. Comfortable is default. Compact reduces vertical rhythm by ~20% for
 users running many agents — it changes spacing only, never hides information.
 
+The executable token authority is `apps/macos/src/styles/tokens.css`. Component
+styles consume variables and may not introduce literal colors or shadows. The
+shell and token verification contract is
+[ADR-025](../decisions/ADR-025-macos-shell-and-navigation.md).
+
 ## Empty and dormant states
 
 Both are common in this product and get real design, not placeholder text. A
