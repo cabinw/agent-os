@@ -12,6 +12,7 @@
     "./event-core-contract.ts",
     "./mcp-server-contract.ts",
     "./sqlite-event-store-contract.ts",
+    "./supervisor-contract.ts",
     "./task-engine-contract.ts"
   ]
 }
