@@ -14,28 +14,33 @@
  *   threadOf(task)           → messages + lifecycle events, seq-ordered
  */
 
-import type { ProjectId } from "@agent-os/event-core";
-
-/** Canonical task lifecycle — ADR-002. Lowercase everywhere, including JSON. */
-export type TaskStatus =
-  | "created"
-  | "assigned"
-  | "running"
-  | "blocked"
-  | "review"
-  | "completed"
-  | "failed"
-  | "cancelled";
-
-/** Terminal states. `blocked` is a bypass back to `running`, not a stage. */
-export const TERMINAL_STATUSES = ["completed", "failed", "cancelled"] as const;
-
-/** `TASK-nnn`, unique per project, never reused. */
-export type TaskId = string & { readonly __brand: "TaskId" };
-
-export type TaskRef = {
-  readonly project: ProjectId;
-  readonly id: TaskId;
-};
+export {
+  TASK_EVENT_TYPES,
+  TASK_STATUSES,
+  TASK_TRANSITION_MATRIX,
+  TERMINAL_STATUSES,
+  IllegalTaskTransitionError,
+  isTaskEventType,
+  transitionTaskStatus,
+} from "./lifecycle.js";
+export type { TaskEventType, TaskStatus } from "./lifecycle.js";
+export {
+  TaskProjectionError,
+  parseTaskProjectState,
+  reduceTaskProject,
+  registerTaskReducer,
+} from "./reducer.js";
+export type {
+  TaskBlocker,
+  TaskCancellation,
+  TaskFailure,
+  TaskProjectState,
+  TaskState,
+} from "./reducer.js";
+export type { TaskId } from "@agent-os/event-core";
+export type TaskRef = Readonly<{
+  project: import("@agent-os/event-core").ProjectId;
+  id: import("@agent-os/event-core").TaskId;
+}>;
 
 export const PACKAGE = "task-engine" as const;

@@ -50,7 +50,7 @@ export interface ProjectionSnapshotCache {
 
 export type ReducerSnapshotOptions<State> = Readonly<{
   version: string;
-  parseState: (value: unknown) => State;
+  parseState: (value: unknown, project: ProjectId) => State;
 }>;
 
 export type EventBusOptions = Readonly<{
@@ -143,7 +143,7 @@ type ReducerRecord = {
   readonly initialState: () => unknown;
   readonly reduce: (state: unknown, event: StoredEvent) => unknown;
   readonly snapshotVersion?: string;
-  readonly parseState?: (value: unknown) => unknown;
+  readonly parseState?: (value: unknown, project: ProjectId) => unknown;
 };
 
 type ProjectProjection = {
@@ -377,7 +377,10 @@ export class EventBus {
         ? {}
         : {
             snapshotVersion: snapshot.version,
-            parseState: snapshot.parseState as (value: unknown) => unknown,
+            parseState: snapshot.parseState as (
+              value: unknown,
+              project: ProjectId,
+            ) => unknown,
           }),
     };
     const states = new Map<ProjectId, unknown>();
@@ -635,7 +638,7 @@ export class EventBus {
         if (reducer?.parseState === undefined) {
           throw new Error(`reducer ${name} has no snapshot parser`);
         }
-        const parsed = reducer.parseState(snapshot.states[name]);
+        const parsed = reducer.parseState(snapshot.states[name], project);
         if (isThenable(parsed)) throw new Error(`reducer ${name} parser is asynchronous`);
         states.set(name, deepFreeze(parsed));
       }
