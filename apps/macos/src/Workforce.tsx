@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { type ConversationProjectViewModel, ThreadsReader } from "./Threads.js";
+import {
+  type ConversationProjectViewModel,
+  type HumanPostingClient,
+  type HumanPostingPolicyViewModel,
+  ThreadsReader,
+} from "./Threads.js";
 import styles from "./Workforce.module.css";
 import type { Locale } from "./i18n.js";
 import { t } from "./i18n.js";
@@ -145,11 +150,15 @@ export function TasksView({
   locale,
   conversation = null,
   initialSelectedTask = null,
+  postingPolicy = null,
+  postingClient,
 }: Readonly<{
   workforce: ProjectWorkforceViewModel | null;
   locale: Locale;
   conversation?: ConversationProjectViewModel | null;
   initialSelectedTask?: string | null;
+  postingPolicy?: HumanPostingPolicyViewModel | null;
+  postingClient?: HumanPostingClient;
 }>) {
   const [filter, setFilter] = useState<(typeof TASK_FILTERS)[number]>("all");
   const [selectedTask, setSelectedTask] = useState<string | null>(initialSelectedTask);
@@ -261,6 +270,8 @@ export function TasksView({
             locale={locale}
             task={selectedTask}
             embedded
+            postingPolicy={postingPolicy}
+            {...(postingClient === undefined ? {} : { postingClient })}
           />
         </aside>
       ) : null}
@@ -272,10 +283,14 @@ export function AgentsView({
   workforce,
   locale,
   conversation = null,
+  postingPolicy = null,
+  postingClient,
 }: Readonly<{
   workforce: ProjectWorkforceViewModel | null;
   locale: Locale;
   conversation?: ConversationProjectViewModel | null;
+  postingPolicy?: HumanPostingPolicyViewModel | null;
+  postingClient?: HumanPostingClient;
 }>) {
   const [mode, setMode] = useState<"roster" | "threads">("roster");
   if (workforce === null)
@@ -308,7 +323,12 @@ export function AgentsView({
         </button>
       </nav>
       {mode === "threads" ? (
-        <ThreadsReader conversation={conversation} locale={locale} />
+        <ThreadsReader
+          conversation={conversation}
+          locale={locale}
+          postingPolicy={postingPolicy}
+          {...(postingClient === undefined ? {} : { postingClient })}
+        />
       ) : (
         <>
           <section

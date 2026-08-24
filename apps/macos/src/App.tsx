@@ -8,7 +8,11 @@ import {
 import { Icon } from "./Icon.js";
 import { ProjectLibraryView, type ProjectLibraryViewModel } from "./ProjectLibrary.js";
 import { ProjectPulseView, type ProjectPulseViewModel } from "./Pulse.js";
-import type { ConversationProjectViewModel } from "./Threads.js";
+import type {
+  ConversationProjectViewModel,
+  HumanPostingClient,
+  HumanPostingPolicyViewModel,
+} from "./Threads.js";
 import { AgentsView, type ProjectWorkforceViewModel, TasksView } from "./Workforce.js";
 import { type Locale, t } from "./i18n.js";
 import {
@@ -32,6 +36,8 @@ export function App({
   approvals = null,
   workforce = null,
   conversation = null,
+  postingPolicy = null,
+  postingClient,
   approvalClient,
 }: Readonly<{
   pulse?: ProjectPulseViewModel | null;
@@ -39,6 +45,8 @@ export function App({
   approvals?: ApprovalCenterViewModel | null;
   workforce?: ProjectWorkforceViewModel | null;
   conversation?: ConversationProjectViewModel | null;
+  postingPolicy?: HumanPostingPolicyViewModel | null;
+  postingClient?: HumanPostingClient;
   approvalClient?: ApprovalSurfaceClient;
 }>) {
   const [locale, setLocale] = useState<Locale>("zh-CN");
@@ -165,9 +173,21 @@ export function App({
         ) : route === "project-library" ? (
           <ProjectLibraryView library={library} locale={locale} />
         ) : route === "tasks" ? (
-          <TasksView workforce={workforce} conversation={conversation} locale={locale} />
+          <TasksView
+            workforce={workforce}
+            conversation={conversation}
+            postingPolicy={postingPolicy}
+            {...(postingClient === undefined ? {} : { postingClient })}
+            locale={locale}
+          />
         ) : route === "agents" ? (
-          <AgentsView workforce={workforce} conversation={conversation} locale={locale} />
+          <AgentsView
+            workforce={workforce}
+            conversation={conversation}
+            postingPolicy={postingPolicy}
+            {...(postingClient === undefined ? {} : { postingClient })}
+            locale={locale}
+          />
         ) : (
           <div className={styles.content}>
             <section className={styles.hero}>

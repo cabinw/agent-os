@@ -4,6 +4,7 @@ import React from "../apps/macos/node_modules/react/index.js";
 import {
   type ConversationProjectViewModel,
   ThreadsReader,
+  createHumanMessageIntent,
 } from "../apps/macos/src/Threads.js";
 
 const actor = (kind: "agent" | "human", id: string) => ({ kind, id });
@@ -199,5 +200,65 @@ describe("RM-3.7 macOS conversation reader", () => {
     expect(html).toContain("Implement webhook idempotency");
     expect(html).not.toContain("Plan database migration");
     expect(html).not.toContain("Search all threads");
+  });
+
+  it("creates a frozen message-only human intent with no approval authority", () => {
+    const intent = createHumanMessageIntent(
+      { task: "task-webhook", executor: "codex" },
+      "Use the reviewed idempotency plan.",
+    );
+    expect(intent).toEqual({
+      to: "codex",
+      type: "instruction",
+      content: "Use the reviewed idempotency plan.",
+      task: "task-webhook",
+    });
+    expect(Object.keys(intent).sort()).toEqual(["content", "task", "to", "type"]);
+    expect(Object.isFrozen(intent)).toBe(true);
+    expect(intent).not.toHaveProperty("actor");
+    expect(intent).not.toHaveProperty("approval");
+    expect(() => createHumanMessageIntent({}, "  guidance")).toThrow(/trimmed/);
+    expect(createHumanMessageIntent({}, "Project guidance").to).toBe("*");
+  });
+
+  it("renders the composer only with enabled sourced policy and a trusted client", () => {
+    const client = { sendMessage: async () => {} };
+    const enabled = renderToStaticMarkup(
+      <ThreadsReader
+        conversation={CONVERSATION}
+        locale="en"
+        task="task-webhook"
+        postingPolicy={{ enabled: true, sourceEvents: ["evt-policy"] }}
+        postingClient={client}
+      />,
+    );
+    expect(enabled).toContain("Send human guidance to the current thread");
+    expect(enabled).toContain("it cannot approve a pending request");
+    expect(enabled).toContain("Policy sources 1");
+
+    const disabled = renderToStaticMarkup(
+      <ThreadsReader
+        conversation={CONVERSATION}
+        locale="en"
+        task="task-webhook"
+        postingPolicy={{ enabled: false, sourceEvents: ["evt-created"] }}
+        postingClient={client}
+      />,
+    );
+    expect(disabled).not.toContain("Send human guidance to the current thread");
+    expect(disabled).toContain("Read-only");
+  });
+
+  it("fails closed when policy is enabled without the trusted client", () => {
+    const html = renderToStaticMarkup(
+      <ThreadsReader
+        conversation={CONVERSATION}
+        locale="en"
+        task="task-webhook"
+        postingPolicy={{ enabled: true, sourceEvents: ["evt-policy"] }}
+      />,
+    );
+    expect(html).toContain("trusted message client is not connected");
+    expect(html).not.toContain("<textarea");
   });
 });

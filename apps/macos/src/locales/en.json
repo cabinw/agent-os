@@ -265,5 +265,13 @@
   "threads.participant.label": "Participant",
   "threads.participant.all": "All participants",
   "workforce.task.openDetail": "View task and thread",
-  "workforce.task.closeDetail": "Close task detail"
+  "workforce.task.closeDetail": "Close task detail",
+  "threads.composer.ariaLabel": "Send human guidance to the current thread",
+  "threads.composer.placeholder": "Write guidance; it cannot approve a pending request",
+  "threads.composer.send": "Send",
+  "threads.composer.sending": "Sending…",
+  "threads.composer.error": "The message was not recorded and the transcript is unchanged. Check the connection and retry.",
+  "threads.composer.enabled": "Human posting enabled",
+  "threads.composer.policyEvidence": "Policy sources",
+  "threads.composer.clientUnavailable": "Human posting is enabled, but the trusted message client is not connected"
 }

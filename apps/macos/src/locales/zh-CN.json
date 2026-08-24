@@ -265,5 +265,13 @@
   "threads.participant.label": "参与者",
   "threads.participant.all": "全部参与者",
   "workforce.task.openDetail": "查看任务与会话",
-  "workforce.task.closeDetail": "关闭任务详情"
+  "workforce.task.closeDetail": "关闭任务详情",
+  "threads.composer.ariaLabel": "向当前会话发送人工指导",
+  "threads.composer.placeholder": "输入指导；它不会批准任何待审批请求",
+  "threads.composer.send": "发送",
+  "threads.composer.sending": "发送中…",
+  "threads.composer.error": "消息未写入，当前记录没有变化。请检查连接后重试。",
+  "threads.composer.enabled": "人工发言已启用",
+  "threads.composer.policyEvidence": "策略来源",
+  "threads.composer.clientUnavailable": "人工发言已启用，但可信消息客户端未连接"
 }

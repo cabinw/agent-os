@@ -59,6 +59,22 @@ export type ConversationProjectViewModel = Readonly<{
   threads: Readonly<Record<string, Thread>>;
 }>;
 
+export type HumanPostingPolicyViewModel = Readonly<{
+  enabled: boolean;
+  sourceEvents: readonly string[];
+}>;
+
+export type HumanMessageIntent = Readonly<{
+  to: string;
+  type: "instruction";
+  content: string;
+  task?: string;
+}>;
+
+export interface HumanPostingClient {
+  sendMessage(intent: HumanMessageIntent): Promise<void>;
+}
+
 export type ThreadsReaderProps = Readonly<{
   conversation: ConversationProjectViewModel | null;
   locale: Locale;
@@ -66,7 +82,24 @@ export type ThreadsReaderProps = Readonly<{
   embedded?: boolean;
   initialQuery?: string;
   initialParticipant?: string;
+  postingPolicy?: HumanPostingPolicyViewModel | null;
+  postingClient?: HumanPostingClient;
 }>;
+
+export function createHumanMessageIntent(
+  thread: Readonly<{ task?: string; executor?: string }>,
+  content: string,
+): HumanMessageIntent {
+  if (content.length === 0 || content.trim() !== content) {
+    throw new TypeError("human message content must be trimmed and non-empty");
+  }
+  return Object.freeze({
+    to: thread.executor ?? "*",
+    type: "instruction",
+    content,
+    ...(thread.task === undefined ? {} : { task: thread.task }),
+  });
+}
 
 function itemEvents(item: ThreadItem): readonly (MessageEvent | DividerEvent)[] {
   return item.kind === "progress-run" ? item.events : [item.event];
@@ -166,6 +199,8 @@ export function ThreadsReader({
   embedded = false,
   initialQuery = "",
   initialParticipant = "",
+  postingPolicy = null,
+  postingClient,
 }: ThreadsReaderProps) {
   const allEntries = useMemo(
     () =>
@@ -182,6 +217,9 @@ export function ThreadsReader({
   const [query, setQuery] = useState(initialQuery);
   const [participant, setParticipant] = useState(initialParticipant);
   const [hideProgress, setHideProgress] = useState(true);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const allParticipants = useMemo(
     () => [...new Set(allEntries.flatMap(([, thread]) => participants(thread)))].sort(),
@@ -236,6 +274,21 @@ export function ThreadsReader({
       if (hideProgress && item.kind === "progress-run") return false;
       return itemMatchesQuery(item, normalizedQuery);
     }) ?? [];
+  const canPost = postingPolicy?.enabled === true && postingClient !== undefined;
+  const send = async () => {
+    const content = draft.trim();
+    if (!canPost || thread === undefined || content === "") return;
+    setSending(true);
+    setSendFailed(false);
+    try {
+      await postingClient.sendMessage(createHumanMessageIntent(thread, content));
+      setDraft("");
+    } catch {
+      setSendFailed(true);
+    } finally {
+      setSending(false);
+    }
+  };
   return (
     <section
       className={styles.reader}
@@ -339,7 +392,13 @@ export function ThreadsReader({
               </label>
             ) : null}
           </div>
-          <span>{t(locale, "threads.readOnly")}</span>
+          <span>
+            {postingPolicy?.enabled === true
+              ? postingClient === undefined
+                ? t(locale, "threads.composer.clientUnavailable")
+                : `${t(locale, "threads.composer.enabled")} · ${t(locale, "threads.composer.policyEvidence")} ${postingPolicy.sourceEvents.length}`
+              : t(locale, "threads.readOnly")}
+          </span>
         </div>
         <div className={styles.stream}>
           {visible.length === 0 ? (
@@ -390,6 +449,29 @@ export function ThreadsReader({
             )
           )}
         </div>
+        {canPost ? (
+          <form
+            className={styles.composer}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void send();
+            }}
+            aria-label={t(locale, "threads.composer.ariaLabel")}
+          >
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder={t(locale, "threads.composer.placeholder")}
+              disabled={sending}
+            />
+            <button type="submit" disabled={sending || draft.trim() === ""}>
+              {sending
+                ? t(locale, "threads.composer.sending")
+                : t(locale, "threads.composer.send")}
+            </button>
+            {sendFailed ? <p>{t(locale, "threads.composer.error")}</p> : null}
+          </form>
+        ) : null}
       </div>
     </section>
   );
