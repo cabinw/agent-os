@@ -47,8 +47,10 @@ function requirePackages(label, names, required, forbidden) {
 try {
   const runner = join(scratch, "runner");
   const sqlite = join(scratch, "sqlite");
+  const macos = join(scratch, "macos");
   deploy("@agent-os/chat-spike", runner);
   deploy("@agent-os/event-store-sqlite", sqlite);
+  deploy("@agent-os/macos", macos);
 
   requirePackages(
     "Runner",
@@ -62,7 +64,15 @@ try {
     ["@agent-os/event-store-sqlite", "@agent-os/event-core", "better-sqlite3"],
     [],
   );
-  console.log("✓ check:native-boundary — Runner excludes SQLite native addon");
+  requirePackages(
+    "macOS frontend",
+    collectPackageNames(macos),
+    ["@agent-os/macos", "react", "react-dom"],
+    ["@agent-os/event-store-sqlite", "better-sqlite3"],
+  );
+  console.log(
+    "✓ check:native-boundary — Runner and macOS frontend exclude SQLite native addon",
+  );
   console.log("  · SQLite adapter deploy contains exact Hub-only driver closure");
 } finally {
   rmSync(scratch, { recursive: true, force: true });
