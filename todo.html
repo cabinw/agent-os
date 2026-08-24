@@ -541,7 +541,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-1-11"><label for="t-1-11" class="tb">
     <span class="tt"><span class="tid">1.4a</span>Agent SDK + 第一个适配器</span>
-    <span class="td"><code>register / receiveTask / reportProgress / reportResult / sendEvent</code>。另外验证一个<b>已经会说 MCP 的智能体零适配器直连</b>——这是 ADR-001 的验收点。</span>
+    <span class="td">按ADR-016分开三层：AgentClient只调用具名MCP工具且没有通用<code>sendEvent</code>；Runner提供strict <code>dispatch / cancel / health / session / close</code>；Adapter只负责vendor wake、流归一化和opaque session。<code>receiveTask</code>属于Runner dispatch。首个正式实现提取subprocess JSONL seam；另验证会说MCP的智能体在participate方向零翻译直连。</span>
     <span class="tm"><span class="tag pkg">agent-sdk</span><span class="tag dep">依赖 1.3a</span><span class="tag sz">3 天</span></span>
     <span class="done-when"><b>完成判据：</b>两个不同厂商的智能体执行同一类任务，核心代码零改动</span>
   </label></li>

@@ -81,7 +81,7 @@ Mechanically checked by `pnpm check:layers`.
 | `event-store-sqlite` | `openSqliteEventStore`, transactional `append`, ordered `read`, online `backup`; separate `openSqliteSnapshotStore` cache | Hub-only durable log plus discardable projection cache |
 | `task-engine` | lifecycle and Agent Catalog reducers; dependency selectors; `rankAgentPlacements`, `selectAgentPlacement` | ADR-002 lifecycle, immutable dependency graph, derived readiness and provider-neutral routing |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
-| `agent-sdk` | strict `dispatch`, normalized result / event / error shapes, `cancel`, adapter `send` | Shared Local / Remote Runner and adapter contract |
+| `agent-sdk` | AgentClient named MCP calls; strict Runner `dispatch/cancel/health/session/close`; normalized adapter `send` and subprocess seam | Shared one-way client, Runner and adapter contracts; vendor values stop at the adapter |
 | `mcp-server` | canonical tool schemas, JSON Schema listing, `createMcpToolRouter`, `RuntimePort` | Transport-neutral MCP validation and authenticated call admission; no state or direct event append |
 
 ## Rules

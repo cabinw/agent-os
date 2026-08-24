@@ -121,6 +121,16 @@ touching `agent-runtime`. An agent that participates through MCP needs no
 translation for its calls, but wake, connection mounting and vendor invocation
 remain Runner responsibilities.
 
+The SDK exposes three deliberately separate surfaces: AgentClient for named MCP
+calls, Runner for dispatch/control, and Adapter for vendor wake and stream
+normalization. `receiveTask` belongs to Runner dispatch; there is no generic
+`sendEvent`. See [ADR-016](../decisions/ADR-016-agent-sdk-boundaries.md).
+
+The shared subprocess adapter seam owns abort, absolute timeout, bounded stderr,
+control-plane environment filtering and JSONL lifecycle. A concrete adapter
+owns only command construction and vendor-line interpretation. Neither retries;
+the Runner owns dispatch idempotency and durable terminal replay.
+
 ## Supervision tree
 
 `parentAgent` forms a tree rooted at the Supervisor. It carries delegation
