@@ -68,5 +68,20 @@ export type {
   TaskContextErrorCode,
   TaskContextSource,
 } from "./context.js";
+export { ProjectPulseError, buildProjectPulse } from "./pulse.js";
+export type {
+  ProjectPulse,
+  ProjectPulseSource,
+  PulseActivity,
+  PulseConsequence,
+  PulseKpis,
+  PulseKnowledge,
+  PulseMetric,
+  PulseMoment,
+  PulseProgress,
+  PulseRisk,
+  PulseStory,
+  PulseWindow,
+} from "./pulse.js";
 
 export const PACKAGE = "mcp-server" as const;

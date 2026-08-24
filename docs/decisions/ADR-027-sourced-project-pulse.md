@@ -40,7 +40,8 @@ Headline consequences rank in this exact order:
 
 1. current blockers older than their severity threshold;
 2. milestone knowledge created in the window;
-3. architecture decisions created in the window;
+3. decision knowledge created in the window and related to at least one task
+   requiring the canonical `architecture` capability;
 4. positive task progress deltas in the window.
 
 Thresholds are critical 0 hours, high 24, medium 72 and low 168. Within a class,
