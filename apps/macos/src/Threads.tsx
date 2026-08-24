@@ -59,6 +59,15 @@ export type ConversationProjectViewModel = Readonly<{
   threads: Readonly<Record<string, Thread>>;
 }>;
 
+export type ThreadsReaderProps = Readonly<{
+  conversation: ConversationProjectViewModel | null;
+  locale: Locale;
+  task?: string;
+  embedded?: boolean;
+  initialQuery?: string;
+  initialParticipant?: string;
+}>;
+
 function itemEvents(item: ThreadItem): readonly (MessageEvent | DividerEvent)[] {
   return item.kind === "progress-run" ? item.events : [item.event];
 }
@@ -137,11 +146,28 @@ function Message({
   );
 }
 
+function itemMatchesQuery(item: ThreadItem, query: string): boolean {
+  if (query === "") return true;
+  return itemEvents(item).some(
+    (event) =>
+      (event.type === "message.sent" &&
+        event.payload.content.toLocaleLowerCase().includes(query)) ||
+      event.type.toLocaleLowerCase().includes(query) ||
+      dividerDetail(event as DividerEvent)
+        .toLocaleLowerCase()
+        .includes(query),
+  );
+}
+
 export function ThreadsReader({
   conversation,
   locale,
-}: Readonly<{ conversation: ConversationProjectViewModel | null; locale: Locale }>) {
-  const entries = useMemo(
+  task,
+  embedded = false,
+  initialQuery = "",
+  initialParticipant = "",
+}: ThreadsReaderProps) {
+  const allEntries = useMemo(
     () =>
       conversation === null
         ? []
@@ -153,24 +179,37 @@ export function ThreadsReader({
     [conversation],
   );
   const [selected, setSelected] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
+  const [participant, setParticipant] = useState(initialParticipant);
   const [hideProgress, setHideProgress] = useState(true);
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const allParticipants = useMemo(
+    () => [...new Set(allEntries.flatMap(([, thread]) => participants(thread)))].sort(),
+    [allEntries],
+  );
+  const scopedEntries = allEntries.filter(
+    ([key, candidate]) =>
+      (task === undefined || key === task) &&
+      (participant === "" || participants(candidate).includes(participant)) &&
+      (normalizedQuery === "" ||
+        candidate.items.some((item) => itemMatchesQuery(item, normalizedQuery))),
+  );
   const activeKey =
-    selected !== null && conversation?.threads[selected] !== undefined
+    selected !== null && scopedEntries.some(([key]) => key === selected)
       ? selected
-      : entries[0]?.[0];
+      : scopedEntries[0]?.[0];
   const thread = activeKey === undefined ? undefined : conversation?.threads[activeKey];
   const messages = useMemo(
     () =>
       new Map(
-        entries.flatMap(([, candidate]) =>
+        allEntries.flatMap(([, candidate]) =>
           candidate.items
             .flatMap(itemEvents)
             .filter((event): event is MessageEvent => event.type === "message.sent")
             .map((event) => [event.id, event] as const),
         ),
       ),
-    [entries],
+    [allEntries],
   );
   if (conversation === null)
     return (
@@ -182,7 +221,7 @@ export function ThreadsReader({
         </div>
       </section>
     );
-  if (entries.length === 0)
+  if (allEntries.length === 0)
     return (
       <section className={styles.pending}>
         <span>◇</span>
@@ -195,59 +234,63 @@ export function ThreadsReader({
   const visible =
     thread?.items.filter((item) => {
       if (hideProgress && item.kind === "progress-run") return false;
-      if (query.trim() === "") return true;
-      return itemEvents(item).some(
-        (event) =>
-          event.type === "message.sent" &&
-          event.payload.content
-            .toLocaleLowerCase()
-            .includes(query.trim().toLocaleLowerCase()),
-      );
+      return itemMatchesQuery(item, normalizedQuery);
     }) ?? [];
   return (
-    <section className={styles.reader} aria-label={t(locale, "threads.reader.ariaLabel")}>
-      <aside className={styles.list}>
-        <label>
-          <span>⌕</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t(locale, "threads.search.placeholder")}
-          />
-        </label>
-        <div className={styles.listHead}>
-          <strong>{t(locale, "threads.list.title")}</strong>
-          <span>{entries.length}</span>
-        </div>
-        {entries.map(([key, candidate]) => {
-          const last = lastEvent(candidate);
-          const preview =
-            last?.type === "message.sent"
-              ? `${last.payload.from}: ${last.payload.content}`
-              : (last?.type ?? t(locale, "threads.preview.empty"));
-          return (
-            <button
-              type="button"
-              key={key}
-              aria-current={activeKey === key ? "page" : undefined}
-              onClick={() => setSelected(key)}
-            >
-              <strong>
-                {key === "$project"
-                  ? t(locale, "threads.project")
-                  : (candidate.title ?? key)}
-              </strong>
-              <p>{preview}</p>
-              <small>
-                {participants(candidate).slice(0, 3).join(" · ")}
-                <time>
-                  {last === undefined ? "" : new Date(last.at).toLocaleDateString(locale)}
-                </time>
-              </small>
-            </button>
-          );
-        })}
-      </aside>
+    <section
+      className={styles.reader}
+      data-embedded={embedded || task !== undefined}
+      aria-label={t(locale, "threads.reader.ariaLabel")}
+    >
+      {task === undefined ? (
+        <aside className={styles.list}>
+          <label>
+            <span>⌕</span>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t(locale, "threads.search.placeholder")}
+            />
+          </label>
+          <div className={styles.listHead}>
+            <strong>{t(locale, "threads.list.title")}</strong>
+            <span>{scopedEntries.length}</span>
+          </div>
+          {scopedEntries.map(([key, candidate]) => {
+            const last = lastEvent(candidate);
+            const preview =
+              last?.type === "message.sent"
+                ? `${last.payload.from}: ${last.payload.content}`
+                : (last?.type ?? t(locale, "threads.preview.empty"));
+            return (
+              <button
+                type="button"
+                key={key}
+                aria-current={activeKey === key ? "page" : undefined}
+                onClick={() => setSelected(key)}
+              >
+                <strong>
+                  {key === "$project"
+                    ? t(locale, "threads.project")
+                    : (candidate.title ?? key)}
+                </strong>
+                <p>{preview}</p>
+                <small>
+                  {participants(candidate).slice(0, 3).join(" · ")}
+                  <time>
+                    {last === undefined
+                      ? ""
+                      : new Date(last.at).toLocaleDateString(locale)}
+                  </time>
+                </small>
+              </button>
+            );
+          })}
+          {scopedEntries.length === 0 ? (
+            <p className={styles.listEmpty}>{t(locale, "threads.search.empty")}</p>
+          ) : null}
+        </aside>
+      ) : null}
       <div className={styles.pane}>
         <header className={styles.threadHeader}>
           <div>
@@ -269,15 +312,33 @@ export function ThreadsReader({
           ) : null}
         </header>
         <div className={styles.tools}>
-          <button
-            type="button"
-            aria-pressed={hideProgress}
-            onClick={() => setHideProgress((value) => !value)}
-          >
-            {hideProgress
-              ? t(locale, "threads.progress.show")
-              : t(locale, "threads.progress.hide")}
-          </button>
+          <div>
+            <button
+              type="button"
+              aria-pressed={hideProgress}
+              onClick={() => setHideProgress((value) => !value)}
+            >
+              {hideProgress
+                ? t(locale, "threads.progress.show")
+                : t(locale, "threads.progress.hide")}
+            </button>
+            {task === undefined ? (
+              <label>
+                {t(locale, "threads.participant.label")}
+                <select
+                  value={participant}
+                  onChange={(event) => setParticipant(event.target.value)}
+                >
+                  <option value="">{t(locale, "threads.participant.all")}</option>
+                  {allParticipants.map((value) => (
+                    <option value={value} key={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+          </div>
           <span>{t(locale, "threads.readOnly")}</span>
         </div>
         <div className={styles.stream}>

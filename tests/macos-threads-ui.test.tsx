@@ -85,6 +85,31 @@ const CONVERSATION: ConversationProjectViewModel = {
         },
       ],
     },
+    "task-database": {
+      task: "task-database",
+      title: "Plan database migration",
+      status: "review",
+      progress: 100,
+      executor: "grok",
+      items: [
+        {
+          kind: "message",
+          event: {
+            id: "evt-database",
+            seq: 7,
+            at: "2026-08-24T09:07:00Z",
+            actor: actor("agent", "grok"),
+            type: "message.sent",
+            payload: {
+              from: "grok",
+              to: "human",
+              type: "answer",
+              content: "The database migration is ready for review.",
+            },
+          },
+        },
+      ],
+    },
     $project: { items: [] },
   },
 };
@@ -92,7 +117,7 @@ const CONVERSATION: ConversationProjectViewModel = {
 describe("RM-3.7 macOS conversation reader", () => {
   it("weaves question, blocker, answer, and resolution in one ordered transcript", () => {
     const html = renderToStaticMarkup(
-      <ThreadsReader conversation={CONVERSATION} locale="en" />,
+      <ThreadsReader conversation={CONVERSATION} locale="en" task="task-webhook" />,
     );
     const markers = [
       "Should retries",
@@ -109,7 +134,7 @@ describe("RM-3.7 macOS conversation reader", () => {
 
   it("renders same-thread reply evidence and keeps progress runs hidden by default", () => {
     const html = renderToStaticMarkup(
-      <ThreadsReader conversation={CONVERSATION} locale="en" />,
+      <ThreadsReader conversation={CONVERSATION} locale="en" task="task-webhook" />,
     );
     expect(html).toContain("↳ codex: Should retries");
     expect(html).toContain("Source event · evt-answer");
@@ -137,5 +162,42 @@ describe("RM-3.7 macOS conversation reader", () => {
     expect(pending).toContain("Waiting for the conversation projection");
     expect(pending).toContain("no sample conversations are inserted");
     expect(empty).toContain("No threads yet");
+  });
+
+  it("searches across threads and lands on the matching transcript", () => {
+    const html = renderToStaticMarkup(
+      <ThreadsReader
+        conversation={CONVERSATION}
+        locale="en"
+        initialQuery="database migration"
+      />,
+    );
+    expect(html).toContain("Plan database migration");
+    expect(html).toContain("ready for review");
+    expect(html).not.toContain("Implement webhook idempotency");
+  });
+
+  it("filters thread membership by participant", () => {
+    const html = renderToStaticMarkup(
+      <ThreadsReader conversation={CONVERSATION} locale="en" initialParticipant="grok" />,
+    );
+    expect(html).toContain("Plan database migration");
+    expect(html).not.toContain("Implement webhook idempotency");
+    expect(html).toContain("All participants");
+  });
+
+  it("embeds the same reader at one task scope without the master list", () => {
+    const html = renderToStaticMarkup(
+      <ThreadsReader
+        conversation={CONVERSATION}
+        locale="en"
+        task="task-webhook"
+        embedded
+      />,
+    );
+    expect(html).toContain('data-embedded="true"');
+    expect(html).toContain("Implement webhook idempotency");
+    expect(html).not.toContain("Plan database migration");
+    expect(html).not.toContain("Search all threads");
   });
 });

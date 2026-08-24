@@ -143,6 +143,51 @@
   color: var(--text-muted);
   font-size: 12px;
 }
+.taskCard footer > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.taskCard footer button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.taskDetail {
+  position: fixed;
+  inset: var(--space-6);
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-popover);
+  background: var(--bg);
+  box-shadow: var(--shadow-popover);
+}
+.taskDetail > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-4);
+}
+.taskDetail > header span {
+  color: var(--text-muted);
+  font-size: var(--font-size-meta);
+}
+.taskDetail > header h2 {
+  margin: var(--space-1) 0 0;
+}
+.taskDetail > header button {
+  width: var(--control-height);
+  height: var(--control-height);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

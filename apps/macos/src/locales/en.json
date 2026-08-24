@@ -260,5 +260,10 @@
   "threads.progress.hide": "Hide progress updates",
   "threads.progress.updates": "progress updates",
   "threads.readOnly": "Read-only · human posting is not connected",
-  "threads.filter.empty": "Nothing matches the current search or filters."
+  "threads.filter.empty": "Nothing matches the current search or filters.",
+  "threads.search.empty": "No thread matches the current search and participant filters.",
+  "threads.participant.label": "Participant",
+  "threads.participant.all": "All participants",
+  "workforce.task.openDetail": "View task and thread",
+  "workforce.task.closeDetail": "Close task detail"
 }

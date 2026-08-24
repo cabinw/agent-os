@@ -260,5 +260,10 @@
   "threads.progress.hide": "隐藏进度更新",
   "threads.progress.updates": "条进度更新",
   "threads.readOnly": "只读 · 人工发言尚未接入",
-  "threads.filter.empty": "当前搜索或过滤条件下没有内容。"
+  "threads.filter.empty": "当前搜索或过滤条件下没有内容。",
+  "threads.search.empty": "没有会话匹配当前搜索和参与者条件。",
+  "threads.participant.label": "参与者",
+  "threads.participant.all": "全部参与者",
+  "workforce.task.openDetail": "查看任务与会话",
+  "workforce.task.closeDetail": "关闭任务详情"
 }

@@ -31,7 +31,7 @@ function expectCatalogError(action: () => unknown, code: I18nCatalogError["code"
 
 describe("RM-3.2 typed JSON i18n", () => {
   it("admits two frozen catalogs with one exact key set", () => {
-    expect(CATALOG_KEYS).toHaveLength(262);
+    expect(CATALOG_KEYS).toHaveLength(267);
     expect(Object.keys(CATALOGS["zh-CN"]).sort()).toEqual([...CATALOG_KEYS]);
     expect(Object.keys(CATALOGS.en).sort()).toEqual([...CATALOG_KEYS]);
     expect(Object.isFrozen(CATALOGS)).toBe(true);

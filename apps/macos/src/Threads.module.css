@@ -9,6 +9,11 @@
   background: var(--surface);
   box-shadow: var(--shadow-card);
 }
+.reader[data-embedded="true"] {
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
 .list {
   border-right: 1px solid var(--border);
   overflow: auto;
@@ -38,6 +43,11 @@
   padding: 4px 14px 10px;
   color: var(--text-muted);
   font-size: 11px;
+}
+.listEmpty {
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--font-size-meta);
 }
 .list > button {
   display: block;
@@ -107,6 +117,23 @@
   background: transparent;
   color: var(--accent);
   cursor: pointer;
+}
+.tools > div {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.tools label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tools select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-size-meta);
 }
 .stream {
   overflow: auto;

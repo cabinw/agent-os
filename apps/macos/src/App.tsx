@@ -165,7 +165,7 @@ export function App({
         ) : route === "project-library" ? (
           <ProjectLibraryView library={library} locale={locale} />
         ) : route === "tasks" ? (
-          <TasksView workforce={workforce} locale={locale} />
+          <TasksView workforce={workforce} conversation={conversation} locale={locale} />
         ) : route === "agents" ? (
           <AgentsView workforce={workforce} conversation={conversation} locale={locale} />
         ) : (

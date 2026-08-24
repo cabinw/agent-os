@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "../apps/macos/node_modules/react-dom/server.js";
 import React from "../apps/macos/node_modules/react/index.js";
+import type { ConversationProjectViewModel } from "../apps/macos/src/Threads.js";
 import {
   AgentsView,
   type ProjectWorkforceViewModel,
@@ -97,6 +98,36 @@ const WORKFORCE: ProjectWorkforceViewModel = {
   threads: { available: false },
 };
 
+const CONVERSATION: ConversationProjectViewModel = {
+  threads: {
+    "TASK-REVIEW": {
+      task: "TASK-REVIEW",
+      title: "Review local flow",
+      status: "review",
+      progress: 100,
+      executor: "agent-codex",
+      items: [
+        {
+          kind: "message",
+          event: {
+            id: "evt-thread-review",
+            seq: 1,
+            at: "2026-08-24T09:01:00Z",
+            actor: { kind: "agent", id: "agent-codex" },
+            type: "message.sent",
+            payload: {
+              from: "agent-codex",
+              to: "human",
+              type: "review",
+              content: "The local flow is ready for human review.",
+            },
+          },
+        },
+      ],
+    },
+  },
+};
+
 describe("RM-3.6 Tasks and Agents macOS surfaces", () => {
   it("keeps 100% progress visibly in review and exposes no-capability diagnosis", () => {
     const html = renderToStaticMarkup(<TasksView workforce={WORKFORCE} locale="en" />);
@@ -122,5 +153,20 @@ describe("RM-3.6 Tasks and Agents macOS surfaces", () => {
     expect(tasks).toContain("Waiting for the workforce projection");
     expect(agents).toContain("no sample tasks or agents are inserted");
     expect(tasks).not.toContain("TASK-REVIEW");
+  });
+
+  it("embeds the shared task-scoped thread reader in task detail", () => {
+    const html = renderToStaticMarkup(
+      <TasksView
+        workforce={WORKFORCE}
+        conversation={CONVERSATION}
+        locale="en"
+        initialSelectedTask="TASK-REVIEW"
+      />,
+    );
+    expect(html).toContain("Close task detail");
+    expect(html).toContain('data-embedded="true"');
+    expect(html).toContain("The local flow is ready for human review.");
+    expect(html).toContain("Source event · evt-thread-review");
   });
 });

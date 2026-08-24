@@ -143,8 +143,16 @@ function Pending({ locale }: Readonly<{ locale: Locale }>) {
 export function TasksView({
   workforce,
   locale,
-}: Readonly<{ workforce: ProjectWorkforceViewModel | null; locale: Locale }>) {
+  conversation = null,
+  initialSelectedTask = null,
+}: Readonly<{
+  workforce: ProjectWorkforceViewModel | null;
+  locale: Locale;
+  conversation?: ConversationProjectViewModel | null;
+  initialSelectedTask?: string | null;
+}>) {
   const [filter, setFilter] = useState<(typeof TASK_FILTERS)[number]>("all");
+  const [selectedTask, setSelectedTask] = useState<string | null>(initialSelectedTask);
   if (workforce === null)
     return (
       <div className={styles.surface}>
@@ -218,14 +226,44 @@ export function TasksView({
               ) : null}
               <footer>
                 <span>{assignmentText(locale, task.assignment)}</span>
-                <small>
-                  {t(locale, "workforce.evidence")} · {task.sourceEvents.length}
-                </small>
+                <div>
+                  <small>
+                    {t(locale, "workforce.evidence")} · {task.sourceEvents.length}
+                  </small>
+                  <button type="button" onClick={() => setSelectedTask(task.task)}>
+                    {t(locale, "workforce.task.openDetail")}
+                  </button>
+                </div>
               </footer>
             </article>
           ))
         )}
       </section>
+      {selectedTask !== null ? (
+        <aside className={styles.taskDetail} aria-labelledby="task-detail-title">
+          <header>
+            <div>
+              <span>{selectedTask}</span>
+              <h2 id="task-detail-title">
+                {workforce.tasks.find((task) => task.task === selectedTask)?.title}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedTask(null)}
+              aria-label={t(locale, "workforce.task.closeDetail")}
+            >
+              ×
+            </button>
+          </header>
+          <ThreadsReader
+            conversation={conversation}
+            locale={locale}
+            task={selectedTask}
+            embedded
+          />
+        </aside>
+      ) : null}
     </div>
   );
 }
