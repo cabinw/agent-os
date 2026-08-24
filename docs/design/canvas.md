@@ -15,11 +15,10 @@ answers "how does this fit together".
 
 ## Edges
 
-`assign` · `report` · `block` · `review` · `depend` · `derive`
-
-Edges are drawn from `causedBy` in the event log, so the graph is generated
-rather than authored. Nobody arranges the canvas by hand and nobody has to keep
-it current.
+Every drawn edge is `causedBy`. Its endpoints are semantic nodes, but its
+evidence is the child event and prior cause event in the immutable log.
+`dependsOn` affects deterministic task layout only; it is not rendered as
+causality. The graph is generated rather than authored.
 
 ## Zoom levels
 
@@ -31,6 +30,8 @@ Level 2  Agent Workspace    one agent, its task, its context and outputs
 
 Zoom changes the level of detail, not just the scale. Moving in reveals
 structure that was aggregated, never just a bigger version of the same picture.
+All three levels disclose or aggregate one sourced semantic projection. Visual
+pan and scale are independent viewport controls.
 
 ## Live behavior
 
@@ -40,5 +41,6 @@ without motion that pulls the eye away from work.
 
 ## Layout
 
-Force-directed within a goal, ordered left-to-right by dependency. Completed
-branches recede in opacity so the active frontier stays prominent.
+Columns are deterministic by node kind. Tasks may be ordered left-to-right by
+dependency without drawing dependency edges. Completed branches recede in
+opacity so the active frontier stays prominent.

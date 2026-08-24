@@ -133,6 +133,15 @@ export {
   connectProjectSnapshotCapture,
   createProjectSnapshotCapture,
 } from "./snapshot-capture.js";
+export { ProjectCanvasError, buildProjectCanvas } from "./canvas.js";
+export type {
+  CanvasEdge,
+  CanvasNode,
+  CanvasNodeKind,
+  CanvasProject,
+  ProjectCanvas,
+  ProjectCanvasSource,
+} from "./canvas.js";
 export type {
   ProjectSnapshotCapture,
   ProjectSnapshotCaptureOptions,
