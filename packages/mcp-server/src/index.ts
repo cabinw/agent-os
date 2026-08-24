@@ -128,6 +128,20 @@ export {
   buildHumanPostingPolicy,
   createHumanPostingService,
 } from "./human-posting.js";
+export {
+  ProjectSnapshotCaptureError,
+  connectProjectSnapshotCapture,
+  createProjectSnapshotCapture,
+} from "./snapshot-capture.js";
+export type {
+  ProjectSnapshotCapture,
+  ProjectSnapshotCaptureOptions,
+  ProjectSnapshotEventSource,
+  ProjectSnapshotRenderer,
+  ProjectSnapshotStorage,
+  ProjectSnapshotWriter,
+  SnapshotFrame,
+} from "./snapshot-capture.js";
 export type {
   HumanMessageCommand,
   HumanMessageWriter,

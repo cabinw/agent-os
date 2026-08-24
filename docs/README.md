@@ -98,6 +98,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-031](decisions/ADR-031-human-thread-posting-is-message-only.md) | Human thread posting is project-gated and structurally cannot decide approvals |
 | [ADR-032](decisions/ADR-032-revival-is-a-sourced-read-model.md) | Revival derives six sourced sections and emits only narrow step intents |
 | [ADR-033](decisions/ADR-033-staleness-is-uncertainty-until-checked.md) | Dormancy yields uncertainty; strict environment checks yield facts |
+| [ADR-034](decisions/ADR-034-milestone-snapshots-use-trusted-ports.md) | Milestone snapshots compose trusted renderer, storage and writer ports |
 
 ## Assets
 

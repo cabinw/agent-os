@@ -73,6 +73,12 @@ last activity, snapshots, knowledge and files are projections. AI copy comes
 only from `pulse.story.generated`; next steps come only from
 `project.revived.plan`. Missing sourced values stay empty.
 
+Visual checkpoints are captured only from durable milestone knowledge. The
+capture pipeline stores bounded PNG/JPEG bytes outside the event log and writes
+only a canonical relative `snapshots/` URI in `project.snapshot.captured`. Each
+event is caused by its milestone and remains selectable in the Overview
+filmstrip. Capture does not grant ambient desktop-recording permission.
+
 ## Snapshots
 
 A project accumulates dated visual checkpoints (`project.snapshot.captured`),
