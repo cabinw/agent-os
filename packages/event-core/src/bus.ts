@@ -8,6 +8,10 @@ import { projectIdSchema } from "./primitives.js";
 import type { ProjectId } from "./primitives.js";
 
 export type EventAppendOptions = Readonly<{ token: string }>;
+export type EventAppendGroupEntry = Readonly<{
+  input: EventAppendInput<EventType>;
+  options: EventAppendOptions;
+}>;
 export type EventReadOptions = Readonly<{ afterSeq?: number }>;
 export type EventAppendInput<Type extends EventType> = EventInput<Type> &
   Readonly<{
@@ -22,6 +26,7 @@ export interface EventBusStore {
     input: EventAppendInput<Type>,
     options: EventAppendOptions,
   ): StoredEvent<Type>;
+  appendGroup?(entries: readonly EventAppendGroupEntry[]): readonly StoredEvent[];
   read(project: ProjectId, options?: EventReadOptions): readonly StoredEvent[];
 }
 
@@ -298,6 +303,72 @@ export class EventBus {
     }
     this.#enqueue(delivered);
     return event;
+  }
+
+  appendGroup(entries: readonly EventAppendGroupEntry[]): readonly StoredEvent[] {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      throw new EventBusError("INVALID_OPTIONS", "event group must be a non-empty array");
+    }
+    if (typeof this.#store.appendGroup !== "function") {
+      throw new EventBusError(
+        "INVALID_OPTIONS",
+        "event bus store has no atomic group support",
+      );
+    }
+    const project = parseProject(entries[0]?.input?.project);
+    for (const entry of entries) {
+      if (parseProject(entry?.input?.project) !== project) {
+        throw new EventBusError(
+          "INVALID_OPTIONS",
+          "an event group cannot cross project boundaries",
+        );
+      }
+    }
+    this.#ensureProject(project);
+    let rows: readonly StoredEvent[];
+    try {
+      rows = this.#store.appendGroup(entries);
+    } catch (cause) {
+      throw new EventReplayError(project, "event store group append failed", { cause });
+    }
+    if (!Array.isArray(rows) || rows.length !== entries.length) {
+      throw new EventReplayError(
+        project,
+        "event store group append returned the wrong event count",
+      );
+    }
+    const events = rows.map((row) => {
+      try {
+        return parseStoredEvent(row);
+      } catch (cause) {
+        throw new EventReplayError(
+          project,
+          "event store group append returned an invalid event",
+          { cause },
+        );
+      }
+    });
+    if (events.some((event) => event.project !== project)) {
+      throw new EventReplayError(
+        project,
+        "event store group append returned an event for another project",
+      );
+    }
+    const delivered = this.#catchUp(project);
+    const projection = this.#projects.get(project);
+    const last = events.at(-1);
+    if (
+      projection === undefined ||
+      last === undefined ||
+      projection.throughSeq < last.seq
+    ) {
+      throw new EventReplayError(
+        project,
+        "store did not return the durable event group during tail catch-up",
+      );
+    }
+    this.#enqueue(delivered);
+    return Object.freeze(events);
   }
 
   subscribe(handler: EventSubscriber, options: SubscribeOptions = {}): () => void {

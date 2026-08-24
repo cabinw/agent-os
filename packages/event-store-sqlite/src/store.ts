@@ -22,6 +22,7 @@ import {
   projectIdSchema,
 } from "@agent-os/event-core";
 import type {
+  EventAppendGroupEntry,
   EventAppendInput,
   EventId,
   EventInput,
@@ -225,6 +226,12 @@ type MetaRow = {
   readonly format_version: number;
   readonly created_at: string;
 };
+type PreparedGroupEntry = Readonly<{
+  input: EventInput;
+  token: string;
+  canonicalInput: string;
+  digest: string;
+}>;
 
 function simplePragma(database: Database.Database, source: string): unknown {
   return database.pragma(source, { simple: true });
@@ -602,6 +609,9 @@ export class SqliteEventStore {
       digest: string,
     ) => StoredEvent
   >;
+  readonly #appendGroupTransaction: Database.Transaction<
+    (entries: readonly PreparedGroupEntry[]) => readonly StoredEvent[]
+  >;
   #closed = false;
   #backupActive = false;
 
@@ -667,6 +677,24 @@ export class SqliteEventStore {
       (input, token, canonicalInput, digest) =>
         this.#appendInsideTransaction(input, token, canonicalInput, digest),
     );
+    this.#appendGroupTransaction = database.transaction(
+      (entries: readonly PreparedGroupEntry[]) => {
+        const existing = entries.filter((entry) =>
+          this.#lookupToken.get(entry.input.project, entry.token),
+        ).length;
+        if (existing !== 0 && existing !== entries.length) {
+          throw new IdempotencyConflictError(entries[0]?.input.project as ProjectId);
+        }
+        return entries.map((entry) =>
+          this.#appendInsideTransaction(
+            entry.input,
+            entry.token,
+            entry.canonicalInput,
+            entry.digest,
+          ),
+        );
+      },
+    );
   }
 
   get closed(): boolean {
@@ -689,6 +717,44 @@ export class SqliteEventStore {
         canonicalInput,
         digest,
       ) as StoredEvent<Type>;
+    } catch (cause) {
+      if (cause instanceof SqliteEventStoreError) throw cause;
+      throw new EventStoreAppendError(cause);
+    }
+  }
+
+  appendGroup(entries: readonly EventAppendGroupEntry[]): readonly StoredEvent[] {
+    this.#assertOpen();
+    if (!Array.isArray(entries) || entries.length === 0) {
+      throw new SqliteEventStoreError(
+        "INVALID_OPTIONS",
+        "event group must be a non-empty array",
+      );
+    }
+    const prepared = entries.map((entry) => {
+      const input = parseEventInput(entry?.input);
+      const token = parseClientToken(entry?.options?.token);
+      const canonicalInput = JSON.stringify(input);
+      return {
+        input,
+        token,
+        canonicalInput,
+        digest: createHash("sha256").update(canonicalInput).digest("hex"),
+      };
+    });
+    const project = prepared[0]?.input.project;
+    if (
+      project === undefined ||
+      prepared.some((entry) => entry.input.project !== project) ||
+      new Set(prepared.map((entry) => entry.token)).size !== prepared.length
+    ) {
+      throw new SqliteEventStoreError(
+        "INVALID_OPTIONS",
+        "event group requires one project and unique client tokens",
+      );
+    }
+    try {
+      return Object.freeze(this.#appendGroupTransaction.immediate(prepared));
     } catch (cause) {
       if (cause instanceof SqliteEventStoreError) throw cause;
       throw new EventStoreAppendError(cause);

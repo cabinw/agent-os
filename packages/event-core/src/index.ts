@@ -101,6 +101,7 @@ export {
 } from "./bus.js";
 export type {
   EventAppendOptions,
+  EventAppendGroupEntry,
   EventAppendInput,
   EventBusOptions,
   EventBusStore,
