@@ -1,0 +1,91 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-subtle: #f3f4f6;
+  --border: #e8eaed;
+  --text: #111827;
+  --text-muted: #6b7280;
+  --accent: #6366f1;
+  --accent-end: #8b5cf6;
+  --accent-soft: #eef2ff;
+  --ok: #10b981;
+  --ok-soft: #ecfdf5;
+  --warn: #f59e0b;
+  --warn-soft: #fffbeb;
+  --risk: #ef4444;
+  --info: #3b82f6;
+  --focus: #4f46e5;
+  --overlay: rgba(17, 24, 39, 0.08);
+  --brand-gradient: linear-gradient(135deg, var(--accent), var(--accent-end));
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI",
+    sans-serif;
+  --font-size-page: 28px;
+  --font-size-hero: 36px;
+  --font-size-section: 15px;
+  --font-size-card: 14px;
+  --font-size-body: 13px;
+  --font-size-meta: 12px;
+  --font-size-kpi: 30px;
+  --weight-regular: 400;
+  --weight-semibold: 600;
+  --weight-kpi: 650;
+  --radius-card: 12px;
+  --radius-panel: 14px;
+  --radius-popover: 16px;
+  --radius-control: 8px;
+  --radius-chip: 6px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-panel: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-popover: 0 16px 48px rgba(0, 0, 0, 0.16);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --sidebar-width: 220px;
+  --content-max: 1440px;
+  --window-min-width: 1024px;
+  --window-min-height: 720px;
+  --control-height: 36px;
+  --nav-item-height: 42px;
+  --navigation-icon-size: 19px;
+  --topbar-height: 88px;
+  --hero-min-height: 210px;
+  --hero-art-size: 300px;
+  --foundation-card-min-height: 140px;
+  --pending-surface-min-height: 150px;
+  --pending-glyph-size: 64px;
+  --density-card-padding: var(--space-5);
+  --density-gap: var(--space-4);
+  --motion-fast: 120ms;
+  --motion-panel: 220ms;
+  --motion-progress: 400ms;
+  --curve-standard: ease-out;
+  --curve-panel: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-density="compact"] {
+  --density-card-padding: var(--space-4);
+  --density-gap: var(--space-3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0e1014;
+    --surface: #161a21;
+    --surface-subtle: #1b2029;
+    --border: #252a33;
+    --text: #e6e8eb;
+    --text-muted: #9ba3af;
+    --accent-soft: #25254d;
+    --ok-soft: #12382f;
+    --warn-soft: #3b2d12;
+    --focus: #a5b4fc;
+    --overlay: rgba(0, 0, 0, 0.2);
+  }
+}

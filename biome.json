@@ -1,7 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
-    "ignore": ["dist/**", "node_modules/**", "doc.html", "todo.html", "ui/**"]
+    "ignore": [
+      "dist/**",
+      "node_modules/**",
+      "target/**",
+      "apps/macos/src-tauri/gen/**",
+      "doc.html",
+      "todo.html",
+      "ui/**"
+    ]
   },
   "organizeImports": { "enabled": true },
   "formatter": {
