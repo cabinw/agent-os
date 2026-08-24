@@ -29,20 +29,7 @@ function nonEmptyUniqueArray<T extends z.ZodType>(item: T) {
   });
 }
 
-export const TOOL_NAMES = Object.freeze([
-  "register_agent",
-  "find_agent",
-  "create_task",
-  "assign_task",
-  "update_task",
-  "send_message",
-  "notify_blocked",
-  "report_result",
-  "request_approval",
-  "get_context",
-  "write_memory",
-  "query_memory",
-] as const);
+export const TOOL_NAMES = AGENT_TOOL_NAMES;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -195,3 +182,4 @@ export const TOOL_DESCRIPTIONS = Object.freeze({
   write_memory: "Admit a sourced durable knowledge item through Memory Core.",
   query_memory: "Query durable project knowledge by text and optional type.",
 } as const satisfies Record<ToolName, string>);
+import { AGENT_TOOL_NAMES } from "@agent-os/agent-sdk";
