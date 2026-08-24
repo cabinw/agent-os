@@ -92,6 +92,12 @@ Returns reachable `(agent, host)` candidates ranked by capability match, current
 load and past outcomes. Callers select a logical agent; the Hub keeps the chosen
 host placement for dispatch.
 
+The catalog alone is insufficient after replay. The Hub joins it with the
+authenticated Runner snapshot, excludes non-accepting and logically saturated
+placements, and applies the deterministic order in ADR-012. No candidate is an
+explicit `no-capability`, `unreachable`, `unavailable` or `saturated` result;
+assignment leaves the task `created` and surfaces the reason.
+
 ### create_task
 
 ```json

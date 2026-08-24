@@ -516,7 +516,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-1-7"><label for="t-1-7" class="tb">
     <span class="tt"><span class="tid">1.2c</span>能力路由 + 智能体注册表</span>
-    <span class="td">只读 <code>capabilities</code>，按（能力匹配度、当前负载、历史结果）排序。饱和的智能体退出匹配。<b>无人具备某能力时任务显式浮出</b>，不静默滞留。</span>
+    <span class="td">事件重放得到 Agent Catalog，再与认证 Runner 的实时 placement snapshot 做纯函数 join；只读 <code>capabilities</code>，按逻辑负载率、placement 负载、Laplace 平滑历史结果和稳定 ID 排序。跨 host 汇总 logical concurrency，饱和的智能体退出匹配。<b>无人具备某能力时返回显式 reason</b>，任务保持 created。</span>
     <span class="tm"><span class="tag pkg">task-engine</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.2a</span><span class="tag sz">3 天</span></span>
     <span class="done-when"><b>完成判据：</b>代码里搜不到任何 provider 字符串；换厂商只是换一次注册</span>
   </label></li>

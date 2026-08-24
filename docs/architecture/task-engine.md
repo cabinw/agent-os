@@ -80,6 +80,30 @@ find_agent(capabilities) ──▶ `(agent, host)` candidates ranked by
 If no candidate exists the task stays `created` and the Supervisor is notified —
 it never silently sits unassigned.
 
+The durable Agent Catalog and live routing inputs are separate:
+
+```
+agent.* events ──▶ catalog `(agent, host)` facts
+Runner snapshot ─▶ reachable · accepting · active dispatches
+task projection ─▶ completed / failed outcomes by logical executor
+                         │
+                         ▼
+                  rankAgentPlacements(...)
+```
+
+`reduceAgentCatalog` validates registration identity and lifecycle replay.
+`rankAgentPlacements` joins it with authenticated live telemetry. It requires a
+full capability match, sums active dispatches across hosts against logical
+`concurrency`, then sorts by logical load ratio, placement load, Laplace-smoothed
+accepted-result rate and lexical `(agent, host)` tie-breakers. It never reads
+`provider` or integration capability.
+
+`selectAgentPlacement` returns either a chosen candidate or an explicit
+`no-capability`, `unreachable`, `unavailable` or `saturated` result. The Hub must
+reserve the selected placement atomically before appending `task.assigned`; the
+chosen host remains operational state. See
+[ADR-012](../decisions/ADR-012-event-catalog-live-routing.md).
+
 ## Dependencies
 
 A task with unmet `dependsOn` cannot leave `created`. When a dependency reaches

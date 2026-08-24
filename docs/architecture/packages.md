@@ -79,7 +79,7 @@ Mechanically checked by `pnpm check:layers`.
 | --- | --- | --- |
 | `event-core` | v1 event schemas and types; `createEventBus`, `append`, `subscribe`, `replay`, `registerReducer` | Permanent record contract and deterministic projection semantics |
 | `event-store-sqlite` | `openSqliteEventStore`, transactional `append`, ordered `read`, online `backup`; separate `openSqliteSnapshotStore` cache | Hub-only durable log plus discardable projection cache |
-| `task-engine` | lifecycle reducer; `validateTaskPlan`, `topologicalTaskOrder`, `readyTaskIds`, `unmetDependencies`; later routing | ADR-002 lifecycle, immutable dependency graph and derived readiness |
+| `task-engine` | lifecycle and Agent Catalog reducers; dependency selectors; `rankAgentPlacements`, `selectAgentPlacement` | ADR-002 lifecycle, immutable dependency graph, derived readiness and provider-neutral routing |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
 | `agent-sdk` | strict `dispatch`, normalized result / event / error shapes, `cancel`, adapter `send` | Shared Local / Remote Runner and adapter contract |
 | `mcp-server` | MCP tool handlers | Validation, authorization, rate limits |

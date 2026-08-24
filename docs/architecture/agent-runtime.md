@@ -97,6 +97,12 @@ Capability vocabulary is defined in
 [protocol/agent-schema.md](../protocol/agent-schema.md); it is a controlled list
 so that `find_agent` is not guessing at free text.
 
+The event-derived catalog is durable; reachability, acceptance and active
+dispatch counts are a live authenticated Runner snapshot. Routing joins both and
+sums active work across placements before enforcing the logical agent's
+`concurrency`. A replayed registration never proves a Runner is currently live.
+See [ADR-012](../decisions/ADR-012-event-catalog-live-routing.md).
+
 ## Adapters
 
 An adapter is the thin translation between a vendor's interface and the shared

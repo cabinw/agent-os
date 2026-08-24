@@ -151,3 +151,9 @@ registered → idle ⇄ working → idle
 
 Disconnection is normal. Tasks held by a disconnected agent return to `assigned`
 after a grace period and are re-matched.
+
+The event-derived catalog is not a live connection table. After replay, the Hub
+must join catalog facts with its authenticated Runner snapshot before routing;
+otherwise a pre-restart registration could look reachable. Same-host reconnect
+updates that live snapshot and emits no duplicate registration event. See
+[ADR-012](../decisions/ADR-012-event-catalog-live-routing.md).

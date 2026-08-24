@@ -76,6 +76,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-009](decisions/ADR-009-versioned-strict-event-contract.md) | Versioned strict events; draft/stored boundary; lossless replay |
 | [ADR-010](decisions/ADR-010-projection-snapshots-as-sidecar-cache.md) | Projection snapshots are versioned, validated, discardable sidecar cache |
 | [ADR-011](decisions/ADR-011-task-dependency-admission.md) | Batch dependency graphs validate before append; readiness stays derived |
+| [ADR-012](decisions/ADR-012-event-catalog-live-routing.md) | Event-derived Agent Catalog joins live placement telemetry for deterministic routing |
 
 ## Assets
 
