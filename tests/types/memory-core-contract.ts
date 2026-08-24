@@ -1,11 +1,13 @@
 import type { KnowledgeId as CanonicalKnowledgeId } from "../../packages/event-core/src/index.js";
 import {
   buildKnowledgeWindow,
+  buildMemoryGraph,
   classifyKnowledgeEvent,
   createKnowledgeExtractor,
   createKnowledgeSuperseder,
   emptyKnowledgeProjectState,
   parseKnowledgeDraft,
+  queryMemory,
   reduceKnowledgeProject,
 } from "../../packages/memory-core/src/index.js";
 import type {
@@ -33,6 +35,14 @@ const memory: KnowledgeProjectState = emptyKnowledgeProjectState();
 void classification;
 void window;
 void reduceKnowledgeProject(memory, untrusted as never);
+const queryResults = queryMemory({
+  project: untrusted as never,
+  state: memory,
+  query: {},
+});
+const graph = buildMemoryGraph({ project: untrusted as never, history: [] });
+void queryResults;
+void graph;
 
 const extractor = createKnowledgeExtractor({
   summarizer: { summarize: () => ({}) },
@@ -52,6 +62,8 @@ draft.sourceEvents.push("evt_01ARZ3NDEKTSV4RRFFQ69G5FAV" as never);
 window.events.push(untrusted as never);
 // @ts-expect-error projection maps are deeply readonly
 memory.items["KN-001"] = untrusted as never;
+// @ts-expect-error semantic relation maps are deeply readonly
+memory.relations.evt_01ARZ3NDEKTSV4RRFFQ69G5FAV = untrusted as never;
 // @ts-expect-error ids are not plain caller strings
 const invalidId: KnowledgeId = "KN-001";
 void invalidId;

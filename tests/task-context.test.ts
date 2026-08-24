@@ -80,6 +80,7 @@ function source(
     } as TaskProjectState,
     memory: {
       items: Object.fromEntries(knowledgeItems.map((item) => [item.id, item])),
+      relations: {},
     } as KnowledgeProjectState,
   };
 }

@@ -1011,14 +1011,22 @@ describe("RM-2.3 · immutable knowledge projection", () => {
     expect(state.items["KN-001"]?.summary).toBe("KN-001 is the selected direction.");
   });
 
-  it("ignores unrelated and graph-link events", () => {
+  it("projects semantic links and ignores unrelated events", () => {
     const state = foldKnowledge([createdKnowledge(1, "KN-001")]);
     const linked = historyEvent(2, "knowledge.linked", {
       from: "KN-001" as never,
       to: "TASK-001" as never,
       relation: "informs",
     });
-    expect(reduceKnowledgeProject(state, linked)).toBe(state);
+    const withLink = reduceKnowledgeProject(state, linked);
+    expect(Object.values(withLink.relations)).toEqual([
+      expect.objectContaining({
+        knowledge: "KN-001",
+        from: "KN-001",
+        to: "TASK-001",
+        relation: "informs",
+      }),
+    ]);
     expect(reduceKnowledgeProject(state, eventFor("task.progress.updated"))).toBe(state);
   });
 
@@ -1062,6 +1070,7 @@ describe("RM-2.3 · immutable knowledge projection", () => {
         "KN-001": { ...foldKnowledge([earlier]).items["KN-001"], createdSeq: 1 },
         "KN-002": { ...foldKnowledge([later]).items["KN-002"], createdSeq: 2 },
       } as never,
+      relations: {},
     };
     expect(() =>
       assertKnowledgeSupersession(reversedState, "KN-002" as never, "KN-001" as never),
