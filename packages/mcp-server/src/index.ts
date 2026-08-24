@@ -96,5 +96,17 @@ export type {
   PulseStory,
   PulseWindow,
 } from "./pulse.js";
+export { ProjectLibraryError, buildProjectLibrary } from "./project-library.js";
+export type {
+  LibraryAgent,
+  LibraryFile,
+  LibraryKnowledge,
+  LibraryNextStep,
+  LibrarySnapshot,
+  LibraryTimelineItem,
+  ProjectLibrary,
+  ProjectLibraryItem,
+  ProjectLibrarySource,
+} from "./project-library.js";
 
 export const PACKAGE = "mcp-server" as const;
