@@ -14,6 +14,7 @@ import type {
   StoredEvent,
   TaskId,
 } from "@agent-os/event-core";
+import { assertTaskReady } from "./graph.js";
 import { TASK_STATUSES, isTaskEventType, transitionTaskStatus } from "./lifecycle.js";
 import type { TaskStatus } from "./lifecycle.js";
 
@@ -459,6 +460,15 @@ export function reduceTaskProject(
         taskId,
       );
     }
+    for (const dependency of event.payload.dependsOn) {
+      if (state.tasks[dependency] === undefined) {
+        throw new TaskProjectionError(
+          "INVALID_STATE",
+          `task ${taskId} depends on missing ${dependency}`,
+          taskId,
+        );
+      }
+    }
     return { tasks: { ...state.tasks, [taskId]: createTask(event) } };
   }
   if (existing === undefined) {
@@ -468,6 +478,7 @@ export function reduceTaskProject(
       taskId,
     );
   }
+  if (event.type === "task.assigned") assertTaskReady(state, existing.id);
   return { tasks: { ...state.tasks, [taskId]: evolveTask(existing, event) } };
 }
 

@@ -38,6 +38,15 @@ export type {
   TaskState,
 } from "./reducer.js";
 export type { TaskId } from "@agent-os/event-core";
+export {
+  TaskGraphError,
+  TaskNotReadyError,
+  assertTaskReady,
+  readyTaskIds,
+  unmetDependencies,
+  validateTaskPlan,
+} from "./graph.js";
+export type { ProposedTask } from "./graph.js";
 export type TaskRef = Readonly<{
   project: import("@agent-os/event-core").ProjectId;
   id: import("@agent-os/event-core").TaskId;
