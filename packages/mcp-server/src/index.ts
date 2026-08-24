@@ -108,5 +108,15 @@ export type {
   ProjectLibraryItem,
   ProjectLibrarySource,
 } from "./project-library.js";
+export { ProjectWorkforceError, buildProjectWorkforce } from "./workforce.js";
+export type {
+  CapabilityCoverage,
+  ProjectWorkforce,
+  ProjectWorkforceSource,
+  WorkforceAgent,
+  WorkforcePlacement,
+  WorkforceTask,
+  WorkforceTaskAssignment,
+} from "./workforce.js";
 
 export const PACKAGE = "mcp-server" as const;
