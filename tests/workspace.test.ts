@@ -7,6 +7,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const PACKAGES = [
   "event-core",
+  "event-store-sqlite",
   "task-engine",
   "memory-core",
   "agent-sdk",
@@ -76,7 +77,7 @@ function readJson(path: string): Record<string, unknown> {
 }
 
 describe("workspace 骨架", () => {
-  it("五个包都存在且命名一致", () => {
+  it("六个包都存在且命名一致", () => {
     for (const p of PACKAGES) {
       const pkg = readJson(`packages/${p}/package.json`);
       expect(pkg.name).toBe(`@agent-os/${p}`);
