@@ -81,6 +81,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-014](decisions/ADR-014-mcp-agent-authorization-matrix.md) | MCP uses a fixed registered/owner/executor matrix; role never grants authority |
 | [ADR-015](decisions/ADR-015-blocking-approval-gate.md) | Approval calls block behind atomic event groups; timeout only expires and never grants |
 | [ADR-016](decisions/ADR-016-agent-sdk-boundaries.md) | AgentClient, Runner and Adapter are separate one-way contracts; no generic event append exists |
+| [ADR-017](decisions/ADR-017-supervisor-plan-admission.md) | Supervisor maps local plan keys to Task ids and atomically admits decisions with the graph |
 
 ## Assets
 

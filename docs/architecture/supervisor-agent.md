@@ -48,6 +48,23 @@ GOAL-003 "Ship payments"
 The Supervisor writes a decision record to Memory whenever it chooses between
 alternatives, so the plan's reasoning survives the plan.
 
+The model emits strict plan-scoped keys, never permanent Task ids. Supervisor
+core allocates Task ids, rewrites local dependency and decision references, and
+runs the whole graph through Task Engine admission before any write:
+
+```
+PlannerModel unknown output
+  └─ strict full-plan parser
+       └─ local key → system Task id
+            └─ validateTaskPlan(current state)
+                 └─ atomic decisions + task.created command
+```
+
+The triggering event is a trusted required `causedBy` and becomes the source of
+planning decisions. Model output cannot name an executor/provider, set state or
+construct an event envelope. See
+[ADR-017](../decisions/ADR-017-supervisor-plan-admission.md).
+
 ## Escalation rules
 
 The Supervisor escalates to a human when:

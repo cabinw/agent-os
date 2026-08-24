@@ -15,6 +15,7 @@ agent-os/
 │   ├── event-core/     kernel
 │   ├── event-store-sqlite/ Hub-only durable adapter
 │   ├── task-engine/    task lifecycle
+│   ├── supervisor/     goal planning and atomic plan admission
 │   ├── memory-core/    knowledge pipeline
 │   ├── agent-sdk/      adapters and agent-facing API
 │   └── mcp-server/     protocol ingress
@@ -70,6 +71,9 @@ Three consequences worth stating explicitly:
 - `agent-sdk` sits beside the domain packages. It defines the shared Runner and
   adapter contract. A Runner reports through that contract; only the Hub admits
   a request and appends an event.
+- `supervisor` depends on Task Engine graph validation and Event Core types. Its
+  PlannerModel and atomic command admission are injected ports; it imports no
+  vendor adapter or event store.
 
 Mechanically checked by `pnpm check:layers`.
 
@@ -82,6 +86,7 @@ Mechanically checked by `pnpm check:layers`.
 | `task-engine` | lifecycle and Agent Catalog reducers; dependency selectors; `rankAgentPlacements`, `selectAgentPlacement` | ADR-002 lifecycle, immutable dependency graph, derived readiness and provider-neutral routing |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
 | `agent-sdk` | AgentClient named MCP calls; strict Runner `dispatch/cancel/health/session/close`; normalized adapter `send` and subprocess seam | Shared one-way client, Runner and adapter contracts; vendor values stop at the adapter |
+| `supervisor` | strict plan parser; local-key Task id mapping; `createSupervisorPlanner` | Vendor-neutral decomposition and atomic decision + task-plan admission |
 | `mcp-server` | canonical tool schemas, JSON Schema listing, `createMcpToolRouter`, `RuntimePort` | Transport-neutral MCP validation and authenticated call admission; no state or direct event append |
 
 ## Rules

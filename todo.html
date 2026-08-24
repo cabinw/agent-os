@@ -548,7 +548,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-1-12"><label for="t-1-12" class="tb">
     <span class="tt"><span class="tid">1.5a</span>Supervisor：目标拆解成任务图</span>
-    <span class="td"><code>claude-opus-5</code> + adaptive thinking + <code>effort: "high"</code>，用 structured outputs 约束成任务图 schema（带 <code>requires</code> 能力和 <code>dependsOn</code>）。<b>拆解时选中某方案就要写一条决策进记忆</b>。</span>
+    <span class="td">生产composition使用ADR-007固定的模型档位；vendor-neutral core只接收PlannerModel。Structured output用plan-local key表达完整task payload和dependsOn，系统分配TaskId后整图先验。<b>选中的方案决策与全部task.created由SupervisorAdmissionPort原子提交</b>，任何解析、图或写入失败都零部分落地。</span>
     <span class="tm"><span class="tag pkg">supervisor</span><span class="tag dep">依赖 1.2c</span><span class="tag sz">4 天</span></span>
   </label></li>
 
