@@ -9,7 +9,8 @@ created · assigned · running · blocked · review · completed · failed · ca
 ```
 
 Terminal: `completed`, `failed`, `cancelled`. `blocked` always returns to
-`running`.
+`running`; `task.started` from `review` begins rejected-work rework. Every result
+enters `review`, including tasks that do not require a separate Approval Gate.
 
 ## Object
 

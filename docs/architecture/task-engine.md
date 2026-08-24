@@ -35,6 +35,10 @@ Canonical. See [ADR-002](../decisions/ADR-002-task-lifecycle.md).
 `blocked` is a bypass, not a stage: a task returns to `running` with its progress
 intact. Terminal states are `completed`, `failed`, `cancelled`.
 
+`task.started` also moves `review → running` when rejected work begins rework.
+All other legal edges are the exhaustive matrix in ADR-002. Any unlisted pair
+throws during command admission and replay.
+
 ## Model
 
 ```json
@@ -89,9 +93,10 @@ arrives, because the agent, not the percentage, declares completion.
 
 ## Approval coupling
 
-If `requiresApproval` is set, `review` is entered on `report_result` and the
-Approval Gate is invoked. No path exists from `running` straight to `completed`
-for such a task. See [product/approvals.md](../product/approvals.md).
+Every `report_result` enters `review`. If `requiresApproval` is set, the Approval
+Gate must additionally grant before `task.completed` is admitted. There is no
+direct `running → completed` path. See
+[product/approvals.md](../product/approvals.md).
 
 ## Emitted events
 
