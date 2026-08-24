@@ -6,8 +6,20 @@
  * following Memory milestones; see ADR-020.
  */
 
-export { knowledgeDraftSchema, parseKnowledgeDraft } from "./schemas.js";
-export type { KnowledgeDraft, KnowledgeId, KnowledgeType, Sourced } from "./schemas.js";
+export {
+  KNOWLEDGE_SUMMARY_JSON_SCHEMA,
+  knowledgeDraftSchema,
+  knowledgeSummarySchema,
+  parseKnowledgeDraft,
+  parseKnowledgeSummary,
+} from "./schemas.js";
+export type {
+  KnowledgeDraft,
+  KnowledgeId,
+  KnowledgeSummary,
+  KnowledgeType,
+  Sourced,
+} from "./schemas.js";
 export {
   KNOWLEDGE_TRIGGER_KINDS,
   classifyKnowledgeEvent,
@@ -19,5 +31,25 @@ export type {
   KnowledgeNoiseReason,
   KnowledgeTriggerKind,
 } from "./triggers.js";
+export { KnowledgeWindowError, buildKnowledgeWindow } from "./windows.js";
+export type {
+  KnowledgeWindow,
+  KnowledgeWindowErrorCode,
+} from "./windows.js";
+export {
+  KnowledgeExtractionError,
+  KnowledgeExtractor,
+  createKnowledgeExtractor,
+  isKnowledgeWindowError,
+} from "./extractor.js";
+export type {
+  KnowledgeAdmissionCommand,
+  KnowledgeAdmissionPort,
+  KnowledgeExtractionErrorCode,
+  KnowledgeExtractionRequest,
+  KnowledgeExtractorOptions,
+  KnowledgeSummarizer,
+  KnowledgeSummarizerInput,
+} from "./extractor.js";
 
 export const PACKAGE = "memory-core" as const;
