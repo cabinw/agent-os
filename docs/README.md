@@ -103,6 +103,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-035](decisions/ADR-035-canvas-semantic-zoom-is-one-sourced-graph.md) | Canvas levels aggregate one sourced semantic graph; edges stay strictly causedBy |
 | [ADR-036](decisions/ADR-036-negotiation-separates-agent-consensus-from-human-resolution.md) | Negotiation state separates agent consensus from escalated human resolution |
 | [ADR-037](decisions/ADR-037-agent-plan-proposals-are-reviewed-additive-graphs.md) | Worker plan proposals are reviewed additive graphs with atomic acceptance |
+| [ADR-038](decisions/ADR-038-autonomous-routing-is-serialized-event-reconciliation.md) | Autonomous routing serializes one event-driven reservation per project |
 
 ## Assets
 

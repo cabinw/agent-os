@@ -109,6 +109,14 @@ reserve the selected placement atomically before appending `task.assigned`; the
 chosen host remains operational state. See
 [ADR-012](../decisions/ADR-012-event-catalog-live-routing.md).
 
+Autonomous routing subscribes to durable work, availability and capacity
+events. It selects one ready task by priority, creation time and id, then asks
+Runtime to atomically reserve the chosen placement and append
+`task.assigned`. That assignment becomes the fresh trigger for the next task.
+Projects serialize independently; no-match and reservation conflict stay typed
+results rather than silent retries. See
+[ADR-038](../decisions/ADR-038-autonomous-routing-is-serialized-event-reconciliation.md).
+
 ## Dependencies
 
 A task with unmet `dependsOn` cannot leave `created`. When a dependency reaches

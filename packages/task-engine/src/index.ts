@@ -60,6 +60,18 @@ export {
   rankAgentPlacements,
   selectAgentPlacement,
 } from "./routing.js";
+export {
+  AUTONOMOUS_ROUTING_TRIGGERS,
+  AutonomousRoutingError,
+  AutonomousTaskRouter,
+  createAutonomousTaskRouter,
+} from "./autonomous-routing.js";
+export type {
+  AutonomousAssignmentCommand,
+  AutonomousRoutingDecision,
+  AutonomousRoutingPort,
+  AutonomousRoutingSnapshot,
+} from "./autonomous-routing.js";
 export type {
   AgentOutcome,
   AgentRouteCandidate,
