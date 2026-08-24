@@ -38,6 +38,20 @@ Hub derives host placement from that connection rather than accepting `host`
 from a dispatch body. See
 [ADR-008](../decisions/ADR-008-server-hub-local-first-runners.md).
 
+## Call admission boundary
+
+HTTP and stdio transports authenticate before invoking the common router. They
+provide trusted `project`, agent principal, Runner `host`, `clientToken` and
+optional runtime-owned `causedBy` as `McpCallContext`. These are not tool
+arguments. The client token scopes idempotent command append; retries reuse it.
+
+Each tool has one strict Zod input schema used both for runtime parsing and its
+published JSON Schema. Parsed input is frozen and dispatched to the matching
+method on a state-free `RuntimePort`. Unknown tools and invalid arguments use
+stable boundary error codes; lifecycle, graph, routing and append conflicts from
+the Runtime Port remain domain errors. See
+[ADR-013](../decisions/ADR-013-mcp-call-admission-boundary.md).
+
 ## Objects
 
 ```

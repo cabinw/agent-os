@@ -82,7 +82,7 @@ Mechanically checked by `pnpm check:layers`.
 | `task-engine` | lifecycle and Agent Catalog reducers; dependency selectors; `rankAgentPlacements`, `selectAgentPlacement` | ADR-002 lifecycle, immutable dependency graph, derived readiness and provider-neutral routing |
 | `memory-core` | `extract`, `query`, `graph` | Knowledge items and links |
 | `agent-sdk` | strict `dispatch`, normalized result / event / error shapes, `cancel`, adapter `send` | Shared Local / Remote Runner and adapter contract |
-| `mcp-server` | MCP tool handlers | Validation, authorization, rate limits |
+| `mcp-server` | canonical tool schemas, JSON Schema listing, `createMcpToolRouter`, `RuntimePort` | Transport-neutral MCP validation and authenticated call admission; no state or direct event append |
 
 ## Rules
 

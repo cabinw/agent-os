@@ -523,7 +523,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-1-8"><label for="t-1-8" class="tb">
     <span class="tt"><span class="tid">1.3a</span>MCP Server：12 个工具 + strict 校验</span>
-    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。全部走 Zod <code>.strict()</code>。Spike 已实现其中 7 个并验证过真实 Agent 边界；正式实现以 v0.3 canonical schema 为准。</span>
+    <span class="td"><code>register_agent / find_agent / create_task / assign_task / update_task / send_message / notify_blocked / report_result / request_approval / get_context / write_memory / query_memory</code>。同一份 Zod strict schema 同时驱动校验与 JSON Schema；认证 transport 另传 project/principal/host/clientToken/causedBy，冻结输入后进入无状态 RuntimePort。Spike 7 工具只作行为证据。</span>
     <span class="tm"><span class="tag pkg">mcp-server</span><span class="tag crit">关键路径</span><span class="tag dep">依赖 1.2c</span><span class="tag sz">4 天</span></span>
   </label></li>
 
