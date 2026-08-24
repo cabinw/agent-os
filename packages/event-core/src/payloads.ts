@@ -275,6 +275,31 @@ const projectRevivedSchema = z.strictObject({
   plan: z.array(revivalPlanStepSchema).nonempty(),
 });
 
+const environmentCheckSchema = z.strictObject({
+  area: z.enum(["dependencies", "apis", "credentials"]),
+  status: z.enum(["current", "stale"]),
+  detail: nonEmptyStringSchema,
+});
+
+const projectEnvironmentCheckedSchema = z.strictObject({
+  checks: z
+    .array(environmentCheckSchema)
+    .nonempty()
+    .superRefine((checks, context) => {
+      const seen = new Set<string>();
+      for (const [index, check] of checks.entries()) {
+        if (seen.has(check.area)) {
+          context.addIssue({
+            code: "custom",
+            message: `duplicate environment area ${check.area}`,
+            path: [index, "area"],
+          });
+        }
+        seen.add(check.area);
+      }
+    }),
+});
+
 const artifactProducedSchema = z.strictObject({
   path: nonEmptyStringSchema,
   kind: nonEmptyStringSchema,
@@ -333,6 +358,7 @@ export const EVENT_TYPES = Object.freeze([
   "project.state.changed",
   "project.snapshot.captured",
   "project.revived",
+  "project.environment.checked",
   "artifact.produced",
   "artifact.derived",
   "measurement.recorded",
@@ -388,6 +414,7 @@ export const eventPayloadSchemas = Object.freeze({
   "project.state.changed": immutableSchema(projectStateChangedSchema),
   "project.snapshot.captured": immutableSchema(projectSnapshotCapturedSchema),
   "project.revived": immutableSchema(projectRevivedSchema),
+  "project.environment.checked": immutableSchema(projectEnvironmentCheckedSchema),
   "artifact.produced": immutableSchema(artifactProducedSchema),
   "artifact.derived": immutableSchema(artifactDerivedSchema),
   "measurement.recorded": immutableSchema(measurementRecordedSchema),

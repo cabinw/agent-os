@@ -84,6 +84,13 @@ export type LibraryRevivalIssue = DeepReadonly<
     reason: string;
   }
 >;
+export type LibraryStaleness = DeepReadonly<
+  Sourced & {
+    area: "dependencies" | "apis" | "credentials";
+    state: "likely-stale" | "current" | "stale";
+    detail: string | null;
+  }
+>;
 export type LibraryRevivalReport = DeepReadonly<{
   built: readonly LibraryRevivalTask[];
   current: Sourced & {
@@ -94,6 +101,7 @@ export type LibraryRevivalReport = DeepReadonly<{
   decisions: readonly LibraryKnowledge[];
   unfinished: readonly LibraryRevivalTask[];
   issues: readonly LibraryRevivalIssue[];
+  staleness: readonly LibraryStaleness[];
   plan: readonly LibraryNextStep[];
 }>;
 export type ProjectLibraryItem = DeepReadonly<{
@@ -238,6 +246,14 @@ function buildProject(
   let agents: AgentCatalogState = { placements: {} };
   let summaryEvent: StoredEvent<"pulse.story.generated"> | undefined;
   let revivalEvent: StoredEvent<"project.revived"> | undefined;
+  const environmentChecks = new Map<
+    "dependencies" | "apis" | "credentials",
+    Readonly<{
+      status: "current" | "stale";
+      detail: string;
+      event: StoredEvent<"project.environment.checked">;
+    }>
+  >();
   const latestTaskEvent = new Map<string, StoredEvent>();
   const latestAgentEvent = new Map<string, StoredEvent>();
   const snapshots: LibrarySnapshot[] = [];
@@ -281,6 +297,14 @@ function buildProject(
         summaryEvent = event;
       } else if (event.type === "project.revived") {
         revivalEvent = event;
+      } else if (event.type === "project.environment.checked") {
+        for (const check of event.payload.checks) {
+          environmentChecks.set(check.area, {
+            status: check.status,
+            detail: check.detail,
+            event,
+          });
+        }
       } else if (event.type === "knowledge.created") {
         knowledge.push({
           knowledge: event.subject.id,
@@ -368,7 +392,13 @@ function buildProject(
 
   const last = history.at(-1) ?? created;
   const lastDormancyActivity =
-    [...history].reverse().find((event) => event.type !== "project.revived") ?? created;
+    [...history]
+      .reverse()
+      .find(
+        (event) =>
+          event.type !== "project.revived" &&
+          event.type !== "project.environment.checked",
+      ) ?? created;
   const inactivity = Math.max(0, now - Date.parse(lastDormancyActivity.at));
   const dormantDays = Math.floor(inactivity / 86_400_000);
   const nextSteps =
@@ -438,6 +468,22 @@ function buildProject(
               sourceEvents: eventIds(latestTaskEvent.get(task.id)),
             })),
           issues: revivalIssues,
+          staleness: (["dependencies", "apis", "credentials"] as const).map((area) => {
+            const checked = environmentChecks.get(area);
+            return checked === undefined
+              ? {
+                  area,
+                  state: "likely-stale" as const,
+                  detail: null,
+                  sourceEvents: [lastDormancyActivity.id],
+                }
+              : {
+                  area,
+                  state: checked.status,
+                  detail: checked.detail,
+                  sourceEvents: [checked.event.id],
+                };
+          }),
           plan: nextSteps,
         }
       : null;

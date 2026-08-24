@@ -117,6 +117,15 @@ const VALID_PAYLOADS: Record<EventType, unknown> = {
       },
     ],
   },
+  "project.environment.checked": {
+    checks: [
+      {
+        area: "dependencies",
+        status: "current",
+        detail: "Lockfile installs and the build succeeds.",
+      },
+    ],
+  },
   "artifact.produced": {
     path: "artifacts/event-contract.md",
     kind: "document",
@@ -190,13 +199,13 @@ function draftFor(type: EventType) {
 }
 
 describe("RM-1.1a · versioned strict event contract", () => {
-  it("exports exactly the 30 canonical event types in catalog order", () => {
+  it("exports exactly the 31 canonical event types in catalog order", () => {
     const catalog = readFileSync("docs/protocol/event-catalog.md", "utf8");
     const catalogTypes = [...catalog.matchAll(/^\| `([a-z]+(?:\.[a-z]+)+)`/gmu)].map(
       (match) => match[1],
     );
 
-    expect(EVENT_TYPES).toHaveLength(30);
+    expect(EVENT_TYPES).toHaveLength(31);
     expect([...EVENT_TYPES]).toEqual(catalogTypes);
     expect(Object.isFrozen(EVENT_TYPES)).toBe(true);
     expect(Object.isFrozen(eventPayloadSchemas)).toBe(true);
@@ -410,6 +419,22 @@ describe("RM-1.1a · versioned strict event contract", () => {
           ...revivedPayload,
           plan: [{ ...revivedPayload.plan[0], invented: true }],
         },
+      }),
+    ).toThrow();
+  });
+
+  it("rejects duplicate environment areas and non-factual statuses", () => {
+    expect(() =>
+      parseEventPayload("project.environment.checked", {
+        checks: [
+          { area: "apis", status: "current", detail: "API responds." },
+          { area: "apis", status: "stale", detail: "API is deprecated." },
+        ],
+      }),
+    ).toThrow();
+    expect(() =>
+      parseEventPayload("project.environment.checked", {
+        checks: [{ area: "credentials", status: "likely-stale", detail: "Not checked." }],
       }),
     ).toThrow();
   });

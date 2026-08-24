@@ -236,6 +236,11 @@ describe("RM-3.5 sourced Project Library", () => {
           sourceEvents: [blocker.id],
         },
       ],
+      staleness: [
+        { area: "dependencies", state: "likely-stale", detail: null },
+        { area: "apis", state: "likely-stale", detail: null },
+        { area: "credentials", state: "likely-stale", detail: null },
+      ],
       plan: [{ title: "Check environment", sourceEvents: [revival.id] }],
     });
     expect(item?.knowledge[0]?.sourceEvents).toEqual([decision.id, blocker.id]);
@@ -265,10 +270,50 @@ describe("RM-3.5 sourced Project Library", () => {
       },
       NOW,
     );
+    const checked = add(
+      target,
+      "project.environment.checked",
+      subject("project", target.project),
+      {
+        checks: [
+          {
+            area: "dependencies",
+            status: "stale",
+            detail: "The existing lockfile no longer resolves.",
+          },
+          {
+            area: "credentials",
+            status: "current",
+            detail: "Credential validation succeeded without exposing secrets.",
+          },
+        ],
+      },
+      NOW,
+    );
     const item = library().projects[0];
     expect(item?.dormantDays).toBe(54);
     expect(item?.revival?.plan).toHaveLength(1);
-    expect(item?.lastActivity.type).toBe("project.revived");
+    expect(item?.lastActivity.type).toBe("project.environment.checked");
+    expect(item?.revival?.staleness).toEqual([
+      {
+        area: "dependencies",
+        state: "stale",
+        detail: "The existing lockfile no longer resolves.",
+        sourceEvents: [checked.id],
+      },
+      {
+        area: "apis",
+        state: "likely-stale",
+        detail: null,
+        sourceEvents: [target.history[1]?.id],
+      },
+      {
+        area: "credentials",
+        state: "current",
+        detail: "Credential validation succeeded without exposing secrets.",
+        sourceEvents: [checked.id],
+      },
+    ]);
   });
 
   it("ranks blocked work before review, running and created work", () => {

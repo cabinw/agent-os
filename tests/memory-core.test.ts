@@ -122,6 +122,15 @@ const PAYLOADS: Record<EventType, unknown> = {
     dormantDays: 31,
     plan: [{ title: "Inspect memory", estimateMinutes: 20, detail: "Replay events" }],
   },
+  "project.environment.checked": {
+    checks: [
+      {
+        area: "dependencies",
+        status: "stale",
+        detail: "The lockfile no longer resolves.",
+      },
+    ],
+  },
   "artifact.produced": {
     path: "artifacts/research.md",
     kind: "document",
@@ -287,10 +296,11 @@ describe("RM-2.1 · structural extraction triggers", () => {
     "artifact.produced",
     "artifact.derived",
     "measurement.recorded",
+    "project.environment.checked",
   ]);
 
   it("classifies every canonical event type without an unowned gap", () => {
-    expect(EVENT_TYPES).toHaveLength(30);
+    expect(EVENT_TYPES).toHaveLength(31);
     for (const type of EVENT_TYPES) {
       const classified = classifyKnowledgeEvent(eventFor(type));
       expect(classified.kind, type).toBe(
@@ -312,6 +322,11 @@ describe("RM-2.1 · structural extraction triggers", () => {
     ["artifact.produced", "research-produced", ["research", "technical-note"]],
     [
       "measurement.recorded",
+      "result-recorded",
+      ["task-summary", "milestone", "technical-note"],
+    ],
+    [
+      "project.environment.checked",
       "result-recorded",
       ["task-summary", "milestone", "technical-note"],
     ],

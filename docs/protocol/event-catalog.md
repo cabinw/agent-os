@@ -134,6 +134,7 @@ measurement may validate a knowledge item.
 | `project.state.changed` | `{ from: ProjectState, to: ProjectState }` | Project state changes; `from != to` |
 | `project.snapshot.captured` | `{ label, image, at: RFC3339 }` | A visual checkpoint is recorded |
 | `project.revived` | `{ dormantDays: PositiveInt, plan: NonEmptyArray<PlanStep> }` | Revival Mode generates a restart plan |
+| `project.environment.checked` | `{ checks: NonEmptyArray<{ area: dependencies \| apis \| credentials, status: current \| stale, detail }> }` | An environment check converts staleness uncertainty into sourced facts |
 
 `PlanStep` is strict `{ title, estimateMinutes: PositiveInt, detail }`; array
 order is execution order. Snapshot payload `at` is capture time and cannot be

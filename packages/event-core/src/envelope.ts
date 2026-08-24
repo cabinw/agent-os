@@ -176,6 +176,7 @@ const EVENT_SUBJECT_KINDS = {
   "project.state.changed": ["project"],
   "project.snapshot.captured": ["project"],
   "project.revived": ["project"],
+  "project.environment.checked": ["project"],
   "artifact.produced": ["artifact"],
   "artifact.derived": ["artifact"],
   "measurement.recorded": ["measurement"],

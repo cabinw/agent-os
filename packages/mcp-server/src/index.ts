@@ -107,6 +107,7 @@ export type {
   LibraryRevivalIssue,
   LibraryRevivalReport,
   LibraryRevivalTask,
+  LibraryStaleness,
   ProjectLibrary,
   ProjectLibraryItem,
   ProjectLibrarySource,

@@ -147,6 +147,11 @@ const RULES = Object.freeze({
     reason: "administrative",
   }),
   "project.revived": Object.freeze({ kind: "noise", reason: "derived-output" }),
+  "project.environment.checked": Object.freeze({
+    kind: "candidate",
+    trigger: "result-recorded",
+    possibleTypes: RESULT_TYPES,
+  }),
   "artifact.produced": Object.freeze({
     kind: "candidate",
     trigger: "research-produced",

@@ -66,6 +66,12 @@ activity, deprecated APIs, and expired credentials are flagged as *likely stale*
 rather than asserted as broken — the environment check in step 1 exists to
 convert those guesses into facts.
 
+The report always separates three categories: dependencies, APIs and
+credentials. Before verification each is `likely-stale`. The latest
+`project.environment.checked` result changes only the checked category to
+`current` or `stale`; partial checks never imply that the other categories were
+verified. Check details contain outcomes, not credential material.
+
 ## Why it works
 
 Every input already exists as events and knowledge. Revival Mode adds no new
