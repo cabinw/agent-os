@@ -92,6 +92,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-025](decisions/ADR-025-macos-shell-and-navigation.md) | macOS uses one native shell, seven route ids and one design-token authority |
 | [ADR-026](decisions/ADR-026-typed-json-i18n-catalogs.md) | UI copy comes from strict typed zh-CN/en JSON catalogs through `t()` |
 | [ADR-027](decisions/ADR-027-sourced-project-pulse.md) | Project Pulse is a deterministic cross-projection read model with source-event evidence |
+| [ADR-028](decisions/ADR-028-approval-surfaces-and-menu-bar-boundary.md) | Approval surfaces submit intents through one trusted client; high-risk decisions stay in app |
 
 ## Assets
 

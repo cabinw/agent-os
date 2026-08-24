@@ -71,8 +71,29 @@ takes one click without opening the app. Anything ambiguous — irreversible,
 high-risk, or lacking detail — is not decidable from the menu bar and links into
 the app instead.
 
+The application does not add an eighth top-level destination. A pending
+approval opens an Approval Center surface from Pulse, Tasks, a thread divider or
+the menu bar and preserves the current project context.
+
+The composition layer supplies an immutable sourced view. Every approval keeps
+the `approval.requested` event id; a terminal approval also keeps its decision
+event id. React does not replay events or infer attribution. Both the in-app and
+menu-bar surfaces submit only an opaque approval id plus note or rejection
+reason to one trusted decision client. The authenticated human principal and
+event admission stay behind that client; see ADR-028.
+
+The in-app surface shows action, full detail, risk, reversibility, requester,
+task attribution and evidence before a decision. An irreversible, high or
+critical request always deep-links here. Closing the view never changes durable
+state.
+
 ## Rejection
 
 A rejection requires a reason. It returns to the agent as guidance, and the task
 returns to `running` so the agent can propose an alternative rather than
 retrying the same action.
+
+Every rejection surface is two-step. Selecting reject reveals a reason field;
+only a non-empty trimmed reason enables confirmation. Cancelling that editor is
+a no-op. Conversations contain an approval divider and link only — message
+input never renders grant or reject controls.

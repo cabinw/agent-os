@@ -20,6 +20,9 @@ stays honest about needing attention.
 Only pending approvals and blockers change the icon. Progress does not — a
 constantly changing menu-bar icon trains people to ignore it.
 
+When both exist, Waiting wins over Attention: a pending human decision is more
+specific and directly actionable than the generic blocker state.
+
 ## Panel
 
 ```
@@ -55,7 +58,8 @@ Width 400pt. Sections collapse when empty — no "no blockers" placeholder rows.
 
 ## Inline approvals
 
-✓ / ✗ act immediately and emit `approval.granted` / `approval.rejected`.
+✓ / ✗ immediately submit grant or reject intent through the trusted client;
+successful admission emits `approval.granted` / `approval.rejected`.
 
 Constraints:
 
@@ -64,6 +68,12 @@ Constraints:
 - Irreversible or high-risk actions are **not** decidable here. They show the
   request and a "Review in app" affordance, because a one-click destructive
   approval from a menu bar is a mistake waiting to happen.
+
+"Immediately" describes the decision path, not a direct event write. The panel
+passes an opaque approval id to the trusted application client. Rust owns tray,
+panel and main-window focus only; it does not hold a human principal, replay
+events or decide policy. Rejection opens the reason field before the client is
+called. See ADR-028.
 
 ## Pause All
 
