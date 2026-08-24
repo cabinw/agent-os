@@ -8,6 +8,7 @@
     "sourceMap": false
   },
   "include": [
+    "./agent-sdk-contract.ts",
     "./event-core-contract.ts",
     "./mcp-server-contract.ts",
     "./sqlite-event-store-contract.ts",
