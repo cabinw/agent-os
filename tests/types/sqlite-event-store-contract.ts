@@ -1,4 +1,10 @@
-import type { EventInput, EventOf } from "../../packages/event-core/src/index.js";
+import type {
+  EventInput,
+  EventOf,
+  EventReducer,
+  ProjectId,
+} from "../../packages/event-core/src/index.js";
+import { createEventBus } from "../../packages/event-core/src/index.js";
 import type {
   BackupEvidence,
   EventStoreAppendError,
@@ -32,3 +38,18 @@ void eventCount;
 declare const failure: EventStoreAppendError;
 const retryable: boolean = failure.retryable;
 void retryable;
+
+const bus = createEventBus({ store });
+declare const project: ProjectId;
+const sequence = bus.registerReducer(
+  "sequence",
+  () => [] as number[],
+  (state, event) => [...state, event.seq],
+);
+const reduced: readonly number[] = sequence.get(project);
+void reduced;
+// @ts-expect-error reducers must be synchronous
+const asyncReducer: EventReducer<number> = async (state) => state + 1;
+void asyncReducer;
+// @ts-expect-error stored runtime fields cannot be appended as producer input
+bus.append(stored, { token: "wrong-shape" });
