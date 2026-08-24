@@ -238,6 +238,32 @@ function integerPragma(database: Database.Database, source: string): number {
   return value as number;
 }
 
+const SQLITE_RETRY_SIGNAL = new Int32Array(new SharedArrayBuffer(4));
+
+function isRetryableSqliteLock(cause: unknown): boolean {
+  if (cause === null || typeof cause !== "object") return false;
+  const code = (cause as { code?: unknown }).code;
+  return (
+    typeof code === "string" &&
+    (code === "SQLITE_LOCKED" || code.startsWith("SQLITE_BUSY"))
+  );
+}
+
+function withBusyRetry<T>(timeoutMs: number, operation: () => T): T {
+  const deadline = Date.now() + timeoutMs;
+  let delayMs = 1;
+  for (;;) {
+    try {
+      return operation();
+    } catch (cause) {
+      const remaining = deadline - Date.now();
+      if (!isRetryableSqliteLock(cause) || remaining <= 0) throw cause;
+      Atomics.wait(SQLITE_RETRY_SIGNAL, 0, 0, Math.min(delayMs, remaining));
+      delayMs = Math.min(delayMs * 2, 25);
+    }
+  }
+}
+
 function assertSafeCount(value: unknown, label: string): number {
   if (!Number.isSafeInteger(value) || (value as number) < 0) {
     throw new EventStoreIntegrityError(`${label} is not a non-negative safe integer`);
@@ -410,7 +436,10 @@ function configureConnection(database: Database.Database, busyTimeoutMs: number)
   database.pragma("foreign_keys = ON");
   database.pragma("trusted_schema = OFF");
   database.pragma("recursive_triggers = ON");
-  if (simplePragma(database, "journal_mode = WAL") !== "wal") {
+  const journalMode = withBusyRetry(busyTimeoutMs, () =>
+    simplePragma(database, "journal_mode = WAL"),
+  );
+  if (journalMode !== "wal") {
     throw new EventStoreOpenError("SQLite refused WAL journal mode");
   }
   database.pragma("synchronous = FULL");

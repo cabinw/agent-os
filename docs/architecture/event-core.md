@@ -156,7 +156,10 @@ Opening an empty database creates the schema in one exclusive transaction.
 Opening a non-empty database with a foreign application id, unknown version,
 unexpected object or failed integrity check performs no migration and no schema
 write. Normal connections require WAL, `synchronous=FULL`, foreign keys,
-`trusted_schema=OFF`, recursive triggers and a bounded busy timeout.
+`trusted_schema=OFF`, recursive triggers and a bounded busy timeout. SQLite does
+not consistently invoke the busy handler while competing connections switch a
+new database to WAL, so that PRAGMA also has a bounded lock retry; concurrent
+first open must not fail merely because another admitted writer starts first.
 
 Online backup uses SQLite's backup API, never a file copy of the live database.
 It writes a new same-directory temporary database, verifies application id,
