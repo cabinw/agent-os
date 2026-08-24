@@ -51,5 +51,30 @@ export type {
   KnowledgeSummarizer,
   KnowledgeSummarizerInput,
 } from "./extractor.js";
+export {
+  KnowledgeProjectionError,
+  assertKnowledgeSupersession,
+  emptyKnowledgeProjectState,
+  parseKnowledgeProjectState,
+  reduceKnowledgeProject,
+  registerKnowledgeReducer,
+} from "./projection.js";
+export type {
+  KnowledgeItem,
+  KnowledgeProjectState,
+  KnowledgeProjectionErrorCode,
+} from "./projection.js";
+export {
+  KnowledgeSuperseder,
+  KnowledgeSupersessionError,
+  createKnowledgeSuperseder,
+} from "./supersession.js";
+export type {
+  KnowledgeSupersederOptions,
+  KnowledgeSupersessionCommand,
+  KnowledgeSupersessionErrorCode,
+  KnowledgeSupersessionPort,
+  KnowledgeSupersessionRequest,
+} from "./supersession.js";
 
 export const PACKAGE = "memory-core" as const;
