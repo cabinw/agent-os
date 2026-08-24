@@ -47,6 +47,26 @@ export {
   validateTaskPlan,
 } from "./graph.js";
 export type { ProposedTask } from "./graph.js";
+export {
+  AgentCatalogError,
+  agentPlacementKey,
+  parseAgentCatalogState,
+  reduceAgentCatalog,
+  registerAgentCatalogReducer,
+} from "./catalog.js";
+export type { AgentCatalogState, AgentPlacementState } from "./catalog.js";
+export {
+  AgentRoutingInputError,
+  rankAgentPlacements,
+  selectAgentPlacement,
+} from "./routing.js";
+export type {
+  AgentOutcome,
+  AgentRouteCandidate,
+  AgentRouteResult,
+  LivePlacement,
+  NoEligiblePlacementReason,
+} from "./routing.js";
 export type TaskRef = Readonly<{
   project: import("@agent-os/event-core").ProjectId;
   id: import("@agent-os/event-core").TaskId;
