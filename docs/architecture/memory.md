@@ -27,6 +27,29 @@ Project Memory  ──▶ Knowledge Graph view · Revival Mode · agent context
 Summarization runs on a window of related events, never a single one, so the
 result reads as a conclusion rather than a log line.
 
+### Extraction trigger
+
+Memory Core opens a candidate window only from a structural anchor:
+
+| Anchor | Events |
+| --- | --- |
+| Decision | `approval.granted`, `approval.rejected` |
+| Result | `task.review.requested`, `task.completed`, `task.failed`, `task.cancelled`, `measurement.recorded` |
+| Resolved blocker | `task.unblocked` |
+| Concluded discussion | `message.sent` type `answer`, `report` or `review` |
+| Research artifact | `artifact.produced`, `artifact.derived` |
+
+Everything else is context or noise, not an anchor. In particular, active
+blockers and approval requests are unresolved; instruction, question, progress
+and warning messages are not conclusions; scheduling events are transient; and
+existing `knowledge.*`, `pulse.*` and `project.revived` output cannot trigger a
+recursive extraction. Classification is structural and never searches text or
+artifact names for keywords. See [ADR-020](../decisions/ADR-020-knowledge-candidate-classification.md).
+
+An anchor is still not knowledge. Extraction requires at least one related
+supporting event in the same project. Noise events may supply that causal or
+task context even though they cannot open a window themselves.
+
 ## Knowledge item
 
 ```json
@@ -47,6 +70,11 @@ result reads as a conclusion rather than a log line.
 
 Types: `decision`, `research`, `technical-note`, `task-summary`, `milestone`,
 `discussion`.
+
+The strict Memory Core draft is exactly the canonical `knowledge.created`
+payload. Id, author, time and sequence derive from the admitted event. Explicit
+`write_memory` adds runtime-owned causal `sourceEvents`; agents do not supply
+envelope authority or a second memory record.
 
 `sourceEvents` is what makes memory auditable — every claim can be traced back to
 the events that produced it. Memory is never the only copy of anything.
