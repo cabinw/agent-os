@@ -7,6 +7,7 @@ import {
   toolInputSchemas,
 } from "../packages/mcp-server/src/index.js";
 import type {
+  AuthorizationPort,
   McpCallContext,
   RuntimePort,
   ToolInputMap,
@@ -101,7 +102,10 @@ type RecordedCall = Readonly<{
   context: McpCallContext;
 }>;
 
-function harness(overrides: Partial<RuntimePort> = {}) {
+function harness(
+  overrides: Partial<RuntimePort> = {},
+  authorizationOverrides: Partial<AuthorizationPort> = {},
+) {
   const calls: RecordedCall[] = [];
   const record =
     (method: keyof RuntimePort) => (input: unknown, callContext: McpCallContext) => {
@@ -123,7 +127,17 @@ function harness(overrides: Partial<RuntimePort> = {}) {
     queryMemory: record("queryMemory"),
     ...overrides,
   } as RuntimePort;
-  return { calls, router: createMcpToolRouter(runtime), runtime };
+  const authorization: AuthorizationPort = {
+    isRegistered: () => true,
+    task: () => ({ owner: "codex" as never, executor: "codex" as never }),
+    ...authorizationOverrides,
+  };
+  return {
+    authorization,
+    calls,
+    router: createMcpToolRouter(runtime, authorization),
+    runtime,
+  };
 }
 
 describe("RM-1.3a · canonical MCP tool surface", () => {
@@ -253,9 +267,103 @@ describe("RM-1.3a · canonical MCP tool surface", () => {
   });
 
   it("fails fast when the Runtime Port is incomplete", () => {
+    const { authorization, runtime } = harness();
+    expect(() =>
+      createMcpToolRouter({ ...runtime, writeMemory: undefined } as never, authorization),
+    ).toThrow(/RuntimePort\.writeMemory/);
+  });
+});
+
+describe("RM-1.3b · fail-closed agent authorization", () => {
+  const registeredTools = TOOL_NAMES.filter((name) => name !== "register_agent");
+
+  it.each(registeredTools)(
+    "rejects unregistered %s before runtime dispatch",
+    async (name) => {
+      const { calls, router } = harness({}, { isRegistered: () => false });
+      await expect(router.call(name, validInputs[name], context())).rejects.toMatchObject(
+        {
+          code: "NOT_REGISTERED",
+          tool: name,
+        },
+      );
+      expect(calls).toEqual([]);
+    },
+  );
+
+  it("allows self-registration without trusting role as authority", async () => {
+    const { calls, router } = harness({}, { isRegistered: () => false });
+    await expect(
+      router.call(
+        "register_agent",
+        { ...validInputs.register_agent, role: "supervisor" },
+        context(),
+      ),
+    ).resolves.toEqual({ method: "registerAgent" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("allows only the task owner to assign", async () => {
+    const denied = harness(
+      {},
+      { task: () => ({ owner: "architect" as never, executor: "codex" as never }) },
+    );
+    await expect(
+      denied.router.call("assign_task", validInputs.assign_task, context()),
+    ).rejects.toMatchObject({ code: "NOT_TASK_OWNER" });
+    expect(denied.calls).toEqual([]);
+
+    const allowed = harness(
+      {},
+      { task: () => ({ owner: "codex" as never, executor: "other" as never }) },
+    );
+    await expect(
+      allowed.router.call("assign_task", validInputs.assign_task, context()),
+    ).resolves.toEqual({ method: "assignTask" });
+  });
+
+  it.each(["update_task", "notify_blocked", "report_result"] as const)(
+    "allows only the task executor to call %s",
+    async (name) => {
+      const denied = harness(
+        {},
+        { task: () => ({ owner: "codex" as never, executor: "other" as never }) },
+      );
+      await expect(
+        denied.router.call(name, validInputs[name], context()),
+      ).rejects.toMatchObject({ code: "NOT_TASK_EXECUTOR", tool: name });
+      expect(denied.calls).toEqual([]);
+    },
+  );
+
+  it("fails closed when task facts are missing", async () => {
+    const { calls, router } = harness({}, { task: () => null });
+    await expect(
+      router.call("report_result", validInputs.report_result, context()),
+    ).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
+    expect(calls).toEqual([]);
+  });
+
+  it.each([
+    ["find_agent", { isRegistered: () => Promise.reject(new Error("offline")) }],
+    ["assign_task", { task: () => Promise.reject(new Error("offline")) }],
+  ] as const)(
+    "fails closed when %s authorization reads fail",
+    async (name, overrides) => {
+      const { calls, router } = harness({}, overrides);
+      await expect(router.call(name, validInputs[name], context())).rejects.toMatchObject(
+        {
+          code: "AUTHORIZATION_UNAVAILABLE",
+        },
+      );
+      expect(calls).toEqual([]);
+    },
+  );
+
+  it("fails fast when the Authorization Port is incomplete", () => {
     const { runtime } = harness();
     expect(() =>
-      createMcpToolRouter({ ...runtime, writeMemory: undefined } as never),
-    ).toThrow(/RuntimePort\.writeMemory/);
+      createMcpToolRouter(runtime, { isRegistered: () => true } as never),
+    ).toThrow(/AuthorizationPort\.task/);
   });
 });

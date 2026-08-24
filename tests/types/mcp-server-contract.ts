@@ -4,6 +4,7 @@ import {
   toolInputSchemas,
 } from "../../packages/mcp-server/src/index.js";
 import type {
+  AuthorizationPort,
   McpCallContext,
   RuntimePort,
   ToolInputMap,
@@ -11,10 +12,11 @@ import type {
 } from "../../packages/mcp-server/src/index.js";
 
 declare const runtime: RuntimePort;
+declare const authorization: AuthorizationPort;
 declare const context: McpCallContext;
 declare const input: ToolInputMap["create_task"];
 
-const router = createMcpToolRouter(runtime);
+const router = createMcpToolRouter(runtime, authorization);
 const names: readonly ToolName[] = TOOL_NAMES;
 const result: Promise<unknown> = router.call("create_task", input, context);
 const title: string = toolInputSchemas.create_task.parse(input).title;
