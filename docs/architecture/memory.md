@@ -50,6 +50,21 @@ An anchor is still not knowledge. Extraction requires at least one related
 supporting event in the same project. Noise events may supply that causal or
 task context even though they cannot open a window themselves.
 
+### Causal window
+
+The runtime supplies complete, contiguous project history from sequence 1.
+Memory Core validates every backward `causedBy`, same-thread message `replyTo`,
+approval request/decision subject, direct task attribution and artifact
+derivation before building one deterministic window. The window contains the
+anchor plus at least one supporting event; a lone or corrupt anchor is not sent
+to a model. See [ADR-021](../decisions/ADR-021-causal-knowledge-windows.md).
+
+The summarizer receives this frozen window and an authority-free strict output
+schema. It cannot choose `sourceEvents`, `relatedTasks`, event authority or the
+idempotency token. Memory Core attaches the exact ordered window ids and derived
+task set, checks the returned type against the anchor's allowed types, reparses
+the canonical draft, then hands one command to an injected admission port.
+
 ## Knowledge item
 
 ```json
@@ -77,7 +92,9 @@ payload. Id, author, time and sequence derive from the admitted event. Explicit
 envelope authority or a second memory record.
 
 `sourceEvents` is what makes memory auditable — every claim can be traced back to
-the events that produced it. Memory is never the only copy of anything.
+the events that produced it. In v1 this is an item-level evidence set: every
+generated statement is attributed to the same complete window. Memory is never
+the only copy of anything.
 
 ## Superseding
 
