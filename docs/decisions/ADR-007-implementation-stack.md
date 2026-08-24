@@ -32,7 +32,8 @@ server event log and Runners own execution and working copies. Local-first is an
 implementation order, not the product topology.
 
 **Event store: SQLite (better-sqlite3, WAL).** Append-only table, per-project
-monotonic `seq`, separate snapshot table. The synchronous API keeps reducers pure
+monotonic `seq`; projection snapshots use the separate sidecar decided by
+[ADR-010](ADR-010-projection-snapshots-as-sidecar-cache.md). The synchronous API keeps reducers pure
 functions — an async reducer would destroy replay determinism.
 
 **Native driver isolation: a separate SQLite adapter package.**

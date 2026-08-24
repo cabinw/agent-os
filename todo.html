@@ -496,7 +496,7 @@ apps/runner ──▶ agent-sdk ──▶ event-core types</code></pre>
 
   <li><input type="checkbox" id="t-1-4"><label for="t-1-4" class="tb">
     <span class="tt"><span class="tid">1.1d</span>快照与恢复</span>
-    <span class="td">每 N 条事件写一次状态快照；启动时加载最新快照 + 重放尾部。快照是缓存，删掉必须不丢数据。</span>
+    <span class="td">每 N 条事件写一次状态快照；启动时验证 reducer manifest、严格 state parser 与 through-event anchor，再重放尾部。快照位于独立 SQLite cache，任何失败退回全量重放。</span>
     <span class="tm"><span class="tag pkg">event-core</span><span class="tag dep">依赖 1.1c</span><span class="tag sz">2 天</span></span>
     <span class="done-when"><b>完成判据：</b>删除所有快照后重启，状态不变</span>
   </label></li>

@@ -179,7 +179,7 @@ createEventBus({ store, onSubscriberError? }) → EventBus
 bus.append(input, { token })                  → StoredEvent
 bus.subscribe(handler, { project? })          → unsubscribe
 bus.replay(project)                           → ReplayEvidence
-bus.registerReducer(name, initialState, fn)   → ReducerHandle<State>
+bus.registerReducer(name, initialState, fn, snapshot?) → ReducerHandle<State>
 handle.get(project)                           → DeepReadonly<State>
 
 store.read(project, { afterSeq? })             → readonly StoredEvent[]
@@ -222,9 +222,57 @@ correcting the code and replaying — never by hand-patching stored state.
 
 ## Snapshots
 
-Full replay is the correctness model, not the hot path. The store writes a state
+Full replay is the correctness model, not the hot path. The bus writes a state
 snapshot every N events; startup loads the latest snapshot and replays the tail.
 Snapshots are a cache and may be discarded without data loss.
+
+RM-1.1d keeps projection snapshots outside the permanent event database. The
+SQLite adapter exposes a separate cache file and Event Core only sees this
+interface:
+
+```ts
+createEventBus({
+  store,
+  snapshots,
+  snapshotEvery,
+  onSnapshotError?
+})
+
+snapshots.load(project, manifest)  → ProjectionSnapshot | null
+snapshots.save(snapshot)           → void
+snapshots.delete(project, manifest) → void
+snapshots.clear(project?)          → deleted row count
+```
+
+The sidecar is a separate identified SQLite database, not a table added
+silently to the frozen event-store v1 format. It contains only the latest cache
+row for `(project, manifest)`. Deleting the file or every row must leave a full
+replay with identical state. Event-store backup does not include it.
+
+When snapshots are enabled, every reducer registration supplies an explicit
+cache version and a synchronous strict state parser. The manifest is the
+canonical sorted list of `(reducer name, cache version)`; changing a reducer's
+projection semantics requires changing its version. Function source text is
+never hashed as a substitute for a version.
+
+A snapshot records `project`, `throughSeq`, `throughEventId`, `manifest` and one
+state per registered reducer. Startup accepts it only when:
+
+1. its manifest and exact state-key set match the installed reducers;
+2. every state passes that reducer's current parser;
+3. the event at `throughSeq` still has `throughEventId`;
+4. the ordered tail begins at `throughSeq + 1`.
+
+Any load, parse, anchor or save failure is reported to `onSnapshotError`, the
+bad cache row is discarded when possible, and Event Core falls back to full
+replay. Snapshot failure never rolls back or hides a durable event. Capture
+happens after all reducer candidates for the boundary event are published; it
+never notifies live subscribers and never writes a domain event.
+
+`project.snapshot.captured` is unrelated: it records a user-visible visual
+checkpoint in the permanent event log. Runner session/request JSON snapshots
+are also operational state, not reducer caches, and cannot satisfy RM-1.1d.
+See [ADR-010](../decisions/ADR-010-projection-snapshots-as-sidecar-cache.md).
 
 ## What Event Core does not do
 
