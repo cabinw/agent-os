@@ -133,13 +133,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
       <section class="overall-progress" id="overview" aria-labelledby="overall-title">
         <div class="overall-meters">
-          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:39.11%">
-            <div class="overall-number"><strong id="overall-percent">39.11%</strong><small>总体实际完成度</small></div>
+          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:39.14%">
+            <div class="overall-number"><strong id="overall-percent">39.14%</strong><small>总体实际完成度</small></div>
           </div>
           <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 60%">
             <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">60%</strong></div>
             <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:60%"></span></div>
-            <small id="current-live-detail">RM-1.1b · 9/10 已验证 · 1 处理中 · 0 待验收</small>
+            <small id="current-live-detail">RM-1.1c · Canonical 文档与现有 reducer 审计启动</small>
           </div>
         </div>
         <div class="overall-copy">
@@ -240,10 +240,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 109,
-  "updatedAt": "2026-08-24 11:02 CST",
+  "revision": 110,
+  "updatedAt": "2026-08-24 11:04 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "RM-1.1b",
+  "currentTaskId": "RM-1.1c",
   "verification": {"testsPassed":323,"testsTotal":323,"filesPassed":15,"filesTotal":15,"gatePassed":5,"gateTotal":5,"lintErrors":0,"checkedAt":"2026-08-24 02:46 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":29,"eventSchemaTotal":29,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
@@ -276,7 +276,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"SVR-06","scope":"route","phase":"Server","title":"服务器自动验收入口与交付矩阵","status":"created","progress":0,"priority":"P1","owner":"服务器工程师 + Codex 验收","dependsOn":["SVR-05"],"blockedBy":[],"acceptance":"静态部署门禁、双机 smoke 命令、全量 verify、脱敏证据矩阵和逐任务 commit 全部可复核。","source":"CLAUDE.md","summary":"交付本地安全门禁与明确的双机 smoke 入口；服务器工程师推送分支，我 review 后再决定集成。"},
 
     {"id":"RM-1.1a","scope":"roadmap","phase":"Phase 1","title":"事件信封 + 29 个 strict schema + ULID","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"未知 version/type 或任何多余字段在 parse 时被拒绝。","source":"todo.html#p1","summary":"version-first parser、type↔subject、深冻结、精确 RFC3339、自引用防线与安全类型收窄已落实；323/323 全仓验证通过。"},
-    {"id":"RM-1.1b","scope":"roadmap","phase":"Phase 1","title":"SQLite 事件存储：append-only + 幂等","status":"running","progress":98,"priority":"P0","owner":"Codex","dependsOn":["RM-1.1a"],"acceptance":"并发 append 无重复 seq；同一 token 重试只落一条。","source":"todo.html#p1","summary":"独立adapter、稳定错误/类型边界、精确DDL与在线备份实现完成；16/16专项测试及全仓339/339通过，build/type/Biome/layer/native filtered-deploy全部绿色。架构、实现、测试已拆成3个逻辑提交；剩余2分只等远端推送确认。","progressBasis":[{"label":"Canonical 契约与反方设计审计","earned":15,"total":15},{"label":"Native 依赖隔离实证","earned":5,"total":5},{"label":"API、DDL 与运维文档","earned":10,"total":10},{"label":"SQLite adapter 实现","earned":35,"total":35},{"label":"并发、耐久与备份测试","earned":25,"total":25},{"label":"全仓集成验证","earned":5,"total":5},{"label":"逻辑提交与交付","earned":3,"total":5}],"checkpoints":[{"label":"Canonical 文档与现有代码对照","status":"done"},{"label":"EventInput / project token 幂等边界","status":"done"},{"label":"Native filtered-deploy 隔离实验","status":"done"},{"label":"API / DDL / 初始化 / 备份契约","status":"done"},{"label":"独立包骨架 / exact pin / layer guard","status":"done"},{"label":"SQLite adapter 事务实现","status":"done"},{"label":"幂等与真实多连接并发测试","status":"done"},{"label":"WAL 在线备份与恢复测试","status":"done"},{"label":"pnpm verify 全仓门禁","status":"done"},{"label":"逻辑提交与交付","status":"running"}]},
+    {"id":"RM-1.1b","scope":"roadmap","phase":"Phase 1","title":"SQLite 事件存储：append-only + 幂等","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":["RM-1.1a"],"acceptance":"并发 append 无重复 seq；同一 token 重试只落一条。","source":"todo.html#p1","summary":"独立adapter、稳定错误/类型边界、精确DDL与在线备份实现完成；16/16专项测试及全仓339/339通过，build/type/Biome/layer/native filtered-deploy全部绿色。架构、实现、测试和看板4个逻辑提交已推送原GitHub仓库。","progressBasis":[{"label":"Canonical 契约与反方设计审计","earned":15,"total":15},{"label":"Native 依赖隔离实证","earned":5,"total":5},{"label":"API、DDL 与运维文档","earned":10,"total":10},{"label":"SQLite adapter 实现","earned":35,"total":35},{"label":"并发、耐久与备份测试","earned":25,"total":25},{"label":"全仓集成验证","earned":5,"total":5},{"label":"逻辑提交与交付","earned":5,"total":5}],"checkpoints":[{"label":"Canonical 文档与现有代码对照","status":"done"},{"label":"EventInput / project token 幂等边界","status":"done"},{"label":"Native filtered-deploy 隔离实验","status":"done"},{"label":"API / DDL / 初始化 / 备份契约","status":"done"},{"label":"独立包骨架 / exact pin / layer guard","status":"done"},{"label":"SQLite adapter 事务实现","status":"done"},{"label":"幂等与真实多连接并发测试","status":"done"},{"label":"WAL 在线备份与恢复测试","status":"done"},{"label":"pnpm verify 全仓门禁","status":"done"},{"label":"逻辑提交与交付","status":"done"}]},
     {"id":"RM-1.1c","scope":"roadmap","phase":"Phase 1","title":"事件总线、重放与 reducer 注册","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1b"],"acceptance":"从首条事件重放与增量归约状态完全一致。","source":"todo.html#p1","summary":"把 ADR-005 变成机器守住的性质。"},
     {"id":"RM-1.1d","scope":"roadmap","phase":"Phase 1","title":"快照与恢复","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["RM-1.1c"],"acceptance":"删除全部快照后重启，状态不变。","source":"todo.html#p1","summary":"快照只是缓存，不能成为真相来源。"},
     {"id":"RM-1.2a","scope":"roadmap","phase":"Phase 1","title":"任务状态转移矩阵与穷举测试","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["RM-1.1c"],"acceptance":"8 状态 × 10 事件全覆盖；progress 不触发状态转移。","source":"todo.html#p1","summary":"实现 ADR-002 的完整生命周期。"},
@@ -381,6 +381,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-24 11:04","kind":"completed","entity":"RM-1.1b","title":"原仓库推送确认，RM-1.1b 达到100%","detail":"77a0502、99f42a3、26d6c23与看板373439f已推送origin/codex/project-control；最后2分只在远端确认后计入。总体从39.11%升至39.14%，当前任务切换RM-1.1c文档/代码审计。"},
     {"at":"2026-08-24 11:02","kind":"progress","entity":"RM-1.1b","title":"3个逻辑提交完成，进度升至98%","detail":"77a0502冻结架构契约、99f42a3实现SQLite adapter、26d6c23记录并发/崩溃/备份测试；提交仅计3分，总体从39.06%升至39.11%，远端尚未确认所以不计最后2分。"},
     {"at":"2026-08-24 10:59","kind":"progress","entity":"RM-1.1b","title":"全仓339/339通过，进度即时升至95%","detail":"构建、类型、Biome、4条分层规则、native filtered-deploy和16个测试文件全部绿色；PROB-STORE由NO-GO关闭。功能/测试95分已全部计入，总体从39.00%升至39.06%，提交仍只占最后5分。"},
     {"at":"2026-08-24 10:57","kind":"verified","entity":"RM-1.1b","title":"Runner native absence 正式门禁通过，进度升至91%","detail":"真实filtered deploy确认Runner不含event-store-sqlite/better-sqlite3，adapter部署包含精确Hub-only驱动闭包；总体立即从38.97%升至39.00%。"},
