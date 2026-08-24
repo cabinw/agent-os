@@ -118,5 +118,19 @@ export type {
   WorkforceTask,
   WorkforceTaskAssignment,
 } from "./workforce.js";
+export {
+  HumanPostingCommandError,
+  HumanPostingPolicyError,
+  buildHumanPostingPolicy,
+  createHumanPostingService,
+} from "./human-posting.js";
+export type {
+  HumanMessageCommand,
+  HumanMessageWriter,
+  HumanPostingPolicy,
+  HumanPostingPolicySource,
+  HumanPostingService,
+  HumanPostingServiceOptions,
+} from "./human-posting.js";
 
 export const PACKAGE = "mcp-server" as const;
