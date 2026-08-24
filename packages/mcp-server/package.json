@@ -17,6 +17,7 @@
     "@agent-os/agent-sdk": "workspace:*",
     "@agent-os/event-core": "workspace:*",
     "@agent-os/memory-core": "workspace:*",
-    "@agent-os/task-engine": "workspace:*"
+    "@agent-os/task-engine": "workspace:*",
+    "zod": "4.4.3"
   }
 }

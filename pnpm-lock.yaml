@@ -66,6 +66,9 @@ importers:
       '@agent-os/task-engine':
         specifier: workspace:*
         version: link:../task-engine
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
 
   packages/memory-core:
     dependencies:
