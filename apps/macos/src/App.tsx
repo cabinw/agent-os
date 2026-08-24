@@ -1,6 +1,7 @@
 import { useState } from "react";
 import styles from "./App.module.css";
 import { Icon } from "./Icon.js";
+import { ProjectPulseView, type ProjectPulseViewModel } from "./Pulse.js";
 import { type Locale, t } from "./i18n.js";
 import {
   NAVIGATION,
@@ -12,7 +13,9 @@ import {
 
 type Density = "comfortable" | "compact";
 
-export function App() {
+export function App({
+  pulse = null,
+}: Readonly<{ pulse?: ProjectPulseViewModel | null }>) {
   const [locale, setLocale] = useState<Locale>("zh-CN");
   const [density, setDensity] = useState<Density>("comfortable");
   const [route, setRoute] = useState<RouteId>(() => landingRoute(false));
@@ -89,61 +92,67 @@ export function App() {
           </div>
         </header>
 
-        <div className={styles.content}>
-          <section className={styles.hero}>
-            <div className={styles.heroCopy}>
-              <span className={styles.readyChip}>{t(locale, "shell.status.ready")}</span>
-              <h2>{t(locale, "shell.ready.title")}</h2>
-              <p>{t(locale, "shell.ready.detail")}</p>
-            </div>
-            <div className={styles.routeSummary}>
-              <span className={styles.eyebrow}>{labelFor(route, locale)}</span>
-              <strong>{descriptionFor(route, locale)}</strong>
-            </div>
-          </section>
-
-          <section aria-labelledby="foundation-title">
-            <div className={styles.sectionHeading}>
-              <div>
-                <span className={styles.eyebrow}>
-                  {t(locale, "shell.foundation.milestone")}
+        {route === "project-pulse" ? (
+          <ProjectPulseView pulse={pulse} locale={locale} />
+        ) : (
+          <div className={styles.content}>
+            <section className={styles.hero}>
+              <div className={styles.heroCopy}>
+                <span className={styles.readyChip}>
+                  {t(locale, "shell.status.ready")}
                 </span>
-                <h2 id="foundation-title">{t(locale, "shell.foundation.title")}</h2>
+                <h2>{t(locale, "shell.ready.title")}</h2>
+                <p>{t(locale, "shell.ready.detail")}</p>
               </div>
-              <span className={styles.pendingChip}>
-                {t(locale, "shell.status.pending")}
-              </span>
-            </div>
-            <div className={styles.foundationGrid}>
-              {[
-                t(locale, "shell.foundation.nativeWindow"),
-                t(locale, "shell.foundation.navigation"),
-                t(locale, "shell.foundation.tokens"),
-              ].map((title, index) => (
-                <article className={styles.foundationCard} key={title}>
-                  <span className={styles.cardNumber}>
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <h3>{title}</h3>
-                  <span className={styles.readyState}>
-                    {t(locale, "shell.status.ready")}
-                  </span>
-                </article>
-              ))}
-            </div>
-          </section>
+              <div className={styles.routeSummary}>
+                <span className={styles.eyebrow}>{labelFor(route, locale)}</span>
+                <strong>{descriptionFor(route, locale)}</strong>
+              </div>
+            </section>
 
-          <section className={styles.pendingSurface} aria-labelledby="pending-title">
-            <div className={styles.pendingGlyph} aria-hidden="true">
-              ◇
-            </div>
-            <div>
-              <h2 id="pending-title">{t(locale, "shell.livePending.title")}</h2>
-              <p>{t(locale, "shell.livePending.detail")}</p>
-              <small>{t(locale, "shell.foundation.note")}</small>
-            </div>
-          </section>
-        </div>
+            <section aria-labelledby="foundation-title">
+              <div className={styles.sectionHeading}>
+                <div>
+                  <span className={styles.eyebrow}>
+                    {t(locale, "shell.foundation.milestone")}
+                  </span>
+                  <h2 id="foundation-title">{t(locale, "shell.foundation.title")}</h2>
+                </div>
+                <span className={styles.pendingChip}>
+                  {t(locale, "shell.status.pending")}
+                </span>
+              </div>
+              <div className={styles.foundationGrid}>
+                {[
+                  t(locale, "shell.foundation.nativeWindow"),
+                  t(locale, "shell.foundation.navigation"),
+                  t(locale, "shell.foundation.tokens"),
+                ].map((title, index) => (
+                  <article className={styles.foundationCard} key={title}>
+                    <span className={styles.cardNumber}>
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <h3>{title}</h3>
+                    <span className={styles.readyState}>
+                      {t(locale, "shell.status.ready")}
+                    </span>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className={styles.pendingSurface} aria-labelledby="pending-title">
+              <div className={styles.pendingGlyph} aria-hidden="true">
+                ◇
+              </div>
+              <div>
+                <h2 id="pending-title">{t(locale, "shell.livePending.title")}</h2>
+                <p>{t(locale, "shell.livePending.detail")}</p>
+                <small>{t(locale, "shell.foundation.note")}</small>
+              </div>
+            </section>
+          </div>
+        )}
       </main>
     </div>
   );

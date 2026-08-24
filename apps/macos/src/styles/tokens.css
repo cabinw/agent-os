@@ -18,8 +18,10 @@
   --focus: #4f46e5;
   --overlay: rgba(17, 24, 39, 0.08);
   --brand-gradient: linear-gradient(135deg, var(--accent), var(--accent-end));
+  --brand-gradient-soft: linear-gradient(135deg, var(--accent-soft), var(--surface));
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI",
     sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --font-size-page: 28px;
   --font-size-hero: 36px;
   --font-size-section: 15px;
