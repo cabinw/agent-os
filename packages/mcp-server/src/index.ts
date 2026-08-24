@@ -22,6 +22,29 @@ export {
 } from "./schemas.js";
 export type { McpCallContext, ToolInputMap, ToolName } from "./schemas.js";
 export type { AuthorizationPort, AuthorizedTask } from "./authorization.js";
+export {
+  ApprovalProjectionError,
+  parseApprovalProjectState,
+  reduceApprovalProject,
+  registerApprovalReducer,
+} from "./approval-projection.js";
+export type {
+  ApprovalDecision,
+  ApprovalProjectState,
+  ApprovalState,
+  ApprovalStatus,
+} from "./approval-projection.js";
+export { ApprovalGate, ApprovalGateError, createApprovalGate } from "./approval-gate.js";
+export type {
+  ApprovalCommandPort,
+  ApprovalGateOptions,
+  ApprovalOutcome,
+  ApprovalPrompt,
+  ApprovalPromptDecision,
+  ApprovalScheduler,
+  HumanPrincipal,
+  PendingApproval,
+} from "./approval-gate.js";
 export { McpToolError } from "./errors.js";
 export type { McpToolErrorCode } from "./errors.js";
 export { createMcpToolRouter } from "./router.js";
