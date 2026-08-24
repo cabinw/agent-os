@@ -196,6 +196,44 @@ describe("RM-1.1b · SQLite append-only event store", () => {
     store.close();
   });
 
+  it("atomically appends and idempotently replays one same-project event group", () => {
+    const target = scratch();
+    const store = openSqliteEventStore({ path: target.path, now: () => FIXED_AT });
+    const group = [
+      { input: projectCreated("proj_group", "One"), options: { token: "group:1" } },
+      { input: projectCreated("proj_group", "Two"), options: { token: "group:2" } },
+    ];
+    const first = store.appendGroup(group);
+    const retry = store.appendGroup(group);
+
+    expect(first.map((event) => event.seq)).toEqual([1, 2]);
+    expect(retry).toEqual(first);
+    expect(store.read("proj_group" as never)).toEqual(first);
+    store.close();
+  });
+
+  it("rejects partial group retries without appending the new members", () => {
+    const target = scratch();
+    const store = openSqliteEventStore({ path: target.path, now: () => FIXED_AT });
+    const existing = {
+      input: projectCreated("proj_group", "One"),
+      options: { token: "partial:1" },
+    };
+    store.append(existing.input, existing.options);
+
+    expect(() =>
+      store.appendGroup([
+        existing,
+        {
+          input: projectCreated("proj_group", "Two"),
+          options: { token: "partial:2" },
+        },
+      ]),
+    ).toThrow(IdempotencyConflictError);
+    expect(store.read("proj_group" as never)).toHaveLength(1);
+    store.close();
+  });
+
   it("persists idempotency across reopen and rejects non-canonical tokens", () => {
     const target = scratch();
     const firstStore = openSqliteEventStore({ path: target.path, now: () => FIXED_AT });

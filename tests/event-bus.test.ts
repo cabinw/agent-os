@@ -96,6 +96,29 @@ describe("RM-1.1c · Event Bus, replay and reducer registration", () => {
     store.close();
   });
 
+  it("publishes an atomic store group only after every durable member is visible", () => {
+    const store = openSqliteEventStore({ path: scratchPath() });
+    const bus = createEventBus({ store });
+    const state = bus.registerReducer("sequence", () => [] as number[], sequenceReducer);
+    const observed: Array<readonly [number, readonly number[]]> = [];
+    bus.subscribe((event) => {
+      observed.push([event.seq, [...state.get("proj_bus" as never)]]);
+    });
+
+    const events = bus.appendGroup([
+      { input: projectCreated("one"), options: { token: "group-one" } },
+      { input: projectCreated("two"), options: { token: "group-two" } },
+    ]);
+
+    expect(events.map((event) => event.seq)).toEqual([1, 2]);
+    expect(state.get("proj_bus" as never)).toEqual([1, 2]);
+    expect(observed).toEqual([
+      [1, [1, 2]],
+      [2, [1, 2]],
+    ]);
+    store.close();
+  });
+
   it("idempotent append retry is neither reduced nor notified twice", () => {
     const store = openSqliteEventStore({ path: scratchPath() });
     const bus = createEventBus({ store });
