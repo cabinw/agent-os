@@ -158,6 +158,37 @@ function internalPackage(specifier) {
   return specifier.match(/^@agent-os\/([a-z-]+)(?:\/|$)/)?.[1] ?? null;
 }
 
+/** Imported i18n t(locale, key) calls use dotted catalog keys, not events. */
+function importedTranslationFunctions(source) {
+  const names = new Set();
+  for (const node of source.statements) {
+    if (
+      !ts.isImportDeclaration(node) ||
+      !ts.isStringLiteralLike(node.moduleSpecifier) ||
+      !/(?:^|\/)i18n\.js$/.test(node.moduleSpecifier.text) ||
+      !node.importClause?.namedBindings ||
+      !ts.isNamedImports(node.importClause.namedBindings)
+    ) {
+      continue;
+    }
+    for (const element of node.importClause.namedBindings.elements) {
+      if ((element.propertyName ?? element.name).text === "t")
+        names.add(element.name.text);
+    }
+  }
+  return names;
+}
+
+function isTranslationKey(literal, translationFunctions) {
+  const call = literal.parent;
+  return (
+    ts.isCallExpression(call) &&
+    call.arguments[1] === literal &&
+    ts.isIdentifier(call.expression) &&
+    translationFunctions.has(call.expression.text)
+  );
+}
+
 /** Strip line and block comments so prose in a doc comment is never a hit. */
 function stripComments(src) {
   return src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
@@ -274,9 +305,13 @@ if (catalogTypes.size === 0) {
   for (const file of EVENT_ROOTS.flatMap((r) => sourceFiles(r))) {
     const source = parseSource(file);
     const modules = new Set(moduleSpecifiers(source).map(({ node }) => node.pos));
+    const translationFunctions = importedTranslationFunctions(source);
     const literals = visit(
       source,
-      (node) => ts.isStringLiteralLike(node) && !modules.has(node.pos),
+      (node) =>
+        ts.isStringLiteralLike(node) &&
+        !modules.has(node.pos) &&
+        !isTranslationKey(node, translationFunctions),
     );
 
     for (const literal of literals) {

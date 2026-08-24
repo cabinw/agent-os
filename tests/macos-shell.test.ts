@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { LOCALES, copy } from "../apps/macos/src/i18n.js";
+import { LOCALES, t } from "../apps/macos/src/i18n.js";
 import { NAVIGATION, ROUTE_IDS, landingRoute } from "../apps/macos/src/navigation.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -49,11 +49,9 @@ describe("RM-3.1 canonical macOS shell", () => {
   it("externalizes every route label and description for both locales", () => {
     expect(LOCALES).toEqual(["zh-CN", "en"]);
     for (const locale of LOCALES) {
-      expect(Object.keys(copy[locale].nav)).toEqual([...ROUTE_IDS]);
-      expect(Object.keys(copy[locale].routeDescription)).toEqual([...ROUTE_IDS]);
       for (const id of ROUTE_IDS) {
-        expect(copy[locale].nav[id].trim()).not.toBe("");
-        expect(copy[locale].routeDescription[id].trim()).not.toBe("");
+        expect(t(locale, `nav.${id}.label`).trim()).not.toBe("");
+        expect(t(locale, `route.${id}.description`).trim()).not.toBe("");
       }
     }
   });

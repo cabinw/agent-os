@@ -98,6 +98,30 @@ describe("check:layers 能真的抓到违规", () => {
     expect(out).toContain("事件类型绕过目录");
   });
 
+  it("放行从 i18n 模块导入的 t(locale, key) 翻译键", () => {
+    const file = join(ROOT, "apps", "macos", "src", "__layering_i18n_probe.ts");
+    writeFileSync(
+      file,
+      'import { t } from "./i18n.js";\nvoid t("en", "probe.translation.key");\n',
+      "utf8",
+    );
+    planted.push(file);
+    expect(run().code).toBe(0);
+  });
+
+  it("不允许本地同名 t() 冒充导入翻译函数绕过事件目录", () => {
+    const file = join(ROOT, "apps", "macos", "src", "__layering_i18n_probe.ts");
+    writeFileSync(
+      file,
+      'const t = (...args: unknown[]) => args;\nvoid t("en", "task.definitely.hidden");\n',
+      "utf8",
+    );
+    planted.push(file);
+    const { code, out } = run();
+    expect(code).toBe(1);
+    expect(out).toContain("事件类型绕过目录");
+  });
+
   it("抓到 dynamic import 形成的反向依赖", () => {
     plant("event-core", 'export const load = () => import("@agent-os/task-engine");\n');
     const { code, out } = run();
