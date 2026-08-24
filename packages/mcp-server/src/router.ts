@@ -1,4 +1,7 @@
 import { ZodError, z } from "zod";
+import { authorizeToolCall } from "./authorization.js";
+import type { AuthorizationPort } from "./authorization.js";
+import { McpToolError } from "./errors.js";
 import {
   TOOL_DESCRIPTIONS,
   TOOL_NAMES,
@@ -75,30 +78,6 @@ const RUNTIME_METHODS = Object.freeze([
   "queryMemory",
 ] as const satisfies readonly (keyof RuntimePort)[]);
 
-export class McpToolError extends Error {
-  readonly code:
-    | "INVALID_ARGUMENTS"
-    | "INVALID_CONTEXT"
-    | "PRINCIPAL_MISMATCH"
-    | "UNKNOWN_TOOL";
-  readonly tool: string;
-  readonly issues: readonly unknown[];
-
-  constructor(
-    code: McpToolError["code"],
-    tool: string,
-    message: string,
-    issues: readonly unknown[] = [],
-    options?: ErrorOptions,
-  ) {
-    super(message, options);
-    this.name = "McpToolError";
-    this.code = code;
-    this.tool = tool;
-    this.issues = issues;
-  }
-}
-
 export type McpToolDefinition = Readonly<{
   name: ToolName;
   description: string;
@@ -165,19 +144,25 @@ function assertPrincipal(tool: ToolName, claimed: string, context: McpCallContex
   }
 }
 
+function assertInputPrincipal<Name extends ToolName>(
+  name: Name,
+  input: ToolInputMap[Name],
+  context: McpCallContext,
+): void {
+  if (name === "register_agent") {
+    assertPrincipal(name, (input as ToolInputMap["register_agent"]).id, context);
+  } else if (name === "send_message") {
+    assertPrincipal(name, (input as ToolInputMap["send_message"]).from, context);
+  }
+}
+
 const DISPATCHERS: DispatcherMap = {
-  register_agent: (runtime, input, context) => {
-    assertPrincipal("register_agent", input.id, context);
-    return runtime.registerAgent(input, context);
-  },
+  register_agent: (runtime, input, context) => runtime.registerAgent(input, context),
   find_agent: (runtime, input, context) => runtime.findAgent(input, context),
   create_task: (runtime, input, context) => runtime.createTask(input, context),
   assign_task: (runtime, input, context) => runtime.assignTask(input, context),
   update_task: (runtime, input, context) => runtime.updateTask(input, context),
-  send_message: (runtime, input, context) => {
-    assertPrincipal("send_message", input.from, context);
-    return runtime.sendMessage(input, context);
-  },
+  send_message: (runtime, input, context) => runtime.sendMessage(input, context),
   notify_blocked: (runtime, input, context) => runtime.notifyBlocked(input, context),
   report_result: (runtime, input, context) => runtime.reportResult(input, context),
   request_approval: (runtime, input, context) => runtime.requestApproval(input, context),
@@ -201,7 +186,10 @@ export type McpToolRouter = Readonly<{
   call(name: string, input: unknown, context: unknown): Promise<unknown>;
 }>;
 
-export function createMcpToolRouter(runtime: RuntimePort): McpToolRouter {
+export function createMcpToolRouter(
+  runtime: RuntimePort,
+  authorization: AuthorizationPort,
+): McpToolRouter {
   if (runtime === null || typeof runtime !== "object") {
     throw new TypeError("RuntimePort is required");
   }
@@ -209,6 +197,15 @@ export function createMcpToolRouter(runtime: RuntimePort): McpToolRouter {
     if (typeof runtime[method] !== "function") {
       throw new TypeError(`RuntimePort.${method} must be a function`);
     }
+  }
+  if (authorization === null || typeof authorization !== "object") {
+    throw new TypeError("AuthorizationPort is required");
+  }
+  if (typeof authorization.isRegistered !== "function") {
+    throw new TypeError("AuthorizationPort.isRegistered must be a function");
+  }
+  if (typeof authorization.task !== "function") {
+    throw new TypeError("AuthorizationPort.task must be a function");
   }
   const definitions = Object.freeze(
     TOOL_NAMES.map((name) =>
@@ -230,6 +227,8 @@ export function createMcpToolRouter(runtime: RuntimePort): McpToolRouter {
       const tool = name as ToolName;
       const context = parseContext(tool, contextValue);
       const parsed = parseInput(tool, input);
+      assertInputPrincipal(tool, parsed, context);
+      await authorizeToolCall(authorization, tool, parsed, context);
       return await dispatch(runtime, tool, parsed, context);
     },
   });

@@ -21,7 +21,10 @@ export {
   toolInputSchemas,
 } from "./schemas.js";
 export type { McpCallContext, ToolInputMap, ToolName } from "./schemas.js";
-export { McpToolError, createMcpToolRouter } from "./router.js";
+export type { AuthorizationPort, AuthorizedTask } from "./authorization.js";
+export { McpToolError } from "./errors.js";
+export type { McpToolErrorCode } from "./errors.js";
+export { createMcpToolRouter } from "./router.js";
 export type {
   McpToolDefinition,
   McpToolRouter,
