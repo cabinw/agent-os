@@ -66,6 +66,17 @@ export {
   AutonomousTaskRouter,
   createAutonomousTaskRouter,
 } from "./autonomous-routing.js";
+export {
+  AgentPerformanceError,
+  deriveAgentPerformance,
+  performanceForCapabilities,
+} from "./performance.js";
+export type {
+  AgentPerformance,
+  AgentPerformanceReport,
+  CapabilityPerformance,
+  PerformanceAggregate,
+} from "./performance.js";
 export type {
   AutonomousAssignmentCommand,
   AutonomousRoutingDecision,

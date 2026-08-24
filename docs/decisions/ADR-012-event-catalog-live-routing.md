@@ -36,11 +36,14 @@ Candidates use one deterministic order:
 1. full required-capability match;
 2. lower logical load ratio;
 3. lower placement load;
-4. higher accepted-result rate with Laplace smoothing;
-5. lexical agent id, then host id.
+4. higher required-capability result score with Laplace smoothing;
+5. higher global accepted-result rate with Laplace smoothing;
+6. lexical agent id, then host id.
 
 Only `completed` and `failed` tasks score past outcomes. Cancelled work is not an
-agent result. Routing never reads `provider` or integration capability.
+agent result. Capability attribution and duration reporting follow
+[ADR-039](ADR-039-agent-performance-is-derived-per-capability.md). Routing never
+reads `provider` or integration capability.
 
 No match is a value, not an exception or silent empty list. The result names one
 of `no-capability`, `unreachable`, `unavailable` or `saturated`; the command

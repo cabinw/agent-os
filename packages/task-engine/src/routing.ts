@@ -2,6 +2,8 @@ import { CAPABILITIES, entityIdSchema } from "@agent-os/event-core";
 import type { Capability, EntityId } from "@agent-os/event-core";
 import { agentPlacementKey } from "./catalog.js";
 import type { AgentCatalogState, AgentPlacementState } from "./catalog.js";
+import { deriveAgentPerformance, performanceForCapabilities } from "./performance.js";
+import type { CapabilityPerformance } from "./performance.js";
 import type { TaskProjectState } from "./reducer.js";
 
 export type LivePlacement = Readonly<{
@@ -26,6 +28,8 @@ export type AgentRouteCandidate = Readonly<{
   placementActive: number;
   outcomes: AgentOutcome;
   outcomeScore: number;
+  capabilityPerformance: readonly CapabilityPerformance[];
+  capabilityOutcomeScore: number;
 }>;
 
 export type NoEligiblePlacementReason =
@@ -134,23 +138,6 @@ function logicalLoads(
   return loads;
 }
 
-function taskOutcomes(tasks: TaskProjectState): ReadonlyMap<string, AgentOutcome> {
-  const outcomes = new Map<string, { completed: number; failed: number }>();
-  for (const task of Object.values(tasks.tasks)) {
-    if (
-      task.executor === undefined ||
-      (task.status !== "completed" && task.status !== "failed")
-    ) {
-      continue;
-    }
-    const current = outcomes.get(task.executor) ?? { completed: 0, failed: 0 };
-    if (task.status === "completed") current.completed += 1;
-    else current.failed += 1;
-    outcomes.set(task.executor, current);
-  }
-  return outcomes;
-}
-
 function compareCandidates(
   left: AgentRouteCandidate,
   right: AgentRouteCandidate,
@@ -164,6 +151,9 @@ function compareCandidates(
   if (logicalLoad !== 0) return logicalLoad;
   if (left.placementActive !== right.placementActive) {
     return left.placementActive - right.placementActive;
+  }
+  if (left.capabilityOutcomeScore !== right.capabilityOutcomeScore) {
+    return right.capabilityOutcomeScore - left.capabilityOutcomeScore;
   }
   const leftOutcomeNumerator = left.outcomes.completed + 1;
   const leftOutcomeDenominator = left.outcomes.completed + left.outcomes.failed + 2;
@@ -186,7 +176,7 @@ export function rankAgentPlacements(
   assertRequirements(requires);
   const live = liveByKey(catalog, livePlacements);
   const loads = logicalLoads(live);
-  const outcomes = taskOutcomes(tasks);
+  const performance = deriveAgentPerformance(tasks);
   const candidates: AgentRouteCandidate[] = [];
   for (const [key, placement] of Object.entries(catalog.placements)) {
     if (!hasCapabilities(placement, requires)) continue;
@@ -194,7 +184,12 @@ export function rankAgentPlacements(
     if (current === undefined || !current.accepting) continue;
     const logicalActive = loads.get(placement.agent) ?? 0;
     if (logicalActive >= placement.concurrency) continue;
-    const history = outcomes.get(placement.agent) ?? { completed: 0, failed: 0 };
+    const overall = performance.agents[placement.agent]?.overall;
+    const history = {
+      completed: overall?.completed ?? 0,
+      failed: overall?.failed ?? 0,
+    };
+    const capability = performanceForCapabilities(performance, placement.agent, requires);
     candidates.push({
       agent: placement.agent,
       host: placement.host,
@@ -205,6 +200,8 @@ export function rankAgentPlacements(
       placementActive: current.active,
       outcomes: { ...history },
       outcomeScore: (history.completed + 1) / (history.completed + history.failed + 2),
+      capabilityPerformance: capability.capabilities,
+      capabilityOutcomeScore: capability.successScore,
     });
   }
   return candidates.sort(compareCandidates);

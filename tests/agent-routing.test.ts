@@ -76,8 +76,36 @@ function catalog(...registrations: StoredEvent<"agent.registered">[]): AgentCata
   return registrations.reduce(reduceAgentCatalog, { placements: {} });
 }
 
-function task(id: string, executor: string, status: TaskStatus): TaskState {
-  return { id, executor, status } as TaskState;
+function task(
+  id: string,
+  executor: string,
+  status: TaskStatus,
+  requires: readonly Capability[] = ["coding"],
+): TaskState {
+  const terminal = status === "completed" || status === "failed";
+  return {
+    id,
+    project: PROJECT,
+    title: id,
+    goal: id,
+    status,
+    progress: status === "completed" ? 100 : 50,
+    priority: "medium",
+    requires,
+    owner: "supervisor",
+    executor,
+    dependsOn: [],
+    outputs: [],
+    requiresApproval: false,
+    createdAt: "2026-08-24T04:00:00Z",
+    startedAt: "2026-08-24T04:01:00Z",
+    ...(status === "completed" ? { acceptedBy: "supervisor" } : {}),
+    ...(status === "failed" ? { failure: { reason: "failed", attempts: 1 } } : {}),
+    ...(status === "cancelled"
+      ? { cancellation: { by: "supervisor", reason: "cancelled" } }
+      : {}),
+    ...(terminal || status === "cancelled" ? { terminalAt: "2026-08-24T04:02:00Z" } : {}),
+  } as TaskState;
 }
 
 function tasks(...items: TaskState[]): TaskProjectState {
@@ -260,6 +288,29 @@ describe("RM-1.2c · deterministic capability routing", () => {
       "beta@b1",
     ]);
     expect(ranked[2]?.outcomes).toEqual({ completed: 0, failed: 1 });
+  });
+
+  it("uses required-capability outcomes before global outcomes", () => {
+    const state = catalog(
+      registration("alpha", "a1", ["coding", "testing"]),
+      registration("beta", "b1", ["coding", "testing"]),
+    );
+    const history = tasks(
+      task("TASK-001", "alpha", "completed", ["coding"]),
+      task("TASK-002", "alpha", "failed", ["testing"]),
+      task("TASK-003", "beta", "failed", ["coding"]),
+      task("TASK-004", "beta", "completed", ["testing"]),
+    );
+    const snapshot = [live("alpha", "a1"), live("beta", "b1")];
+
+    expect(selectAgentPlacement(state, history, snapshot, ["coding"])).toMatchObject({
+      matched: true,
+      candidate: { agent: "alpha", capabilityOutcomeScore: 2 / 3 },
+    });
+    expect(selectAgentPlacement(state, history, snapshot, ["testing"])).toMatchObject({
+      matched: true,
+      candidate: { agent: "beta", capabilityOutcomeScore: 2 / 3 },
+    });
   });
 
   it("sums active work across hosts and excludes every placement when saturated", () => {

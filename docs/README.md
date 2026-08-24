@@ -104,6 +104,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-036](decisions/ADR-036-negotiation-separates-agent-consensus-from-human-resolution.md) | Negotiation state separates agent consensus from escalated human resolution |
 | [ADR-037](decisions/ADR-037-agent-plan-proposals-are-reviewed-additive-graphs.md) | Worker plan proposals are reviewed additive graphs with atomic acceptance |
 | [ADR-038](decisions/ADR-038-autonomous-routing-is-serialized-event-reconciliation.md) | Autonomous routing serializes one event-driven reservation per project |
+| [ADR-039](decisions/ADR-039-agent-performance-is-derived-per-capability.md) | Agent performance is replay-derived per capability and feeds deterministic routing |
 
 ## Assets
 

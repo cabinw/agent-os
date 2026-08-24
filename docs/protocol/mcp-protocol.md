@@ -395,4 +395,4 @@ the graph against current state and atomically admits `plan.accepted` plus all
 
 ## Planned
 
-Autonomous task routing and agent performance analytics.
+No additional Phase 5 protocol surface is defined.

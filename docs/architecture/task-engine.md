@@ -74,7 +74,8 @@ task.requires = ["coding", "testing"]
         │
         ▼
 find_agent(capabilities) ──▶ `(agent, host)` candidates ranked by
-                              (capability match, current load, past outcomes)
+                              (capability match, current load,
+                               capability outcomes, global outcomes)
 ```
 
 If no candidate exists the task stays `created` and the Supervisor is notified —
@@ -90,7 +91,8 @@ The durable Agent Catalog and live routing inputs are separate:
 ```
 agent.* events ──▶ catalog `(agent, host)` facts
 Runner snapshot ─▶ reachable · accepting · active dispatches
-task projection ─▶ completed / failed outcomes by logical executor
+task projection ─▶ completed / failed outcomes and duration
+                   by logical executor × required capability
                          │
                          ▼
                   rankAgentPlacements(...)
@@ -99,9 +101,12 @@ task projection ─▶ completed / failed outcomes by logical executor
 `reduceAgentCatalog` validates registration identity and lifecycle replay.
 `rankAgentPlacements` joins it with authenticated live telemetry. It requires a
 full capability match, sums active dispatches across hosts against logical
-`concurrency`, then sorts by logical load ratio, placement load, Laplace-smoothed
-accepted-result rate and lexical `(agent, host)` tie-breakers. It never reads
-`provider` or integration capability.
+`concurrency`, then sorts by logical load ratio, placement load,
+Laplace-smoothed required-capability score, global accepted-result rate and
+lexical `(agent, host)` tie-breakers. `deriveAgentPerformance` also reports
+average observed task duration; no performance state is stored. It never reads
+`provider` or integration capability. See
+[ADR-039](../decisions/ADR-039-agent-performance-is-derived-per-capability.md).
 
 `selectAgentPlacement` returns either a chosen candidate or an explicit
 `no-capability`, `unreachable`, `unavailable` or `saturated` result. The Hub must
