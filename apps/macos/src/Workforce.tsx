@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { type ConversationProjectViewModel, ThreadsReader } from "./Threads.js";
 import styles from "./Workforce.module.css";
 import type { Locale } from "./i18n.js";
 import { t } from "./i18n.js";
@@ -232,7 +233,12 @@ export function TasksView({
 export function AgentsView({
   workforce,
   locale,
-}: Readonly<{ workforce: ProjectWorkforceViewModel | null; locale: Locale }>) {
+  conversation = null,
+}: Readonly<{
+  workforce: ProjectWorkforceViewModel | null;
+  locale: Locale;
+  conversation?: ConversationProjectViewModel | null;
+}>) {
   const [mode, setMode] = useState<"roster" | "threads">("roster");
   if (workforce === null)
     return (
@@ -264,13 +270,7 @@ export function AgentsView({
         </button>
       </nav>
       {mode === "threads" ? (
-        <section className={styles.pending}>
-          <span aria-hidden="true">◇</span>
-          <div>
-            <h3>{t(locale, "workforce.threads.pending.title")}</h3>
-            <p>{t(locale, "workforce.threads.pending.detail")}</p>
-          </div>
-        </section>
+        <ThreadsReader conversation={conversation} locale={locale} />
       ) : (
         <>
           <section
