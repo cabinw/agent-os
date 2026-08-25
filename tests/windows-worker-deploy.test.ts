@@ -206,6 +206,13 @@ public static class Probe {
     expect(module).toContain("DeleteSubdirectoriesAndFiles");
     expect(module).toContain("PropagationFlags]::InheritOnly");
     expect(module).toContain("$checkedDirectParent");
+    const trustedExecutable = module.slice(
+      module.indexOf("function Assert-AgentOSTrustedExecutable"),
+      module.indexOf("function Get-AgentOSWorkerProcesses"),
+    );
+    expect(trustedExecutable).toContain("FileSystemRights]::WriteData");
+    expect(trustedExecutable).toContain("FileSystemRights]::AppendData");
+    expect(trustedExecutable).not.toContain("'Write, Modify, FullControl");
     expect(module).toContain("function Get-AgentOSCanonicalReleaseManifest");
     expect(module).toContain("function Get-AgentOSExactTreeDigest");
     expect(module).toContain("function Assert-AgentOSConfiguredWorkerRelease");
