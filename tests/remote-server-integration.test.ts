@@ -1,5 +1,14 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +18,11 @@ import {
   SubprocessAdapter,
   childProcessEnv,
 } from "../apps/chat-spike/src/adapters/base.mjs";
+// @ts-expect-error — spike modules are plain .mjs, not part of tsc --build
+import {
+  createRunnerWorker,
+  requireWindowsJobAssignment,
+} from "../apps/chat-spike/src/runner-worker.mjs";
 
 const SERVER = resolve("apps/chat-spike/src/server.mjs");
 const WORKER_ENTRY = resolve("apps/chat-spike/src/runner-worker.mjs");
@@ -60,6 +74,15 @@ class ChildEnvFixtureAdapter extends SubprocessAdapter {
 
   handleLine(line: FixtureLine) {
     return { text: line.text, sessionId: line.sessionId };
+  }
+}
+
+class PathShadowFixtureAdapter extends SubprocessAdapter {
+  static id = "path-shadow-fixture";
+  static label = "PATH shadow fixture";
+
+  buildCommand() {
+    return { cmd: "shadowed-vendor", args: [] };
   }
 }
 
@@ -201,6 +224,86 @@ async function terminate(server: ReturnType<typeof spawnServer>) {
 }
 
 describe("Remote Runner production composition", () => {
+  it("requires a fixed Job Object assignment gate before Windows startup", async () => {
+    const scratch = await realpath(
+      await mkdtemp(join(tmpdir(), "agent-os-job-assignment-")),
+    );
+    const gate = join(scratch, "job-assigned.gate");
+    try {
+      expect(() =>
+        requireWindowsJobAssignment({
+          environment: { AGENT_OS_JOB_ASSIGNMENT_GATE: gate },
+          platform: "win32",
+          timeoutMs: 0,
+        }),
+      ).toThrow(/was not proven/);
+      await writeFile(gate, "assigned", { mode: 0o600 });
+      expect(() =>
+        requireWindowsJobAssignment({
+          environment: { AGENT_OS_JOB_ASSIGNMENT_GATE: gate },
+          platform: "win32",
+          timeoutMs: 0,
+        }),
+      ).not.toThrow();
+      await rm(gate);
+      await symlink(join(scratch, "missing"), gate);
+      expect(() =>
+        requireWindowsJobAssignment({
+          environment: { AGENT_OS_JOB_ASSIGNMENT_GATE: gate },
+          platform: "win32",
+          timeoutMs: 0,
+        }),
+      ).toThrow();
+    } finally {
+      await rm(scratch, { force: true, recursive: true });
+    }
+  });
+
+  it("injects one configured Windows durability boundary into both Worker stores", async () => {
+    const scratch = await realpath(
+      await mkdtemp(join(tmpdir(), "agent-os-worker-durability-")),
+    );
+    try {
+      const gate = join(scratch, "job-assigned.gate");
+      await writeFile(gate, "assigned", { mode: 0o600 });
+      const environment = {
+        AGENT_OS_JOB_ASSIGNMENT_GATE: gate,
+        AGENT_OS_URL: "https://hub.example.invalid",
+        AGENT_OS_RUNNER_TOKEN: RUNNER_TOKEN,
+        AGENT_OS_RUNNER_ID: HOST_ID,
+        AGENT_OS_AGENT_TOKENS: JSON.stringify({
+          "env-fixture": AGENT_TOKENS.claude,
+        }),
+        AGENT_CWD: join(scratch, "workspaces"),
+        SESSION_PATH: join(scratch, "state", "sessions.json"),
+        AGENT_OS_CREDENTIAL_ROOT: join(scratch, "state", "credentials"),
+      };
+      const durability = {
+        platform: "win32",
+        windowsReplace: () => {},
+      };
+      const { runner } = createRunnerWorker({
+        environment: { ...environment },
+        platform: "win32",
+        durability,
+        adapterCatalog: [ChildEnvFixtureAdapter],
+        getAdapterImpl: () => ChildEnvFixtureAdapter,
+      });
+      expect(runner.sessionStore.durability).toBe(durability);
+      expect(runner.requestStore.durability).toBe(durability);
+
+      expect(() =>
+        createRunnerWorker({
+          environment: { ...environment },
+          platform: "win32",
+          adapterCatalog: [ChildEnvFixtureAdapter],
+          getAdapterImpl: () => ChildEnvFixtureAdapter,
+        }),
+      ).toThrow(/AGENT_OS_PWSH_BIN is required/);
+    } finally {
+      await rm(scratch, { force: true, recursive: true });
+    }
+  });
   it("removes control credentials from a real vendor child", async () => {
     const scratch = await mkdtemp(join(tmpdir(), "agent-os-child-env-"));
     const controlled = {
@@ -211,6 +314,10 @@ describe("Remote Runner production composition", () => {
       agent_os_runner_token: "lowercase_control_token_must_be_removed",
       AGENT_OS_TOKEN: "ambient_token_that_must_be_replaced",
       AGENT_OS_URL: "https://ambient.invalid",
+      AWS_ACCESS_KEY_ID: "unrelated_aws_secret",
+      DATABASE_URL: "postgres://unrelated:secret@database.invalid/app",
+      GITHUB_TOKEN: "unrelated_github_secret",
+      PATH: `${scratch}/malicious-path-shadow`,
     };
     const previous = new Map(
       Object.keys(controlled).map((name) => [name, process.env[name]]),
@@ -237,15 +344,43 @@ describe("Remote Runner production composition", () => {
         lowercaseRunnerToken: null,
         scopedToken: AGENT_TOKENS.claude,
         scopedUrl: "https://hub.example",
+        path: null,
+        githubToken: null,
+        awsAccessKey: null,
+        databaseUrl: null,
       });
       expect(() => childProcessEnv({ AGENT_OS_RUNNER_TOKEN: RUNNER_TOKEN })).toThrow(
         /不允许注入控制面变量/,
+      );
+      expect(() => childProcessEnv({ GITHUB_TOKEN: "injected" })).toThrow(
+        /不允许注入非允许变量/,
       );
     } finally {
       for (const [name, value] of previous) {
         if (value === undefined) delete process.env[name];
         else process.env[name] = value;
       }
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects a bare vendor command before a malicious PATH shadow can execute", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "agent-os-path-shadow-"));
+    const shadow = join(scratch, "shadowed-vendor");
+    const marker = join(scratch, "executed");
+    const previousPath = process.env.PATH;
+    try {
+      await writeFile(shadow, `#!/bin/sh\n: > '${marker}'\n`, "utf8");
+      await chmod(shadow, 0o700);
+      process.env.PATH = `${scratch}${process.platform === "win32" ? ";" : ":"}${previousPath ?? ""}`;
+      const adapter = new PathShadowFixtureAdapter({ cwd: scratch });
+      await expect(adapter.send("must not execute")).rejects.toThrow(
+        /executable 必须是固定绝对路径/,
+      );
+      expect(await exists(marker)).toBe(false);
+    } finally {
+      if (previousPath === undefined) process.env.PATH = undefined;
+      else process.env.PATH = previousPath;
       await rm(scratch, { recursive: true, force: true });
     }
   });
@@ -303,6 +438,10 @@ describe("Remote Runner production composition", () => {
       {
         env: { ...valid, AGENT_OS_RUNNER_TOKEN: AGENT_TOKENS.claude },
         message: /RUNNER_TOKEN must be independent/,
+      },
+      {
+        env: valid,
+        message: /AGENT_OS_CODEX_BIN is required/,
       },
       {
         env: {
@@ -490,6 +629,10 @@ describe("Remote Runner production composition", () => {
         AGENT_OS_RUNNER_ID: HOST_ID,
         AGENT_OS_RUNNER_TOKEN: RUNNER_TOKEN,
         AGENT_OS_AGENT_TOKENS: JSON.stringify(AGENT_TOKENS),
+        AGENT_OS_CLAUDE_BIN: process.execPath,
+        AGENT_OS_CODEX_BIN: process.execPath,
+        AGENT_OS_GROK_BIN: process.execPath,
+        AGENT_OS_KIMI_BIN: process.execPath,
         AGENT_CWD: entryWorkspace,
         SESSION_PATH: join(scratch, "entry-worker", "sessions.json"),
       });

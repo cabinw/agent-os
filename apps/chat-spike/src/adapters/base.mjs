@@ -14,6 +14,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { isAbsolute } from "node:path";
 import {
   RUNNER_ERROR_CODES,
   RunnerDispatchError,
@@ -26,11 +27,33 @@ function abortReason(signal, fallback = "Adapter 已取消") {
 
 const SCOPED_AGENT_ENV = new Set(["AGENT_OS_URL", "AGENT_OS_TOKEN"]);
 const isAgentOsEnv = (name) => name.toUpperCase().startsWith("AGENT_OS_");
+const INHERITED_VENDOR_ENV = new Set([
+  "APPDATA",
+  "COLORTERM",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "LOCALAPPDATA",
+  "NO_COLOR",
+  "PROGRAMDATA",
+  "SSL_CERT_DIR",
+  "SSL_CERT_FILE",
+  "SystemRoot",
+  "TEMP",
+  "TERM",
+  "TMP",
+  "TMPDIR",
+  "TZ",
+  "USERPROFILE",
+  "WINDIR",
+  "XDG_CACHE_HOME",
+  "XDG_CONFIG_HOME",
+]);
 
 /**
- * Vendor processes inherit normal tool/runtime configuration, never Agent OS
- * control-plane credentials. A per-agent MCP mount may add back only its own
- * scoped URL and bearer token.
+ * Vendor processes receive a minimal runtime allowlist, never the Worker's
+ * ambient PATH, cloud/database credentials or Agent OS control-plane secrets.
+ * A per-agent MCP mount may add back only its own scoped URL and bearer token.
  */
 export function childProcessEnv(extra = {}) {
   if (extra === null || typeof extra !== "object" || Array.isArray(extra)) {
@@ -38,12 +61,13 @@ export function childProcessEnv(extra = {}) {
   }
   const environment = Object.fromEntries(
     Object.entries(process.env).filter(
-      ([name, value]) => !isAgentOsEnv(name) && value !== undefined,
+      ([name, value]) => INHERITED_VENDOR_ENV.has(name) && value !== undefined,
     ),
   );
   for (const [name, value] of Object.entries(extra)) {
-    if (isAgentOsEnv(name) && !SCOPED_AGENT_ENV.has(name)) {
-      throw new TypeError(`child process 不允许注入控制面变量 ${name}`);
+    if (!SCOPED_AGENT_ENV.has(name)) {
+      const category = isAgentOsEnv(name) ? "控制面变量" : "非允许变量";
+      throw new TypeError(`child process 不允许注入${category} ${name}`);
     }
     if (typeof value !== "string") {
       throw new TypeError(`child process env ${name} 必须是字符串`);
@@ -79,11 +103,12 @@ export class Adapter {
    * participate channel opening inside a wake. Null means the vendor will not,
    * and the adapter speaks for it instead.
    *
-   * @param {{ cwd: string, model?: string, onEvent?: (e: object) => void,
+   * @param {{ cwd: string, executable?: string, model?: string, onEvent?: (e: object) => void,
    *           mcp?: {args: string[], env: Record<string,string>} | null }} opts
    */
-  constructor({ cwd, model, onEvent, mcp }) {
+  constructor({ cwd, executable, model, onEvent, mcp }) {
     this.cwd = cwd;
+    this.executable = executable;
     this.model = model;
     this.onEvent = onEvent ?? (() => {});
     this.mcp = mcp ?? null;
@@ -166,6 +191,15 @@ export class SubprocessAdapter extends Adapter {
     const started = Date.now();
     const built = this.buildCommand(prompt, this._sessionId);
     const cmd = built.cmd;
+    if (typeof cmd !== "string" || !isAbsolute(cmd)) {
+      throw new TypeError(`${this.constructor.label} executable 必须是固定绝对路径`);
+    }
+    if (
+      !Array.isArray(built.args) ||
+      built.args.some((value) => typeof value !== "string")
+    ) {
+      throw new TypeError(`${this.constructor.label} arguments 必须是字符串数组`);
+    }
     // Appended, never woven in: two vendors are sensitive to argument order and
     // the trailing position is the one that behaves the same everywhere.
     const args = [...built.args, ...(this.mcp?.args ?? [])];
@@ -227,8 +261,6 @@ export class SubprocessAdapter extends Adapter {
       }, timeoutMs);
 
       let buf = "";
-      let stderr = "";
-
       const onStdout = (d) => {
         buf += d.toString();
         for (let i = buf.indexOf("\n"); i >= 0; i = buf.indexOf("\n")) {
@@ -247,9 +279,9 @@ export class SubprocessAdapter extends Adapter {
         }
       };
 
-      const onStderr = (d) => {
-        stderr += d.toString();
-      };
+      // Drain vendor stderr without reflecting it into durable Runner errors.
+      // CLI diagnostics may contain bearer tokens, config paths or prompt data.
+      const onStderr = () => {};
 
       child.stdout.on("data", onStdout);
       child.stderr.on("data", onStderr);
@@ -264,11 +296,7 @@ export class SubprocessAdapter extends Adapter {
       child.on("close", (code) => {
         closeResolve();
         if (code === 0) return succeed();
-        fail(
-          new Error(
-            `${this.constructor.label} 退出码 ${code}${stderr ? `：${stderr.trim().slice(0, 200)}` : ""}`,
-          ),
-        );
+        fail(new Error(`${this.constructor.label} 退出码 ${code}`));
       });
     });
 

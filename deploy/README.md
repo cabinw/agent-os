@@ -120,9 +120,9 @@ and candidate UID/GID fails closed before layout publication.
 | --- | --- |
 | service identity | fixed local `<worker-account>`, non-administrator, owns the Grok login |
 | background manager | Task Scheduler, startup trigger, run whether logged on or not |
-| releases | `C:\ProgramData\AgentOS\releases\<revision>`; immutable after verification |
+| releases | `C:\ProgramData\AgentOS\releases\worker-admin-<sha256>` plus protected application releases; immutable after verification |
 | active release | Scheduled Task action; changed only while the task is stopped |
-| secret configuration | `C:\ProgramData\AgentOS\config\worker.env` |
+| secret configuration | `C:\ProgramData\AgentOS\config\worker.json`; Worker read-only, `SYSTEM` and Administrators full control |
 | state root | `C:\ProgramData\AgentOS\state` |
 | workspace root | `C:\ProgramData\AgentOS\workspaces` |
 | vendor session state | `C:\ProgramData\AgentOS\state\runner-sessions.json` |
@@ -131,9 +131,25 @@ and candidate UID/GID fails closed before layout publication.
 | logs | `C:\ProgramData\AgentOS\logs`, rotated and ACL-restricted |
 
 Protect `config`, `state`, `credentials` and `logs` from inherited `Users`
-access. Their DACL must grant only the Worker account, `SYSTEM` and local
-Administrators. Installation and health checks must verify the effective ACL;
-`mode: 0600` and `chmod` are not Windows evidence.
+access. State, credential, workspace, log and run directories grant the Worker,
+`SYSTEM` and local Administrators full control. The configuration directory and
+file grant the Worker read/execute only. Installation and health checks verify
+the exact protected DACL and owner; `mode: 0600` and `chmod` are not Windows
+evidence.
+
+Windows PowerShell 5.1 is only the offline bootstrap entry. It admits one pinned
+PowerShell 7.4 MSI after SHA-256, Authenticode signer-thumbprint, single-link,
+ancestry and private-stage checks. All lifecycle scripts require 7.4. Installation
+preflights account, Task, source-tree and secret hashes before the first root
+write, then advances an admin-only `intent → layout → release → config → task →
+committed` journal. Admin upgrades use a target-hash journal and adopt only the
+same or next phase after a crash; other unfinished upgrades fail closed.
+
+The Worker host creates Node suspended, assigns it to a kill-on-close Job Object,
+then resumes it. Session and request stores publish one same-directory candidate
+through `ReplaceFileW`, or `MoveFileExW` with write-through for first creation,
+before updating memory. These are code and fault-injection contracts. Effective
+ACL, Task Scheduler, Job Object and NTFS kill/reboot evidence remain field gates.
 
 ## Configuration contract
 
@@ -586,15 +602,15 @@ cd "$SOURCE_ROOT"
 | real Linux alias and mount proof | Ubuntu idle and controlled process-churn scans pass 20/20 each; an ext4 private-namespace bind-alias `O_TMPFILE` is rejected when its mount object is unavailable to the inspector; same-namespace chroot/linkat and active systemd-cgroup trim remain pending |
 | production event-store durability | blocked on RM-1.1b; outside this workflow |
 | EventLog caller-acknowledgement atomicity | marker phases fail closed before cleanup, but crash after durable marker removal and before caller observation remains ambiguous without RM-1.1b operation idempotency |
-| Windows atomic replacement on repeated persistence | requires real NTFS reproduction and fix |
-| Windows account-only ACL for state and bearer mounts | requires implementation and effective-ACL proof |
-| reparse-point/hardlink-safe credential mounting | not implemented |
-| Windows vendor process-tree cancellation and orphan check | requires real Grok validation |
-| minimal child environment and trusted CLI discovery | not implemented |
+| Windows atomic replacement on repeated persistence | unified candidate/flush/ReplaceFile boundary and failure rollback pass locally; real NTFS kill/reboot/concurrent-read proof remains |
+| Windows account-only ACL for state and bearer mounts | exact protected DACL setters/assertions implemented; effective-access proof remains |
+| reparse-point/hardlink-safe credential mounting | fixed paths, single-link files, protected ancestors and workspace-external credential roots pass locally; real NTFS proof remains |
+| Windows vendor process-tree cancellation and orphan check | suspended create → Job assign → resume implemented; real Grok cancellation/Task-stop proof remains |
+| minimal child environment and trusted CLI discovery | allowlisted environment and fixed trusted executable ancestry pass locally |
 | large Grok prompt transport beyond Windows argv limits | requires live stdin/argv measurement |
-| raw stderr redaction and bounded capture | not implemented |
+| raw stderr redaction and bounded capture | normalized bounded adapter errors pass locally; real vendor-output canary remains |
 | real Hub/Worker restart task-state reconciliation | Task Engine policy absent; reproduce and report blocker |
-| Remote Worker terminal-cache timing contract | flaky baseline observed; define hard bound or eventual convergence without retry masking |
+| Remote Worker terminal-cache timing contract | hard peak plus ACK convergence contract passes; retain load-tolerant lease tests |
 | Windows SSH service-owned startup | current listener is not owned by the stopped registered service |
 
 Until these gates pass, the supported claim is **staging deployment and

@@ -32,7 +32,7 @@ export class ClaudeAdapter extends SubprocessAdapter {
     ];
     if (resume) args.push("--resume", resume);
     if (this.model) args.push("--model", this.model);
-    return { cmd: "claude", args };
+    return { cmd: this.executable, args };
   }
 
   handleLine(o) {

@@ -1,5 +1,15 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import {
+  link,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -30,7 +40,7 @@ function at(path: string, token: string, init: RequestInit = {}) {
 }
 
 beforeAll(async () => {
-  scratch = await mkdtemp(join(tmpdir(), "agent-os-hub-security-"));
+  scratch = await realpath(await mkdtemp(join(tmpdir(), "agent-os-hub-security-")));
   logPath = join(scratch, "events.jsonl");
   const env = Object.fromEntries(
     Object.entries(process.env).filter(([name]) => name !== "HOST"),
@@ -259,8 +269,10 @@ describe("credential, HTML and local execution hardening", () => {
 
   it("gives Grok only the Agent OS MCP surface and protects its credential file", async () => {
     const dir = join(scratch, "grok-policy");
+    const credentialDir = join(scratch, "credentials", "grok-policy");
     const mounted = mountMcp("grok", {
       dir,
+      credentialDir,
       url: baseUrl,
       token: CLAUDE_TOKEN,
     });
@@ -274,8 +286,112 @@ describe("credential, HTML and local execution hardening", () => {
 
     const configPath = join(dir, ".grok", "config.toml");
     const config = await readFile(configPath, "utf8");
-    expect(config).toContain(`AGENT_OS_TOKEN = "${CLAUDE_TOKEN}"`);
+    expect(config).not.toContain(CLAUDE_TOKEN);
+    expect(config).not.toContain("AGENT_OS_TOKEN");
+    expect(config).toContain("AGENT_OS_SECRET_FILE");
     expect(config).not.toContain("AGENT_OS_CALLER");
     expect((await stat(configPath)).mode & 0o777).toBe(0o600);
+    const secretPath = join(credentialDir, "mcp-secret.json");
+    expect(await readFile(secretPath, "utf8")).toContain(CLAUDE_TOKEN);
+    expect((await stat(secretPath)).mode & 0o777).toBe(0o600);
+  });
+
+  it("refuses credential reparse points, hard links and workspace config links", async () => {
+    const target = join(scratch, "credential-link-target");
+    const workspace = join(scratch, "credential-link-workspace");
+    await mkdir(target, { recursive: true });
+    await mkdir(workspace, { recursive: true });
+    const linkedRoot = join(scratch, "credential-root-link");
+    await symlink(target, linkedRoot, "dir");
+    expect(() =>
+      mountMcp("claude", {
+        dir: workspace,
+        credentialDir: linkedRoot,
+        url: baseUrl,
+        token: CLAUDE_TOKEN,
+      }),
+    ).toThrow(/fixed non-link directory/);
+
+    const hardlinkRoot = join(scratch, "credential-hardlink-root");
+    await mkdir(hardlinkRoot, { recursive: true });
+    const protectedFile = join(scratch, "credential-hardlink-protected");
+    await writeFile(protectedFile, JSON.stringify({ token: CLAUDE_TOKEN }), {
+      mode: 0o600,
+    });
+    await link(protectedFile, join(hardlinkRoot, "mcp-secret.json"));
+    expect(() =>
+      mountMcp("claude", {
+        dir: workspace,
+        credentialDir: hardlinkRoot,
+        url: baseUrl,
+        token: CLAUDE_TOKEN,
+      }),
+    ).toThrow(/private non-link regular file/);
+
+    const safeRoot = join(scratch, "credential-safe-root");
+    const configTarget = join(scratch, "workspace-config-target");
+    await writeFile(configTarget, "do-not-overwrite", { mode: 0o600 });
+    await symlink(configTarget, join(workspace, "mcp.json"));
+    expect(() =>
+      mountMcp("claude", {
+        dir: workspace,
+        credentialDir: safeRoot,
+        url: baseUrl,
+        token: CLAUDE_TOKEN,
+      }),
+    ).toThrow(/private non-link regular file/);
+    expect(await readFile(configTarget, "utf8")).toBe("do-not-overwrite");
+  });
+
+  it("loads the scoped bearer through the private secret file, not ambient env", async () => {
+    const workspace = join(scratch, "bridge-secret-workspace");
+    const credentialDir = join(scratch, "bridge-secret-root");
+    await mkdir(workspace, { recursive: true });
+    mountMcp("claude", {
+      dir: workspace,
+      credentialDir,
+      url: baseUrl,
+      token: CLAUDE_TOKEN,
+    });
+    const bridge = spawn(
+      process.execPath,
+      [resolve("apps/chat-spike/bin/agent-os-mcp.mjs")],
+      {
+        env: {
+          ...process.env,
+          AGENT_OS_URL: baseUrl,
+          AGENT_OS_TOKEN: "wrong_ambient_token_that_must_be_ignored",
+          AGENT_OS_SECRET_FILE: join(credentialDir, "mcp-secret.json"),
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
+    try {
+      const response = await new Promise<Record<string, unknown>>((accept, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error("MCP bridge response timeout")),
+          2000,
+        );
+        let buffer = "";
+        bridge.stdout.on("data", (chunk) => {
+          buffer += chunk.toString();
+          const newline = buffer.indexOf("\n");
+          if (newline === -1) return;
+          clearTimeout(timer);
+          accept(JSON.parse(buffer.slice(0, newline)));
+        });
+        bridge.once("exit", (code) => {
+          clearTimeout(timer);
+          reject(new Error(`MCP bridge exited before response: ${code}`));
+        });
+        bridge.stdin.write(
+          `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`,
+        );
+      });
+      expect(response.error).toBeUndefined();
+      expect(response.result).toMatchObject({ tools: expect.any(Array) });
+    } finally {
+      bridge.kill("SIGKILL");
+    }
   });
 });
