@@ -240,8 +240,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 451,
-  "updatedAt": "2026-08-26 03:55 CST",
+  "revision": 452,
+  "updatedAt": "2026-08-26 03:59 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-05",
   "verification": {"testsPassed":1258,"testsTotal":1258,"filesPassed":63,"filesTotal":63,"gatePassed":11,"gateTotal":11,"lintErrors":0,"checkedAt":"2026-08-26 03:54 CST"},
@@ -412,6 +412,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-26 03:59","kind":"completed","entity":"SVR-06","title":"Grok联调修复与看板证据已按三项逻辑提交推送","detail":"1d400c1只包含Windows专用账户profile环境恢复、ADR/文档与部署测试；677b7ef只包含精确GROK_FOLDER_TRUST=false准入、ADR与安全/集成测试；2e798de只包含99.65%看板及双机证据。三项均已推送原GitHub仓库codex/project-control；提交不重复计分，整体保持99.65%。"},
     {"at":"2026-08-26 03:55","kind":"progress","entity":"SVR-05","title":"真实Grok跨主机执行完成，看板升至99.65%","detail":"专用AgentOSWorker完成device-code授权与独立smoke；修复Windows profile环境恢复及精确GROK_FOLDER_TRUST=false准入后，TASK-004由真实Grok执行。Windows请求账本与Ubuntu Remote账本均completed、126 events、零candidate残留，Grok通过MCP写入message.sent。SVR-05 58→82、SVR-06 93→97，总体6249.8→6277.8/6300（99.65%）。领域任务仍running，因为Ubuntu线上旧Hub缺少仓库当前fallback/recovery逻辑。"},
     {"at":"2026-08-26 03:54","kind":"problem","entity":"PROB-HUB-PUBLISHER-TRUST","title":"剩余路径收敛为正式signed Hub激活","detail":"真实Ubuntu只读检查确认publisher policy/state目录均未配置；线上Hub无法通过已实现的签名发布链激活当前bundle。没有手工覆盖不可变release，也没有用控制面token冒充Grok补review事件。待正式root-owned离线bundle建立信任根并升级后，再补单一review、取消/旧lease及HTTPS流量切换验收。"},
     {"at":"2026-08-26 02:59","kind":"problem","entity":"PROB-GROK-WORKER-AUTH","title":"唯一剩余路径收敛为专用Grok device-code授权","detail":"实机只读`grok login --help`确认支持`--device-auth`/`--device-code`，可在无头AgentOSWorker身份启动；完成授权仍需要人在auth.x.ai使用专用vendor账号确认，不能由仓库、Ubuntu root、Windows SYSTEM或服务器工程师权限替代。其他自主项已完成并通过当前HEAD 1258/1258；看板保持99.20%，不为外部授权准备虚增进度。"},
