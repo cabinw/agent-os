@@ -34,6 +34,7 @@ type config struct {
 	readClock                                            func() int64
 	afterFirstHash                                       func() error
 	afterLock                                            func() error
+	afterRecordCandidateSync                             func(string) error
 }
 
 type policyKey struct {
@@ -394,6 +395,41 @@ func recordCandidate(path string, data []byte, cfg config) (string, bool, error)
 	return temporary, err == nil, nil
 }
 
+func soleRecordCandidate(path string, cfg config) (string, bool, error) {
+	directory := filepath.Dir(path)
+	prefix := filepath.Base(path) + ".candidate-"
+	directoryHandle, err := openTrustedDirectory(directory, cfg)
+	if err != nil {
+		return "", false, err
+	}
+	entries, err := directoryHandle.ReadDir(-1)
+	_ = directoryHandle.Close()
+	if err != nil {
+		return "", false, err
+	}
+	candidate := ""
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), prefix) {
+			if candidate != "" {
+				return "", false, reject("record_candidate_conflict")
+			}
+			candidate = filepath.Join(directory, entry.Name())
+		}
+	}
+	if candidate == "" {
+		return "", false, nil
+	}
+	data, err := readBoundedTrusted(candidate, 1024, cfg)
+	if err != nil {
+		return "", false, reject("record_candidate_conflict")
+	}
+	digest := sha256.Sum256(data)
+	if candidate != path+".candidate-"+hex.EncodeToString(digest[:]) {
+		return "", false, reject("record_candidate_conflict")
+	}
+	return candidate, true, nil
+}
+
 func atomicRecord(path string, data []byte, cfg config) error {
 	directory := filepath.Dir(path)
 	temporary, exists, err := recordCandidate(path, data, cfg)
@@ -411,9 +447,10 @@ func atomicRecord(path string, data []byte, cfg config) error {
 		return err
 	}
 	ok := false
+	preserve := false
 	defer func() {
 		file.Close()
-		if !ok {
+		if !ok && !preserve {
 			os.Remove(temporary)
 		}
 	}()
@@ -422,6 +459,13 @@ func atomicRecord(path string, data []byte, cfg config) error {
 	}
 	if err = file.Sync(); err != nil {
 		return err
+	}
+	if cfg.afterRecordCandidateSync != nil {
+		preserve = true
+		if err = cfg.afterRecordCandidateSync(path); err != nil {
+			return err
+		}
+		preserve = false
 	}
 	if err = file.Close(); err != nil {
 		return err
@@ -593,6 +637,36 @@ func verifyArtifact(cfg config, artifactPath, envelopePath, signaturePath, expec
 	if hasPolicy && trustedTime < priorPolicy.time {
 		return artifactRecord{}, reject("clock_untrusted")
 	}
+	policyCandidatePath, hasPolicyCandidate, err := soleRecordCandidate(policyRecordPath, cfg)
+	if err != nil {
+		return artifactRecord{}, reject("publication_failed")
+	}
+	if hasPolicyCandidate {
+		candidatePolicy, _, readErr := readPolicyRecord(policyCandidatePath, cfg)
+		minimum := int64(1)
+		if hasPolicy {
+			minimum = priorPolicy.time
+		}
+		if readErr != nil || candidatePolicy.epoch != parsedPolicy.epoch || candidatePolicy.hash != policyHash || candidatePolicy.time < minimum || candidatePolicy.time > finalObserved {
+			return artifactRecord{}, reject("publication_failed")
+		}
+		trustedTime = candidatePolicy.time
+	}
+	artifactCandidatePath, hasArtifactCandidate, err := soleRecordCandidate(recordPath, cfg)
+	if err != nil {
+		return artifactRecord{}, reject("publication_failed")
+	}
+	if hasArtifactCandidate {
+		candidateRecord, _, readErr := readArtifactRecord(artifactCandidatePath, cfg)
+		minimum := int64(1)
+		if hasPolicy {
+			minimum = priorPolicy.time
+		}
+		if readErr != nil || candidateRecord.typeName != record.typeName || candidateRecord.sequence != record.sequence || candidateRecord.envelopeHash != record.envelopeHash || candidateRecord.artifactHash != record.artifactHash || candidateRecord.bytes != record.bytes || candidateRecord.policyEpoch != record.policyEpoch || candidateRecord.acceptedAt < minimum || candidateRecord.acceptedAt > finalObserved || (hasPrior && record.sequence == prior.sequence && candidateRecord.acceptedAt != prior.acceptedAt) {
+			return artifactRecord{}, reject("publication_failed")
+		}
+		record.acceptedAt = candidateRecord.acceptedAt
+	}
 	policyFrame := fmt.Sprintf("agent-os-policy-record-v1\nepoch=%d\npolicy_sha256=%s\ntrusted_time=%d\n", parsedPolicy.epoch, policyHash, trustedTime)
 	artifactFrame := fmt.Sprintf("agent-os-artifact-record-v1\nartifact_type=%s\nsequence=%d\nenvelope_sha256=%s\nartifact_sha256=%s\nartifact_bytes=%d\npolicy_epoch=%d\naccepted_at=%d\n", record.typeName, record.sequence, record.envelopeHash, record.artifactHash, record.bytes, record.policyEpoch, record.acceptedAt)
 	if _, _, err = recordCandidate(policyRecordPath, []byte(policyFrame), cfg); err != nil {
@@ -649,6 +723,32 @@ func verifyArtifact(cfg config, artifactPath, envelopePath, signaturePath, expec
 	}
 	record.artifactHash = firstHash
 	record.bytes = firstBytes
+	publicationTime := finalObserved
+	if cfg.readClock != nil {
+		publicationTime = cfg.readClock()
+		if publicationTime < finalObserved {
+			if output != nil {
+				_ = os.Remove(candidate)
+				_ = syncDir(staging, cfg)
+			}
+			return artifactRecord{}, reject("clock_untrusted")
+		}
+		if publicationTime < parsedEnvelope.notBefore || publicationTime > parsedEnvelope.expires || publicationTime < key.notBefore || publicationTime > key.after {
+			if output != nil {
+				_ = os.Remove(candidate)
+				_ = syncDir(staging, cfg)
+			}
+			return artifactRecord{}, reject("artifact_envelope_rejected")
+		}
+	}
+	if !hasArtifactCandidate && (!hasPrior || record.sequence != prior.sequence) {
+		record.acceptedAt = publicationTime
+		artifactFrame = fmt.Sprintf("agent-os-artifact-record-v1\nartifact_type=%s\nsequence=%d\nenvelope_sha256=%s\nartifact_sha256=%s\nartifact_bytes=%d\npolicy_epoch=%d\naccepted_at=%d\n", record.typeName, record.sequence, record.envelopeHash, record.artifactHash, record.bytes, record.policyEpoch, record.acceptedAt)
+	}
+	if !hasPolicyCandidate {
+		trustedTime = publicationTime
+		policyFrame = fmt.Sprintf("agent-os-policy-record-v1\nepoch=%d\npolicy_sha256=%s\ntrusted_time=%d\n", parsedPolicy.epoch, policyHash, trustedTime)
+	}
 	final := filepath.Join(staging, fmt.Sprintf("%s-%d-%s", expectedType, record.sequence, record.artifactHash))
 	if _, err = os.Lstat(final); errors.Is(err, os.ErrNotExist) {
 		if err = os.Link(candidate, final); err != nil {
@@ -685,6 +785,12 @@ func verifyArtifact(cfg config, artifactPath, envelopePath, signaturePath, expec
 	}
 	if !hasPrior || record != prior {
 		if err = atomicRecord(recordPath, []byte(artifactFrame), cfg); err != nil {
+			return artifactRecord{}, reject("publication_failed")
+		}
+	}
+	if trustedTime != publicationTime {
+		policyFrame = fmt.Sprintf("agent-os-policy-record-v1\nepoch=%d\npolicy_sha256=%s\ntrusted_time=%d\n", parsedPolicy.epoch, policyHash, publicationTime)
+		if err = atomicRecord(policyRecordPath, []byte(policyFrame), cfg); err != nil {
 			return artifactRecord{}, reject("publication_failed")
 		}
 	}
