@@ -550,6 +550,26 @@ from the inspector namespace, and the helper failed closed with
 namespace chroot, linkat publication and active-to-trimmed systemd cgroup
 evidence remain required before field acceptance.
 
+The remaining evidence has a bounded, source-tree probe entry point. Run each
+mode separately from a frozen, root-owned, non-group/world-writable checkout
+whose ancestor directories have the same trust boundary; an ordinary user or
+`/tmp` checkout is rejected before compilation. On the target Ubuntu host, each mode
+uses one unique `/tmp/agent-os-openfd-probe.*` tree and, for `cgroup`, one
+unique `agent-os-openfd-probe-*.service`. The trap removes only those owned
+resources. Output contains booleans and reason classes, never state contents.
+
+```bash
+sudo deploy/hub/probes/state-open-files-linux.sh chroot
+sudo deploy/hub/probes/state-open-files-linux.sh otmpfile
+sudo deploy/hub/probes/state-open-files-linux.sh cgroup
+```
+
+The probe requires root, a local writable ext4 `/tmp`, cgroup v2/systemd for
+the cgroup mode, and a C compiler. A missing kernel/filesystem capability is a
+reported failure, not a skipped pass. The `otmpfile` mode publishes with
+`linkat` exactly between the helper's two scans and requires the helper to
+fail closed on the resulting state-tree change.
+
 ```bash
 sudo /usr/libexec/agent-os/hub/bin/upgrade.sh \
   --archive /secure/staging/agent-os-<next-revision>.tar.gz \
