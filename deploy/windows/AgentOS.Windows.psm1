@@ -568,10 +568,12 @@ function Assert-AgentOSReleaseTree {
     $expectedInheritance = if ($kind -eq 'Directory') {
       [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
     } else { [Security.AccessControl.InheritanceFlags]::None }
-    foreach ($rule in $acl.Access) {
-      $sid = $rule.IdentityReference.Translate(
-        [Security.Principal.SecurityIdentifier]
-      ).Value
+    foreach ($rule in $acl.GetAccessRules(
+      $true,
+      $true,
+      [Security.Principal.SecurityIdentifier]
+    )) {
+      $sid = $rule.IdentityReference.Value
       if ($rule.IsInherited -or $rule.AccessControlType -ne 'Allow' -or
           $sid -notin $allowed -or -not $seen.Add($sid) -or
           $rule.InheritanceFlags -ne $expectedInheritance -or
@@ -632,10 +634,12 @@ function Assert-AgentOSTrustedExecutable {
   while ($cursor) {
     $acl = Get-Acl -LiteralPath $cursor
     $effectiveMask = if ($checkedDirectParent) { $destructiveMask } else { $writeMask }
-    foreach ($rule in $acl.Access) {
-      $sid = $rule.IdentityReference.Translate(
-        [Security.Principal.SecurityIdentifier]
-      ).Value
+    foreach ($rule in $acl.GetAccessRules(
+      $true,
+      $true,
+      [Security.Principal.SecurityIdentifier]
+    )) {
+      $sid = $rule.IdentityReference.Value
       if ($rule.AccessControlType -eq 'Allow' -and $sid -in $untrusted -and
           ($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0 -and
           ($rule.FileSystemRights -band $effectiveMask) -ne 0) {

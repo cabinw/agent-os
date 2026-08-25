@@ -212,6 +212,8 @@ public static class Probe {
     );
     expect(trustedExecutable).toContain("FileSystemRights]::WriteData");
     expect(trustedExecutable).toContain("FileSystemRights]::AppendData");
+    expect(trustedExecutable).toContain("$acl.GetAccessRules(");
+    expect(trustedExecutable).toContain("[Security.Principal.SecurityIdentifier]");
     expect(trustedExecutable).not.toContain("'Write, Modify, FullControl");
     expect(module).toContain("function Get-AgentOSCanonicalReleaseManifest");
     expect(module).toContain("function Get-AgentOSExactTreeDigest");
