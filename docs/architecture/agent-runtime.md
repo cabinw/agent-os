@@ -35,8 +35,11 @@ registered ──▶ idle ──▶ working ──▶ idle
 ```
 
 `disconnected` is expected, not exceptional — Runner and agent processes are
-ephemeral. Any task held by a disconnected placement returns to `assigned`
-after a grace period and is re-matched to an eligible `(agent, host)`.
+ephemeral. A transport lease may be reoffered after its grace period, but the
+durable task does not invent a `running → assigned` transition. Hub boot keeps
+the task `running` and re-dispatches with the existing `task.started` id; an old
+lease is fenced and a surviving Worker replays the same logical execution. See
+[ADR-042](../decisions/ADR-042-interrupted-runner-dispatch-recovery.md).
 
 **This is now measured, not assumed.** Dropping the vendor session every turn and
 rebuilding from `get_context` lost none of four planted facts across four vendors,

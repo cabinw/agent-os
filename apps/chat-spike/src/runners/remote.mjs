@@ -2125,27 +2125,41 @@ export class RemoteRunner {
     return true;
   }
 
-  close() {
+  close({ preserveInflight = false } = {}) {
     if (this.closePromise) return this.closePromise;
     this.closed = true;
     const cancellations = [];
     for (const record of this.requests.values()) {
       if (record.terminal) continue;
-      if (record.state === "pending" || record.state === "offered") {
+      if (preserveInflight) {
+        record.listeners.clear();
+        record.deferred.reject(
+          transportError(
+            record.request.requestId,
+            "Remote Runner 已关闭；请求等待重启恢复",
+            true,
+            RUNNER_ERROR_CODES.UNAVAILABLE,
+          ),
+        );
+      } else if (record.state === "pending" || record.state === "offered") {
         this.cancelPendingRecord(record);
       } else cancellations.push(this.cancel(record.request.requestId));
     }
     this.closePromise = (async () => {
       let timer;
-      await Promise.race([
-        Promise.allSettled(cancellations),
-        new Promise((resolve) => {
-          timer = setTimeout(resolve, this.closeGraceMs);
-        }),
-      ]);
+      if (!preserveInflight) {
+        await Promise.race([
+          Promise.allSettled(cancellations),
+          new Promise((resolve) => {
+            timer = setTimeout(resolve, this.closeGraceMs);
+          }),
+        ]);
+      }
       clearTimeout(timer);
-      for (const record of this.requests.values()) {
-        if (!record.terminal) this.cancelPendingRecord(record);
+      if (!preserveInflight) {
+        for (const record of this.requests.values()) {
+          if (!record.terminal) this.cancelPendingRecord(record);
+        }
       }
       for (const control of this.controls.values()) {
         clearTimeout(control.timeout);

@@ -41,7 +41,7 @@ class RemoteTaskFixtureAdapter extends SubprocessAdapter {
 
   async send(prompt, options) {
     const result = await super.send(prompt, options);
-    await this.mcp.reportResult();
+    if (!prompt.endsWith("__RESTART__")) await this.mcp.reportResult();
     return result;
   }
 }

@@ -37,8 +37,10 @@ type FixtureLine = {
 };
 
 type StoredEvent = {
+  id?: string;
   type: string;
   actor?: { kind: string; id: string };
+  causedBy?: string;
   payload?: Record<string, unknown>;
 };
 
@@ -612,6 +614,125 @@ describe("Remote Runner production composition", () => {
       ) {
         productionWorker.child.kill("SIGTERM");
         await waitForExit(productionWorker.child, 10_000);
+      }
+      if (server.child.exitCode === null && server.child.signalCode === null) {
+        await terminate(server);
+      }
+      await rm(scratch, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it("restarts the real Hub mid-dispatch and converges without a second started event", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "agent-os-remote-restart-"));
+    const logPath = join(scratch, "hub", "events.jsonl");
+    const placementPath = join(scratch, "hub", "remote-placement.json");
+    const workerWorkspace = join(scratch, "worker", "workspaces");
+    const workerSessionPath = join(scratch, "worker", "sessions.json");
+    const serverEnvironment = {
+      LOG_PATH: logPath,
+      AGENT_OS_RUNNER_MODE: "remote",
+      AGENT_OS_RUNNER_ID: HOST_ID,
+      AGENT_OS_RUNNER_TOKEN: RUNNER_TOKEN,
+      AGENT_OS_HUMAN_TOKEN: HUMAN_TOKEN,
+      AGENT_OS_AGENT_TOKENS: JSON.stringify(AGENT_TOKENS),
+      AGENT_OS_REMOTE_STATE_PATH: placementPath,
+    };
+    let server = spawnServer({ ...serverEnvironment, PORT: "0" });
+    let worker: ReturnType<typeof spawnProgram> | null = null;
+
+    try {
+      const baseUrl = await waitForReady(server);
+      const port = new URL(baseUrl).port;
+      worker = spawnProgram(FIXTURE_WORKER_ENTRY, {
+        AGENT_OS_URL: baseUrl,
+        AGENT_OS_RUNNER_ID: HOST_ID,
+        AGENT_OS_RUNNER_TOKEN: RUNNER_TOKEN,
+        AGENT_OS_AGENT_TOKENS: JSON.stringify(AGENT_TOKENS),
+        AGENT_CWD: workerWorkspace,
+        SESSION_PATH: workerSessionPath,
+      });
+      await waitForOutput(worker, /remote runner worker\s+→/);
+      await waitFor(async () => {
+        const probe = await authenticated(baseUrl, "/task", HUMAN_TOKEN, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: "" }),
+        });
+        await probe.text();
+        return probe.status !== 503;
+      });
+
+      const taskResponse = await authenticated(baseUrl, "/task", HUMAN_TOKEN, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: "restart convergence __RESTART__",
+          requires: ["architecture"],
+        }),
+      });
+      expect(taskResponse.status).toBe(202);
+      const task = (await taskResponse.json()) as { task: string };
+      await waitFor(async () =>
+        (await replay(logPath)).some(
+          (event) => event.type === "task.started" && event.payload?.task === task.task,
+        ),
+      );
+      await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+
+      expect(await terminate(server)).toEqual({ code: 0, signal: null });
+      expect(
+        (await replay(logPath)).some(
+          (event) =>
+            event.type === "task.review.requested" && event.payload?.task === task.task,
+        ),
+      ).toBe(false);
+
+      server = spawnServer({ ...serverEnvironment, PORT: port });
+      expect(await waitForReady(server)).toBe(baseUrl);
+      try {
+        await waitForOutput(server, new RegExp(`恢复任务\\s+→\\s+${task.task}`));
+      } catch (error) {
+        throw new Error(
+          `boot reconciliation: ${String(error)}\nrestarted Hub:\n${server.captured.output}\nevents:\n${JSON.stringify(await replay(logPath), null, 2)}`,
+        );
+      }
+      let restartStage = "worker reconnect";
+      try {
+        await waitFor(async () => {
+          const probe = await authenticated(baseUrl, "/task", HUMAN_TOKEN, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ title: "" }),
+          });
+          await probe.text();
+          return probe.status !== 503;
+        });
+        restartStage = "task review";
+        await waitFor(async () =>
+          (await replay(logPath)).some(
+            (event) =>
+              event.type === "task.review.requested" && event.payload?.task === task.task,
+          ),
+        );
+      } catch (error) {
+        throw new Error(
+          `${restartStage}: ${String(error)}\nrestarted Hub:\n${server.captured.output}\nWorker:\n${worker.captured.output}`,
+        );
+      }
+
+      const lifecycle = (await replay(logPath)).filter(
+        (event) => event.payload?.task === task.task,
+      );
+      const started = lifecycle.filter((event) => event.type === "task.started");
+      const review = lifecycle.filter((event) => event.type === "task.review.requested");
+      expect(started).toHaveLength(1);
+      expect(review).toHaveLength(1);
+      expect(review[0].causedBy).toBe(started[0].id);
+      expect(server.captured.output).toContain(task.task);
+    } finally {
+      if (worker && worker.child.exitCode === null && worker.child.signalCode === null) {
+        worker.child.kill("SIGTERM");
+        await waitForExit(worker.child, 10_000);
       }
       if (server.child.exitCode === null && server.child.signalCode === null) {
         await terminate(server);

@@ -9,6 +9,12 @@ if (prompt.endsWith("__BLOCK__")) {
   process.stderr.write("fixture failed\n");
   process.exitCode = 7;
 } else {
+  if (prompt.endsWith("__RESTART__")) {
+    process.stdout.write(
+      `${JSON.stringify({ type: "progress", label: `delayed:${process.pid}` })}\n`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
   const sessionId = resume || "fixture-session-1";
   process.stdout.write(
     `${JSON.stringify({ type: "delta", text: `stream:${prompt}` })}\n`,

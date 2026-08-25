@@ -668,6 +668,7 @@ describe("Hub runtime hardening", () => {
 
     await expect(hub.close()).rejects.toBe(closeFailure);
     expect(runner.close).toHaveBeenCalledOnce();
+    expect(runner.close).toHaveBeenCalledWith({ preserveInflight: true });
   });
 
   it("marks stopping and stops HTTP accepts before closing the Runner", async () => {

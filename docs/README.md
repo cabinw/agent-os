@@ -105,6 +105,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-037](decisions/ADR-037-agent-plan-proposals-are-reviewed-additive-graphs.md) | Worker plan proposals are reviewed additive graphs with atomic acceptance |
 | [ADR-038](decisions/ADR-038-autonomous-routing-is-serialized-event-reconciliation.md) | Autonomous routing serializes one event-driven reservation per project |
 | [ADR-039](decisions/ADR-039-agent-performance-is-derived-per-capability.md) | Agent performance is replay-derived per capability and feeds deterministic routing |
+| [ADR-042](decisions/ADR-042-interrupted-runner-dispatch-recovery.md) | Hub boot reuses the stored started id to resume interrupted Runner dispatch |
 
 ## Assets
 

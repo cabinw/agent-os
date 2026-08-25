@@ -72,6 +72,10 @@ export class Hub {
     this.byId = new Map();
     /** Registration idempotency also survives a Hub restart. */
     this.announcedIds = new Set();
+    /** A boot reconciliation is idempotent within one Hub process. */
+    this.resumedTaskIds = new Set();
+    /** Shutdown cancellation retires transport leases, not durable tasks. */
+    this.closing = false;
     for (const e of log.replay()) {
       this.byId.set(e.id, e);
       if (e.type === "agent.registered" && e.payload?.id) {
@@ -224,6 +228,70 @@ export class Hub {
   }
 
   /**
+   * Resume durable assigned/running work after every executor has registered.
+   *
+   * A running task keeps its existing task.started id. That id was the original
+   * Runner requestId, so re-dispatch reaches the Remote Worker idempotency cache
+   * instead of creating a second logical execution. No lifecycle event is
+   * appended until the executor reports a terminal result.
+   */
+  resumeInterruptedTasks() {
+    const tasks = this.tasks();
+    const history = this.log.replay();
+    const resumed = [];
+    for (const task of Object.values(tasks)) {
+      if (!new Set(["assigned", "running"]).has(task.status)) continue;
+      if (this.resumedTaskIds.has(task.id)) continue;
+      const entry = this.agents.get(task.executor);
+      if (!entry) continue;
+
+      const lifecycle = history.findLast(
+        (event) =>
+          event.subject?.kind === "task" &&
+          event.subject.id === task.id &&
+          event.type === (task.status === "running" ? "task.started" : "task.assigned"),
+      );
+      if (!lifecycle) continue;
+      const assignment =
+        task.status === "assigned"
+          ? lifecycle
+          : history.findLast(
+              (event) =>
+                event.seq < lifecycle.seq &&
+                event.subject?.kind === "task" &&
+                event.subject.id === task.id &&
+                event.type === "task.assigned",
+            );
+      if (!assignment) continue;
+      const priorLifecycle = history.findLast(
+        (event) =>
+          event.seq < assignment.seq &&
+          event.subject?.kind === "task" &&
+          event.subject.id === task.id &&
+          Object.hasOwn(TRANSITIONS, event.type),
+      );
+      const rework = priorLifecycle?.type === "task.review.requested";
+
+      this.resumedTaskIds.add(task.id);
+      const cause = {
+        id: lifecycle.id,
+        payload: {
+          from: assignment.actor?.kind === "agent" ? assignment.actor.id : HUMAN_ID,
+          to: entry.id,
+          task: task.id,
+          content: rework
+            ? `${task.id} 未通过验收，请重做。`
+            : `你被指派了 ${task.id}：${task.title}`,
+        },
+      };
+      if (task.status === "running") this.enqueue(entry, cause);
+      else this.wakeForTask(entry, task.id, cause);
+      resumed.push(task.id);
+    }
+    return resumed;
+  }
+
+  /**
    * Legality is checked here, at the boundary, and the illegal move is
    * *rejected* rather than corrected (ADR-002). Correcting would mean the log
    * records a transition nobody asked for.
@@ -325,6 +393,32 @@ export class Hub {
       const before = this.log.seq;
       const reply = await this.execute(entry, cause, this.prompt(entry, cause));
 
+      // A successful Runner result is itself a task delivery. Agents normally
+      // call report_result for a richer summary, but transport recovery must
+      // not strand a task when that MCP call was interrupted with the Hub.
+      if (entry.task) {
+        const task = this.tasks()[entry.task];
+        if (task?.status === "running") {
+          this.taskEvent(
+            "task.review.requested",
+            entry.task,
+            {
+              claimed: "completed",
+              summary: reply.text || "Runner 已返回结果",
+              outputs: [],
+            },
+            { kind: "agent", id: entry.id },
+          );
+          this.broadcast("tasks", { tasks: this.tasks() });
+        }
+        this.broadcast("turn", {
+          agent: entry.id,
+          ms: reply.ms,
+          viaTools: this.actedDuring(entry.id, before),
+        });
+        return;
+      }
+
       // An agent that already acted — sent a message, or delivered a task — has
       // spoken. Echoing its transcript on top would double every turn, and the
       // first live run of C did exactly that: `report_result` plus a verbatim
@@ -347,6 +441,26 @@ export class Hub {
         entry.id,
       );
       this.broadcast("turn", { agent: entry.id, ms: reply.ms, fresh: reply.fresh });
+    } catch (error) {
+      if (!this.closing && entry.task && error?.error?.retryable !== true) {
+        const task = this.tasks()[entry.task];
+        if (task?.status === "running") {
+          const attempts = this.log
+            .replay()
+            .filter(
+              (event) =>
+                event.type === "task.started" && event.subject?.id === entry.task,
+            ).length;
+          this.taskEvent("task.failed", entry.task, {
+            reason: error?.error?.code
+              ? `Runner dispatch failed: ${error.error.code}`
+              : "Runner dispatch failed",
+            attempts: Math.max(1, attempts),
+          });
+          this.broadcast("tasks", { tasks: this.tasks() });
+        }
+      }
+      throw error;
     } finally {
       entry.busy = false;
       entry.cause = null;
@@ -728,6 +842,7 @@ export class Hub {
   }
 
   async close() {
-    await this.runner.close();
+    this.closing = true;
+    await this.runner.close({ preserveInflight: true });
   }
 }

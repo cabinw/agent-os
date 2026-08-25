@@ -51,6 +51,7 @@ interface TestHub {
   ) => void;
   roster: () => Array<{ hasSession: boolean }>;
   resetSession: (agent: string) => Promise<void>;
+  resumeInterruptedTasks: () => string[];
   say: (content: string, to: string) => void;
   tasks: () => Record<string, { executor: string | null; status: string }>;
 }
@@ -671,6 +672,67 @@ describe("C 任务对象", () => {
     expect(started.actor.kind).toBe("system");
   });
 
+  it("Hub 重启复用 task.started requestId 收敛 running task，且启动恢复幂等", async () => {
+    let releaseInterrupted: () => void = () => {};
+    const interrupted = new Promise<void>((resolve) => {
+      releaseInterrupted = resolve;
+    });
+    const firstAdapter = fakeAdapter("alpha", "Alpha", {
+      onSend: async () => {
+        await interrupted;
+        return "old execution stopped";
+      },
+    });
+    const first = makeHub({ alpha: firstAdapter }, [
+      { id: "alpha", capabilities: ["coding"] },
+    ]);
+    await first.hub.tools.call("create_task", {
+      title: "恢复中的任务",
+      requires: ["coding"],
+    });
+    await first.hub.tools.call("assign_task", { task: "TASK-001" });
+    for (let index = 0; index < 20; index++) {
+      if (first.hub.tasks()["TASK-001"].status === "running") break;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    expect(first.hub.tasks()["TASK-001"].status).toBe("running");
+    const started = first.log
+      .replay()
+      .find((event: TestEvent) => event.type === "task.started");
+
+    const resumedAdapter = fakeAdapter("alpha", "Alpha", {
+      onSend: async () => "恢复后交付",
+    });
+    const restartedRunner = new TrustedFakeRunner({ alpha: resumedAdapter });
+    const restarted = new Hub({
+      log: first.log,
+      projectId: "proj_test",
+      broadcast: () => {},
+      getAdapter: (id: string) => (id === "alpha" ? resumedAdapter.Fake : null),
+      runner: restartedRunner,
+    }) as TestHub;
+    restarted.register("alpha", { id: "alpha", capabilities: ["coding"] });
+
+    expect(restarted.resumeInterruptedTasks()).toEqual(["TASK-001"]);
+    expect(restarted.resumeInterruptedTasks()).toEqual([]);
+    await settle(restarted);
+
+    expect(restarted.tasks()["TASK-001"].status).toBe("review");
+    expect(restartedRunner.dispatches).toHaveLength(1);
+    expect(restartedRunner.dispatches[0]).toEqual(first.runner.dispatches[0]);
+    expect(restartedRunner.dispatches[0].requestId).toBe(started.id);
+    expect(
+      first.log.replay().filter((event: TestEvent) => event.type === "task.started"),
+    ).toHaveLength(1);
+    const review = first.log
+      .replay()
+      .find((event: TestEvent) => event.type === "task.review.requested");
+    expect(review?.causedBy).toBe(started.id);
+
+    releaseInterrupted();
+    await settle(first.hub);
+  });
+
   /** Rule 3, and the one that has to survive a persuasive agent. */
   it("agent 报 completed，任务仍然只到 review", async () => {
     const hubRef = hubReference();
@@ -835,7 +897,7 @@ describe("一轮只写一次（C 的真机 bug）", () => {
     expect(messages(made.log)).toHaveLength(0);
   });
 
-  it("任务唤醒也在因果链上——task.started 是这一轮的 cause", async () => {
+  it("未显式调用 report_result 时，Runner result 仍以 task.started 为 cause 进入 review", async () => {
     const a = fakeAdapter("alpha", "Alpha");
     const { hub, log } = makeHub({ alpha: a }, [
       { id: "alpha", capabilities: ["coding"] },
@@ -844,9 +906,11 @@ describe("一轮只写一次（C 的真机 bug）", () => {
     await hub.tools.call("assign_task", { task: "TASK-001" });
     await settle(hub);
 
-    const reply = log.replay().find((e: { type: string }) => e.type === "message.sent");
+    const review = log
+      .replay()
+      .find((e: { type: string }) => e.type === "task.review.requested");
     const started = log.replay().find((e: { type: string }) => e.type === "task.started");
-    expect(reply.causedBy).toBe(started.id);
-    expect(hub.depthOf(reply.id)).toBeGreaterThan(0);
+    expect(review.causedBy).toBe(started.id);
+    expect(messages(log)).toHaveLength(0);
   });
 });

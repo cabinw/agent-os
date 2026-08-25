@@ -209,7 +209,7 @@ describe("EVIDENCE-01 · runtime-owned evidence path", () => {
     expect(reply?.causedBy).not.toBe(forged.id);
   });
 
-  it("快速重复指派只产生一个 task.started 和一次执行", async () => {
+  it("快速重复指派只产生一个 task.started、一次执行和一次交付", async () => {
     const adapter = fakeAdapter();
     const { hub, log } = makeHub(adapter);
     await hub.tools.call("create_task", { title: "one start", requires: ["coding"] });
@@ -225,11 +225,17 @@ describe("EVIDENCE-01 · runtime-owned evidence path", () => {
     await Promise.all([firstAssign, secondAssign]);
     await settle(hub);
 
-    expect(
-      log.replay().filter((event: { type: string }) => event.type === "task.started"),
-    ).toHaveLength(1);
+    const started = log
+      .replay()
+      .filter((event: { type: string }) => event.type === "task.started");
+    const reviews = log
+      .replay()
+      .filter((event: { type: string }) => event.type === "task.review.requested");
+    expect(started).toHaveLength(1);
+    expect(reviews).toHaveLength(1);
+    expect(reviews[0].causedBy).toBe(started[0].id);
     expect(adapter.prompts).toHaveLength(1);
-    expect(hub.tasks()["TASK-001"].status).toBe("running");
+    expect(hub.tasks()["TASK-001"].status).toBe("review");
   });
 
   it("Hub 重启后重复注册不追加第二个 agent.registered", () => {

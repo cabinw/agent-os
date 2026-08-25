@@ -497,6 +497,10 @@ server.listen(PORT, HOST, () => {
     );
   }
   console.log(`回环预算   →  ${hub.budget} 跳`);
+  const resumedTasks = hub.resumeInterruptedTasks();
+  if (resumedTasks.length > 0) {
+    console.log(`恢复任务   →  ${resumedTasks.join(", ")}`);
+  }
 });
 
 installShutdownSignalHandlers({ shutdown: lifecycle.shutdown });

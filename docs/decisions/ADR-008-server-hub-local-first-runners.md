@@ -135,6 +135,10 @@ host. It would route work to an agent instance that cannot execute it.
 - Git synchronization and conflicts are explicit operational concerns.
 - Logical placement and Runner-owned vendor handles survive process restarts,
   but correctness never depends on a resumable vendor session.
+- Hub boot reconciles durable `assigned` and `running` tasks after the listener
+  is ready. A running task reuses its stored `task.started` id as the Runner
+  `requestId`; it does not append a second lifecycle event. See
+  [ADR-042](ADR-042-interrupted-runner-dispatch-recovery.md).
 - A Runner resolves canonical workspace paths under a configured root and
   rejects both `..` and symbolic-link escapes before starting an adapter.
 - Local and Remote paths must pass the same contract suite; transport-specific
