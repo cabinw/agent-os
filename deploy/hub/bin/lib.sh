@@ -2985,15 +2985,20 @@ migrate_installed_admin_kit() {
     # rollback path is allowed to start the old Hub.
     require_installed_runtime_contract
     record_admin_migration_phase rolled_back
-    # The legacy SVR-02 unit has no recovery-start gate, so it can be started
-    # while the exact normal+persistent ingress guard remains published. Keep
-    # it disabled, prove direct loopback liveness, and only then remove the
-    # guard. A reboot before cleanup cannot auto-start it, and public traffic
-    # never reaches an unverified rollback process.
+    # The original legacy SVR-02 unit has no recovery-start gate. A 25-file
+    # generation rollback restores a later unit that does have that gate and
+    # must publish the transaction-bound one-time token before start. Keep
+    # either unit disabled, prove direct loopback liveness, and only then
+    # remove the guards.
     reset_failed_or_prove_inactive "$SERVICE_NAME" ||
       die 'legacy Hub reset-failed failed after migration rollback'
-    service_control start "$SERVICE_NAME" ||
-      die 'legacy Hub failed to start after migration rollback'
+    if [[ "$ADMIN_MIGRATION_CONTRACT_KIND" == generation ]]; then
+      start_authorized_recovery_service "$ADMIN_MIGRATION_TRANSACTION" ||
+        die 'generation Hub failed its authorized start after migration rollback'
+    else
+      service_control start "$SERVICE_NAME" ||
+        die 'legacy Hub failed to start after migration rollback'
+    fi
     health_gate live || die 'legacy Hub failed liveness after migration rollback'
     maintenance_off "$ADMIN_MIGRATION_TRANSACTION"
     service_enable

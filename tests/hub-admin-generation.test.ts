@@ -19,7 +19,7 @@ const library = "deploy/hub/bin/lib.sh";
 const digestHelper = "deploy/hub/admin-generation-digest.mjs";
 const executionFixture = "tests/fixtures/hub-admin-generation-execution.sh";
 const oldAdmin = "50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36";
-const newAdmin = "e140e2124db426a7805eccd5c67a2e91c19a827e73ea79d6a1a210cb19c57e0f";
+const newAdmin = "af8d4c3fcdf474851a7fae3e33e42d79c3c92286e2ddc781acaa640982e7afaa";
 const oldRuntime = "ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440";
 const newRuntime = oldRuntime;
 const predecessor = "7b9ee35e2f422fbf2699ad404f03f6a7b02fdf82a2ea104b8fc1e8b0f4f00b03";
@@ -225,7 +225,7 @@ describe("allowlisted Hub admin generation upgrade", () => {
       expect(source).toContain(value);
       expect(readFileSync(library, "utf8")).not.toContain(value);
     }
-    expect(source).toContain("--upgrade-generation hub-admin-25-20260825-g3");
+    expect(source).toContain("--upgrade-generation hub-admin-25-20260825-g4");
     expect(source).not.toContain("--expected-next-sha256");
   });
 
@@ -233,7 +233,7 @@ describe("allowlisted Hub admin generation upgrade", () => {
     const result = digest();
     expect(result.status, result.stderr).toBe(0);
     expect(result.value).toEqual({
-      admin: { entryCount: 28, fileCount: 25, totalBytes: 547900, treeSha256: newAdmin },
+      admin: { entryCount: 28, fileCount: 25, totalBytes: 548107, treeSha256: newAdmin },
       runtime: { entryCount: 5, fileCount: 5, totalBytes: 9204, treeSha256: oldRuntime },
     });
   });
@@ -291,6 +291,18 @@ describe("allowlisted Hub admin generation upgrade", () => {
     );
     expect(prepare).toBeGreaterThan(lockedPreflight);
     expect(migrate).toBeGreaterThan(prepare);
+  });
+
+  it("uses a transaction-bound start for a generation rollback", () => {
+    const source = readFileSync(library, "utf8");
+    const rollback = source.indexOf('if [[ "$action" == rollback ]]');
+    const authorized = source.indexOf(
+      'start_authorized_recovery_service "$ADMIN_MIGRATION_TRANSACTION"',
+      rollback,
+    );
+    const direct = source.indexOf('service_control start "$SERVICE_NAME"', authorized);
+    expect(authorized).toBeGreaterThan(rollback);
+    expect(direct).toBeGreaterThan(authorized);
   });
 
   it("classifies the exact predecessor and rejects unknown generation history", () => {

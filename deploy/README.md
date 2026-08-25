@@ -485,10 +485,10 @@ from the operator:
 
 ```bash
 sudo /root/agent-os-admin-kit/bootstrap-admin.sh \
-  --upgrade-generation hub-admin-25-20260825-g3
+  --upgrade-generation hub-admin-25-20260825-g4
 
 sudo /root/agent-os-admin-kit/bootstrap-admin.sh \
-  --upgrade-generation hub-admin-25-20260825-g3 --rollback
+  --upgrade-generation hub-admin-25-20260825-g4 --rollback
 ```
 
 The source, target, old/new runtime payload and optional ADR-041 predecessor

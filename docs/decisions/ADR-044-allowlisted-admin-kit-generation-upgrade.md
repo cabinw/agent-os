@@ -15,14 +15,14 @@ unaudited source merely because it can be hashed.
 The separately delivered bootstrap exposes one reviewed generation identifier:
 
 ```text
-bootstrap-admin.sh --upgrade-generation hub-admin-25-20260825-g3 [--rollback]
+bootstrap-admin.sh --upgrade-generation hub-admin-25-20260825-g4 [--rollback]
 ```
 
 The identifier selects compile-time identities in `bootstrap-admin.sh`. The
 operator cannot supply an old or new digest. This edge fixes:
 
 - old 25-file administrator tree `50363eb8…`;
-- new 25-file administrator tree `e140e212…`;
+- new 25-file administrator tree `af8d4c3f…`;
 - old and new runtime payload `ccbc5110…` (the five runtime files are unchanged);
 - the optional ADR-041 predecessor transaction and its immutable journal
   digest `7b9ee35e…`;
@@ -57,6 +57,10 @@ transaction under the deployment lock and republishes only its matching
 one-time recovery-start token before resuming. It does not authorize an
 unrecorded, committed or finalized transaction.
 
+Generation rollback always starts the restored 25-file unit through the same
+transaction-bound one-time token. Only the original legacy unit, which has no
+recovery-start gate, uses a guarded direct start.
+
 ## Alternatives
 
 **Accept `--expected-current-sha256` and `--expected-next-sha256`.** Rejected:
@@ -74,8 +78,10 @@ only fixed edge identities live outside the installed 25-file tree.
 - Each future administrator generation needs a new reviewed identifier and
   explicit digest edge.
 - The historical `g1` edge moved `444a9550…` to `f9063464…`; `g2` then moved
-  `f9063464…` to `50363eb8…`. Their completed target-Ubuntu journals are the
-  immutable ancestor chain for `g3`.
+  `f9063464…` to `50363eb8…`. The `g3` target-Ubuntu attempt was explicitly
+  rolled back and finalized after its prepared-phase SIGKILL. The completed
+  `g1`/`g2` journals remain the immutable ancestor chain for `g4`; the `g3`
+  journal is validated as the rolled-back attempt for the current old digest.
 - The final target digest must be recalculated after the last `bin/lib.sh`
   change and frozen with its focused test.
 - The current focused gate proves identity selection, fail-closed source
