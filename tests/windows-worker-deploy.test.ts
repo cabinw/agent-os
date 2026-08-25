@@ -179,7 +179,10 @@ public static class Probe {
     expect(module).toContain("AreAccessRulesProtected");
     expect(module).toContain("S-1-5-18");
     expect(module).toContain("S-1-5-32-544");
-    expect(module).toContain("GetLinkCount");
+    expect(module).toContain("AgentOS.Windows.FileIdentity");
+    expect(module).toContain("GetFileInformationByHandle");
+    expect(module).toContain("FileIdentity]::LinkCount");
+    expect(module).not.toContain("[IO.File]::GetLinkCount");
     expect(module).toContain("ReparsePoint");
     expect(module).toContain("function Set-AgentOSAdminAcl");
     expect(module).toContain("function Assert-AgentOSAdminAcl");
