@@ -831,7 +831,8 @@ function Set-AgentOSWorkerExecutableAcl {
     $acl = Get-Acl -LiteralPath $directory
     $acl.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
       $WorkerSid,
-      [Security.AccessControl.FileSystemRights]::Traverse,
+      [Security.AccessControl.FileSystemRights] `
+        'Traverse, ReadAttributes, ReadExtendedAttributes, ReadPermissions',
       [Security.AccessControl.InheritanceFlags]::None,
       [Security.AccessControl.PropagationFlags]::None,
       [Security.AccessControl.AccessControlType]::Allow
@@ -878,7 +879,9 @@ function Assert-AgentOSWorkerExecutableAcl {
     throw "Agent OS managed executable is not executable by the Worker: $Path"
   }
   foreach ($directory in $ancestors) {
-    $allowsTraverse = $false
+    $allowsInspection = $false
+    $requiredRights = [Security.AccessControl.FileSystemRights] `
+      'Traverse, ReadAttributes, ReadExtendedAttributes, ReadPermissions'
     foreach ($rule in (Get-Acl -LiteralPath $directory).GetAccessRules(
       $true,
       $true,
@@ -888,13 +891,13 @@ function Assert-AgentOSWorkerExecutableAcl {
         if ($rule.AccessControlType -ne 'Allow') {
           throw "Agent OS managed executable ancestry denies the Worker: $Path"
         }
-        if (($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::Traverse) -ne 0) {
-          $allowsTraverse = $true
+        if (($rule.FileSystemRights -band $requiredRights) -eq $requiredRights) {
+          $allowsInspection = $true
         }
       }
     }
-    if (-not $allowsTraverse) {
-      throw "Agent OS managed executable ancestry blocks Worker traversal: $Path"
+    if (-not $allowsInspection) {
+      throw "Agent OS managed executable ancestry blocks Worker inspection: $Path"
     }
   }
 }

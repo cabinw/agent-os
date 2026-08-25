@@ -160,6 +160,10 @@ if ($relatedProcesses.Count -ne 0) {
   throw 'Windows Worker admin upgrade requires zero related processes'
 }
 
+foreach ($executable in @($nodePath, $grokPath, $configuredPowerShellPath)) {
+  Set-AgentOSWorkerExecutableAcl -Path $executable -WorkerSid $workerSid
+}
+
 function Test-UpgradeTaskAction {
   param([Parameter(Mandatory)][string]$HostPath)
   try {

@@ -5,7 +5,39 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$agentRoot = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'AgentOS'
+$statusPath = Join-Path (Join-Path $agentRoot 'logs') 'worker-host-status.json'
+function Write-WorkerHostStatus {
+  param(
+    [Parameter(Mandatory)][string]$Phase,
+    [AllowNull()][string]$PreviousPhase,
+    [AllowNull()][Nullable[int]]$ExitCode,
+    [AllowNull()][Nullable[int]]$HResult
+  )
+  $status = [ordered]@{
+    phase = $Phase
+    previousPhase = $PreviousPhase
+    exitCode = $ExitCode
+    hresult = $HResult
+  }
+  [IO.File]::WriteAllText(
+    $statusPath,
+    ($status | ConvertTo-Json -Compress),
+    [Text.UTF8Encoding]::new($false)
+  )
+}
+$script:lastHostPhase = 'bootstrap'
+trap {
+  try {
+    Write-WorkerHostStatus -Phase 'host_error' -PreviousPhase $script:lastHostPhase `
+      -HResult $_.Exception.HResult
+  } catch {}
+  exit 1
+}
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 Import-Module (Join-Path $PSScriptRoot 'AgentOS.Windows.psm1') -Force
+$script:lastHostPhase = 'module_loaded'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 
 if (-not ('AgentOS.Windows.Job' -as [type])) {
   Add-Type -TypeDefinition @'
@@ -179,17 +211,27 @@ $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom
 $workerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
 Assert-AgentOSWorkerReadAcl -Path ([IO.Path]::GetDirectoryName($ConfigPath)) -WorkerSid $workerSid
 Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
+$script:lastHostPhase = 'config_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 $workerReleaseRoot = Assert-AgentOSConfiguredWorkerRelease -Config $config -WorkerSid $workerSid
+$script:lastHostPhase = 'release_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 
-$agentRoot = Get-AgentOSRoot
+if ((Get-AgentOSRoot) -cne $agentRoot) { throw 'Agent OS root resolution changed' }
 $expectedConfig = Join-Path $agentRoot 'config\worker.json'
 if ($ConfigPath -cne $expectedConfig) { throw 'Worker config is outside the fixed Agent OS root' }
 $nodePath = [string]$config.nodePath
 $workerEntry = [string]$config.workerEntry
 $runtimeRoot = [string]$config.runtimeRoot
 $workingDirectory = [string]$config.workingDirectory
+$script:lastHostPhase = 'checking_node'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 $null = Assert-AgentOSTrustedExecutable -Path $nodePath -WorkerSid $workerSid
+$script:lastHostPhase = 'node_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 $null = Assert-AgentOSTrustedExecutable -Path $workerEntry -WorkerSid $workerSid
+$script:lastHostPhase = 'entry_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 $null = Assert-AgentOSFixedPath -Path $runtimeRoot -Kind Directory
 if (-not (Test-AgentOSContainedPath -Root $workerReleaseRoot -Path $workerEntry)) {
   throw 'Worker entry is outside a protected Agent OS release'
@@ -198,11 +240,15 @@ if ($runtimeRoot -cne (Join-Path $agentRoot 'run')) {
   throw 'Worker runtime root is outside the fixed Agent OS root'
 }
 $null = Assert-AgentOSFixedPath -Path $workingDirectory -Kind Directory
+$script:lastHostPhase = 'working_directory_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 if ($workingDirectory -cne $workerReleaseRoot -and
     -not (Test-AgentOSContainedPath -Root $workerReleaseRoot -Path $workingDirectory)) {
   throw 'Worker working directory is outside a protected Agent OS release'
 }
 Assert-AgentOSPrivateAcl -Path $runtimeRoot -WorkerSid $workerSid
+$script:lastHostPhase = 'paths_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 
 $allowedEnvironment = [Collections.Generic.HashSet[string]]::new(
   [string[]]@(
@@ -233,6 +279,8 @@ foreach ($property in $config.environment.PSObject.Properties) {
   }
   $start.Environment[$property.Name] = [string]$property.Value
 }
+$script:lastHostPhase = 'environment_loaded'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 $expectedEnvironmentPaths = @{
   AGENT_CWD = (Join-Path $agentRoot 'workspaces')
   SESSION_PATH = (Join-Path $agentRoot 'state\runner-sessions.json')
@@ -281,32 +329,16 @@ Assert-AgentOSRuntimeArchitecture `
     $nodePath,
     $start.Environment['AGENT_OS_GROK_BIN']
   )
+$script:lastHostPhase = 'executables_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 
 $gate = Join-Path $runtimeRoot 'job-assigned.gate'
 $null = Assert-AgentOSFixedPath -Path $gate -Kind File
 Assert-AgentOSPrivateAcl -Path $gate -WorkerSid $workerSid
-$statusPath = Join-Path (Join-Path $agentRoot 'logs') 'worker-host-status.json'
 $null = Assert-AgentOSFixedPath -Path $statusPath -Kind File
 Assert-AgentOSPrivateAcl -Path $statusPath -WorkerSid $workerSid
-function Write-WorkerHostStatus {
-  param(
-    [Parameter(Mandatory)][string]$Phase,
-    [AllowNull()][string]$PreviousPhase,
-    [AllowNull()][Nullable[int]]$ExitCode,
-    [AllowNull()][Nullable[int]]$HResult
-  )
-  $status = [ordered]@{
-    phase = $Phase
-    previousPhase = $PreviousPhase
-    exitCode = $ExitCode
-    hresult = $HResult
-  }
-  [IO.File]::WriteAllText(
-    $statusPath,
-    ($status | ConvertTo-Json -Compress),
-    [Text.UTF8Encoding]::new($false)
-  )
-}
+$script:lastHostPhase = 'preflight_verified'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 [IO.File]::WriteAllText($gate, 'pending', [Text.UTF8Encoding]::new($false))
 $start.Environment['AGENT_OS_JOB_ASSIGNMENT_GATE'] = $gate
 [AgentOS.Windows.Job]::AssertQuotingContract()

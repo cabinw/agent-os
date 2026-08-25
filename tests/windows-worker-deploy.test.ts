@@ -325,11 +325,12 @@ public static class Probe {
     expect(windowsModule).toContain("LsaAddAccountRights");
     expect(install).toContain("Set-AgentOSWorkerExecutableAcl -Path $executable");
     expect(windowsModule).toContain(
-      "[Security.AccessControl.FileSystemRights]::Traverse",
+      "'Traverse, ReadAttributes, ReadExtendedAttributes, ReadPermissions'",
     );
     expect(windowsModule).toContain(
       "Assert-AgentOSWorkerExecutableAcl -Path $executable",
     );
+    expect(upgrade).toContain("Set-AgentOSWorkerExecutableAcl -Path $executable");
     expect(windowsModule).toContain(
       "Assert-AgentOSBatchLogonRight -WorkerSid $workerSid",
     );
@@ -343,6 +344,11 @@ public static class Probe {
     expect(host).toContain("WriteAllText($gate, 'closed'");
     expect(host).toContain("Write-WorkerHostStatus -Phase 'host_error'");
     expect(host).toContain("Write-WorkerHostStatus -Phase 'child_exit'");
+    expect(host).toContain("$script:lastHostPhase = 'bootstrap'");
+    expect(host).toContain("$script:lastHostPhase = 'checking_node'");
+    expect(host).toContain("$script:lastHostPhase = 'entry_verified'");
+    expect(host).toContain("$script:lastHostPhase = 'preflight_verified'");
+    expect(host.indexOf("trap {")).toBeLessThan(host.indexOf("Import-Module"));
     expect(host).toContain("[Action[string]]{");
     expect(install.indexOf("if ($journalNeedsIntentRebind)")).toBeLessThan(
       install.indexOf("$journal -and $journal.phase -eq 'committed'"),
