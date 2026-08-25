@@ -90,13 +90,13 @@ fi
 # shellcheck source=bin/lib.sh
 source "$SCRIPT_DIR/bin/lib.sh"
 
-readonly ADMIN_GENERATION_ID=hub-admin-25-20260825-g1
-readonly ADMIN_GENERATION_OLD_SHA256=444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6
-readonly ADMIN_GENERATION_NEW_SHA256=f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8
+readonly ADMIN_GENERATION_ID=hub-admin-25-20260825-g2
+readonly ADMIN_GENERATION_OLD_SHA256=f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8
+readonly ADMIN_GENERATION_NEW_SHA256=4c8a57bc59a2329995c2289fc55570ead0a514a967f6bdf3bb5f714462ee63c3
 readonly ADMIN_GENERATION_OLD_RUNTIME_SHA256=ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440
 readonly ADMIN_GENERATION_NEW_RUNTIME_SHA256=ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440
-readonly ADMIN_GENERATION_PREDECESSOR_TRANSACTION=upgrade-admin-migration-1f064246a0f547571aa832b374baae377a8bbfb3b8b10733ed530b459d168220-attempt-000001
-readonly ADMIN_GENERATION_PREDECESSOR_SHA256=8ff2613d3a952cc35f4954b8cfccb0206e1514d094cdec2ee3c774d44e5e853f
+readonly ADMIN_GENERATION_PREDECESSOR_TRANSACTION=upgrade-admin-migration-444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6-attempt-000001
+readonly ADMIN_GENERATION_PREDECESSOR_SHA256=7a332db8154e10f9fb0de500474db2ad2e02e98c8b59f6fe5a46e990b5c95112
 
 replace_cold=false
 migrate_installed=false
@@ -134,7 +134,7 @@ else
   printf '%s\n' \
     'usage: bootstrap-admin.sh [--replace-cold --expected-current-sha256 HEX]' \
     '       bootstrap-admin.sh --migrate-installed --expected-current-sha256 HEX [--rollback]' \
-    '       bootstrap-admin.sh --upgrade-generation hub-admin-25-20260825-g1 [--rollback]' >&2
+    '       bootstrap-admin.sh --upgrade-generation hub-admin-25-20260825-g2 [--rollback]' >&2
   exit 2
 fi
 
