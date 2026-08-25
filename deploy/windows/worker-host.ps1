@@ -245,6 +245,14 @@ foreach ($name in @('AGENT_OS_CLAUDE_BIN', 'AGENT_OS_CODEX_BIN', 'AGENT_OS_GROK_
 }
 $null = Assert-AgentOSTrustedExecutable -Path $start.Environment['AGENT_OS_PWSH_BIN'] -WorkerSid $workerSid
 $null = Assert-AgentOSTrustedExecutable -Path $start.Environment['AGENT_OS_WINDOWS_REPLACE_SCRIPT'] -WorkerSid $workerSid
+Assert-AgentOSRuntimeArchitecture `
+  -DeclaredHostMachine ([string]$config.hostArchitecture) `
+  -DeclaredWorkerMachine ([string]$config.workerArchitecture) `
+  -AssetPaths @(
+    $start.Environment['AGENT_OS_PWSH_BIN'],
+    $nodePath,
+    $start.Environment['AGENT_OS_GROK_BIN']
+  )
 
 $gate = Join-Path $runtimeRoot 'job-assigned.gate'
 if (Test-Path -LiteralPath $gate) { Remove-Item -LiteralPath $gate -Force }

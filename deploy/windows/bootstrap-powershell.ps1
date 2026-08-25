@@ -2,6 +2,9 @@
 #requires -Version 5.1
 param(
   [Parameter(Mandatory)][string]$MsiPath,
+  [Parameter(Mandatory)][ValidateSet('AMD64', 'ARM64')][string]$ExpectedHostMachine,
+  [Parameter(Mandatory)][ValidateSet('AMD64')][string]$ExpectedWorkerMachine,
+  [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$ExpectedArchitectureHelperSha256,
   [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$ExpectedMsiSha256,
   [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{64}$')][string]$ExpectedPwshSha256,
   [Parameter(Mandatory)][ValidatePattern('^[a-fA-F0-9]{40}$')][string]$ExpectedSignerThumbprint
@@ -60,6 +63,42 @@ function Assert-BootstrapFile {
   }
 }
 
+function Assert-BootstrapAdminOnlyAcl {
+  param([Parameter(Mandatory)][string]$Path)
+  $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
+  if (-not $acl.AreAccessRulesProtected) {
+    throw 'PowerShell bootstrap ACL inheritance is enabled'
+  }
+  $owner = ([Security.Principal.NTAccount]$acl.Owner).Translate(
+    [Security.Principal.SecurityIdentifier]
+  ).Value
+  if ($owner -cne 'S-1-5-32-544') {
+    throw 'PowerShell bootstrap ACL owner is not Administrators'
+  }
+  $expected = @('S-1-5-18', 'S-1-5-32-544')
+  $actual = @($acl.Access | ForEach-Object {
+    if ($_.IsInherited -or $_.AccessControlType -ne 'Allow' -or
+        ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
+          [Security.AccessControl.FileSystemRights]::FullControl) {
+      throw 'PowerShell bootstrap ACL is not protected full-control allow-only'
+    }
+    $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
+  } | Sort-Object -Unique)
+  if (($actual -join ',') -cne (($expected | Sort-Object) -join ',')) {
+    throw 'PowerShell bootstrap ACL contains an unauthorized principal'
+  }
+}
+
+$architectureHelper = Join-Path $PSScriptRoot 'AgentOS.Architecture.ps1'
+Assert-BootstrapFile -Path $architectureHelper
+Assert-BootstrapAdminOnlyAcl -Path $PSScriptRoot
+Assert-BootstrapAdminOnlyAcl -Path $architectureHelper
+if ((Get-FileHash -LiteralPath $architectureHelper -Algorithm SHA256).Hash -cne
+    $ExpectedArchitectureHelperSha256.ToUpperInvariant()) {
+  throw 'PowerShell architecture helper digest changed'
+}
+. $architectureHelper
+
 function Assert-ApprovedMsi {
   param([Parameter(Mandatory)][string]$Path)
   Assert-BootstrapFile -Path $Path
@@ -71,12 +110,19 @@ function Assert-ApprovedMsi {
       $signature.SignerCertificate.Thumbprint -cne $ExpectedSignerThumbprint.ToUpperInvariant()) {
     throw 'PowerShell MSI does not have the approved Authenticode signer'
   }
+  Assert-AgentOSBootstrapArchitecture `
+    -DeclaredHostMachine $ExpectedHostMachine `
+    -DeclaredWorkerMachine $ExpectedWorkerMachine `
+    -MsiPath $Path
 }
 
 function Set-BootstrapAcl {
   param([Parameter(Mandatory)][string]$Path)
   $acl = Get-Acl -LiteralPath $Path
   $acl.SetAccessRuleProtection($true, $false)
+  $administratorSid = New-Object -TypeName Security.Principal.SecurityIdentifier `
+    -ArgumentList 'S-1-5-32-544'
+  $acl.SetOwner($administratorSid)
   foreach ($rule in @($acl.Access)) { $null = $acl.RemoveAccessRuleAll($rule) }
   foreach ($sid in @('S-1-5-18', 'S-1-5-32-544')) {
     $identity = New-Object -TypeName Security.Principal.SecurityIdentifier -ArgumentList $sid
@@ -97,20 +143,7 @@ function Set-BootstrapAcl {
 
 function Assert-BootstrapAcl {
   param([Parameter(Mandatory)][string]$Path)
-  $acl = Get-Acl -LiteralPath $Path
-  if (-not $acl.AreAccessRulesProtected) { throw 'PowerShell bootstrap ACL inheritance is enabled' }
-  $expected = @('S-1-5-18', 'S-1-5-32-544')
-  $actual = @($acl.Access | ForEach-Object {
-    if ($_.AccessControlType -ne 'Allow' -or
-        ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
-          [Security.AccessControl.FileSystemRights]::FullControl) {
-      throw 'PowerShell bootstrap ACL is not full-control allow-only'
-    }
-    $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
-  } | Sort-Object -Unique)
-  if (($actual -join ',') -cne (($expected | Sort-Object) -join ',')) {
-    throw 'PowerShell bootstrap ACL contains an unauthorized principal'
-  }
+  Assert-BootstrapAdminOnlyAcl -Path $Path
 }
 
 function Assert-FixedPwsh {
@@ -122,6 +155,11 @@ function Assert-FixedPwsh {
   if ($hash -cne $ExpectedPwshSha256.ToUpperInvariant()) {
     throw 'fixed PowerShell executable digest changed'
   }
+  Assert-AgentOSPEMachine -Path $fixedPwsh -ExpectedMachine $ExpectedWorkerMachine
+  Assert-AgentOSHostAssetArchitecture `
+    -DeclaredHostMachine $ExpectedHostMachine `
+    -DeclaredWorkerMachine $ExpectedWorkerMachine `
+    -AssetPaths @($fixedPwsh)
   $signature = Get-AuthenticodeSignature -LiteralPath $fixedPwsh
   if ($signature.Status -ne 'Valid' -or
       $signature.SignerCertificate.Thumbprint -cne $ExpectedSignerThumbprint.ToUpperInvariant()) {

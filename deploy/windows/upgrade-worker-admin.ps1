@@ -23,9 +23,28 @@ $null = Assert-AgentOSTrustedExecutable -Path $PowerShellPath -WorkerSid $worker
 $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
 Assert-AgentOSWorkerReadAcl -Path (Split-Path -LiteralPath $ConfigPath -Parent) -WorkerSid $workerSid
 Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
+$runtimeConfig = try {
+  Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+} catch {
+  throw 'Worker secret configuration is invalid'
+}
+$nodePath = [string]$runtimeConfig.nodePath
+$grokPath = [string]$runtimeConfig.environment.AGENT_OS_GROK_BIN
+$configuredPowerShellPath = [string]$runtimeConfig.environment.AGENT_OS_PWSH_BIN
+if ($configuredPowerShellPath -cne $PowerShellPath) {
+  throw 'Worker PowerShell path does not match the fixed task executable'
+}
+foreach ($executable in @($nodePath, $grokPath, $configuredPowerShellPath)) {
+  $null = Assert-AgentOSTrustedExecutable -Path $executable -WorkerSid $workerSid
+}
+Assert-AgentOSRuntimeArchitecture `
+  -DeclaredHostMachine ([string]$runtimeConfig.hostArchitecture) `
+  -DeclaredWorkerMachine ([string]$runtimeConfig.workerArchitecture) `
+  -AssetPaths @($configuredPowerShellPath, $nodePath, $grokPath)
 
 $adminFiles = @(
-  'AgentOS.Windows.psm1', 'health-worker.ps1', 'start-worker.ps1',
+  'AgentOS.Architecture.ps1', 'AgentOS.Windows.psm1',
+  'health-worker.ps1', 'start-worker.ps1',
   'replace-file.ps1', 'stop-worker.ps1', 'uninstall-worker.ps1',
   'upgrade-worker-admin.ps1', 'worker-host.ps1'
 )
