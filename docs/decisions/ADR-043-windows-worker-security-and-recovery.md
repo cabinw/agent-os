@@ -23,6 +23,22 @@ endpoint fingerprints. A retry adopts only an allowed phase transition. Admin
 upgrade journals are target-hash scoped so a committed A → B transaction does
 not block B → C.
 
+The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
+Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.
+The latter is the field path `support_arm64_host_amd64_worker`. Machine identity
+comes from `IsWow64Process2`, and AMD64 emulation from
+`GetMachineTypeAttributes`; environment architecture variables are not trust
+inputs. The bootstrap reads the MSI SummaryInformation Template and requires an
+AMD64 package. Before the administrator dot-sources the shared architecture
+helper, it verifies the helper and source-root protected ACL, owner, ancestry,
+single-link identity and an explicit SHA-256 pin. Before any install write and
+before every lifecycle action, the
+declared host/Worker pair must match the native machine, current PowerShell
+process and descriptor-read PE machines of the pinned PowerShell, Node and Grok
+executables. Unknown machines, ARM64 without explicit AMD64 emulation, a native
+ARM64 Worker process, or any asset/declaration mismatch fail closed. Signer,
+digest, ancestry, single-link, ACL and Job Object requirements remain unchanged.
+
 The host creates Node with `CREATE_SUSPENDED`, assigns it to a kill-on-close Job
 Object and only then resumes its primary thread. Vendor children inherit that
 boundary. The child receives an allowlisted environment and fixed executable
@@ -51,6 +67,8 @@ the next version transition.
 
 - Installation requires an elevated administrator token and a fixed local
   Worker identity; runtime execution remains non-administrator.
+- ARM64 host support does not admit ARM64 runtime assets in this generation;
+  PowerShell, Node and Grok remain pinned AMD64 artifacts under emulation.
 - Configuration rotation and admin upgrades are privileged stopped-state
   operations.
 - Candidate, journal and release topology is part of the recovery protocol and

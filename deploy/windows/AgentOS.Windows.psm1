@@ -1,6 +1,7 @@
 #requires -Version 7.4
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'AgentOS.Architecture.ps1')
 
 function Assert-AgentOSFixedPath {
   param(
@@ -399,10 +400,32 @@ function Assert-AgentOSWorkerTask {
     [Parameter(Mandatory)][string]$ConfigPath
   )
   $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+  $workerSid = ([Security.Principal.NTAccount]$WorkerAccount).Translate(
+    [Security.Principal.SecurityIdentifier]
+  )
+  $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
+  Assert-AgentOSWorkerReadAcl `
+    -Path (Split-Path -LiteralPath $ConfigPath -Parent) `
+    -WorkerSid $workerSid
+  Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
+  $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  foreach ($executable in @(
+    $PowerShellPath,
+    [string]$config.nodePath,
+    [string]$config.environment.AGENT_OS_GROK_BIN
+  )) {
+    $null = Assert-AgentOSTrustedExecutable -Path $executable -WorkerSid $workerSid
+  }
+  Assert-AgentOSRuntimeArchitecture `
+    -DeclaredHostMachine ([string]$config.hostArchitecture) `
+    -DeclaredWorkerMachine ([string]$config.workerArchitecture) `
+    -AssetPaths @(
+      $PowerShellPath,
+      [string]$config.nodePath,
+      [string]$config.environment.AGENT_OS_GROK_BIN
+    )
   if ($task.Principal.UserId -cne $WorkerAccount -and
-      $task.Principal.UserId -cne ([Security.Principal.NTAccount]$WorkerAccount).Translate(
-        [Security.Principal.SecurityIdentifier]
-      ).Value) {
+      $task.Principal.UserId -cne $workerSid.Value) {
     throw 'Agent OS Worker task identity changed'
   }
   if ($task.Principal.RunLevel -ne 'Limited') {
@@ -418,4 +441,4 @@ function Assert-AgentOSWorkerTask {
   return $task
 }
 
-Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
+Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath

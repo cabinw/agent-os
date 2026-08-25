@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const MODULE = "deploy/windows/AgentOS.Windows.psm1";
+const ARCHITECTURE = "deploy/windows/AgentOS.Architecture.ps1";
 const HOST = "deploy/windows/worker-host.ps1";
 const INSTALL = "deploy/windows/install-worker.ps1";
 const START = "deploy/windows/start-worker.ps1";
@@ -39,9 +40,131 @@ describe("Windows Worker deployment contract", () => {
     expect(bootstrap).toContain("Assert-BootstrapAcl -Path $stagePath");
     expect(bootstrap).toContain("'/i', $stagePath");
     expect(bootstrap).toContain("outside the audited 7.4 release line");
+    expect(bootstrap).toContain("ExpectedHostMachine");
+    expect(bootstrap).toContain("ExpectedWorkerMachine");
+    expect(bootstrap).toContain("ExpectedArchitectureHelperSha256");
+    expect(bootstrap).toContain("Assert-BootstrapFile -Path $architectureHelper");
+    expect(bootstrap).toContain("Assert-BootstrapAdminOnlyAcl -Path $PSScriptRoot");
+    expect(bootstrap).toContain("Assert-BootstrapAdminOnlyAcl -Path $architectureHelper");
+    expect(bootstrap).toContain("Assert-AgentOSBootstrapArchitecture");
+    expect(bootstrap).toContain("Assert-AgentOSPEMachine -Path $fixedPwsh");
+    expect(bootstrap.indexOf(". $architectureHelper")).toBeLessThan(
+      bootstrap.indexOf("$stageRoot ="),
+    );
+    const architectureLoad = bootstrap.indexOf(". $architectureHelper");
+    for (const trustCheck of [
+      "Assert-BootstrapFile -Path $architectureHelper",
+      "Assert-BootstrapAdminOnlyAcl -Path $PSScriptRoot",
+      "Assert-BootstrapAdminOnlyAcl -Path $architectureHelper",
+      "Get-FileHash -LiteralPath $architectureHelper",
+    ]) {
+      expect(bootstrap.indexOf(trustCheck)).toBeLessThan(architectureLoad);
+    }
     expect(bootstrap).toContain("ADD_PATH=0");
     expect(bootstrap).not.toContain("Invoke-WebRequest");
   });
+
+  it("binds bootstrap, install and runtime to one machine contract", async () => {
+    const [architecture, module, install, upgrade, host] = await Promise.all(
+      [ARCHITECTURE, MODULE, INSTALL, UPGRADE, HOST].map((path) =>
+        readFile(path, "utf8"),
+      ),
+    );
+    expect(architecture).toContain("IsWow64Process2");
+    expect(architecture).toContain("GetMachineTypeAttributes");
+    expect(architecture).toContain("private const uint USER_ENABLED = 0x00000001;");
+    expect(architecture).toContain("Process.GetCurrentProcess().MainModule.FileName");
+    expect(architecture).toContain("return PEMachine(executable)");
+    expect(architecture).not.toContain("processMachine == 0 ? nativeMachine");
+    expect(architecture).toContain("MsiGetSummaryInformation");
+    expect(architecture).toContain("PID_TEMPLATE = 7");
+    expect(architecture).toContain("public static ushort PEMachine");
+    expect(architecture).toContain('return "machine_unknown"');
+    expect(architecture).toContain('return "amd64_emulation_unavailable"');
+    expect(architecture).toContain('return "process_machine_mismatch"');
+    expect(architecture).toContain('return "asset_machine_mismatch"');
+    expect(module).toContain(". (Join-Path $PSScriptRoot 'AgentOS.Architecture.ps1')");
+    expect(module).toContain("Assert-AgentOSRuntimeArchitecture");
+    const workerTask = module.indexOf("function Assert-AgentOSWorkerTask");
+    const taskConfigRead = module.indexOf(
+      "$config = Get-Content -LiteralPath $ConfigPath",
+      workerTask,
+    );
+    expect(
+      module.indexOf("Assert-AgentOSWorkerReadAcl -Path $ConfigPath", workerTask),
+    ).toBeLessThan(taskConfigRead);
+    for (const source of [install, upgrade]) {
+      expect(source).toContain("'AgentOS.Architecture.ps1'");
+      expect(source).toContain("Assert-AgentOSRuntimeArchitecture");
+      expect(source).toContain("$configuredPowerShellPath, $nodePath, $grokPath");
+    }
+    expect(install.indexOf("Assert-AgentOSRuntimeArchitecture")).toBeLessThan(
+      install.indexOf("New-Item -ItemType Directory -Path $root"),
+    );
+    expect(host).toContain("Assert-AgentOSRuntimeArchitecture");
+    expect(host).toContain("$start.Environment['AGENT_OS_PWSH_BIN']");
+    expect(host).toContain("$start.Environment['AGENT_OS_GROK_BIN']");
+    expect(host).not.toMatch(/-AssetPaths[^\n]*(?:workerEntry|\.ps1|\.mjs)/u);
+  });
+
+  it.runIf(Boolean(CSC && MONO))(
+    "executes the production ARM64-host AMD64-worker decision table",
+    async () => {
+      const architecture = await readFile(ARCHITECTURE, "utf8");
+      const typeDefinition = architecture.match(
+        /Add-Type -TypeDefinition @'\n([\s\S]*?)\n'@/u,
+      )?.[1];
+      expect(typeDefinition).toBeTruthy();
+      const probe = `${typeDefinition}
+public static class Probe {
+  public static void Main() {
+    ushort A = AgentOS.Windows.Machine.AMD64;
+    ushort R = AgentOS.Windows.Machine.ARM64;
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(A, A, A, false, A, new ushort[]{A, A, A}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(R, A, R, true, A, new ushort[]{A, A, A}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(R, A, R, false, A, new ushort[]{A}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(R, A, R, true, R, new ushort[]{A}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(R, A, R, true, A, new ushort[]{R}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(R, A, 0, true, A, new ushort[]{A}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(R, A, R, true, A, new ushort[]{0}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(0, A, R, true, A, new ushort[]{A}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.ContractCode(A, A, R, true, A, new ushort[]{A}));
+    System.Console.WriteLine(AgentOS.Windows.Machine.Name(AgentOS.Windows.Machine.ParseMsiTemplate("x64;1033")));
+    System.Console.WriteLine(AgentOS.Windows.Machine.Name(AgentOS.Windows.Machine.ParseMsiTemplate("Arm64;1033")));
+    System.Console.WriteLine(AgentOS.Windows.Machine.Name(AgentOS.Windows.Machine.ParseMsiTemplate("Intel;1033")));
+  }
+}
+`;
+      const root = mkdtempSync(join(tmpdir(), "agent-os-machine-probe-"));
+      try {
+        const source = join(root, "machine.cs");
+        const executable = join(root, "machine.exe");
+        writeFileSync(source, probe, { encoding: "utf8", mode: 0o600 });
+        const compile = spawnSync(CSC, ["/nologo", `/out:${executable}`, source], {
+          encoding: "utf8",
+        });
+        expect(compile.status, compile.stderr || compile.stdout).toBe(0);
+        const result = spawnSync(MONO, [executable], { encoding: "utf8" });
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout.trim().split(/\r?\n/u)).toEqual([
+          "ok",
+          "ok",
+          "amd64_emulation_unavailable",
+          "process_machine_mismatch",
+          "asset_machine_mismatch",
+          "machine_unknown",
+          "machine_unknown",
+          "machine_unknown",
+          "host_machine_mismatch",
+          "AMD64",
+          "ARM64",
+          "unknown",
+        ]);
+      } finally {
+        rmSync(root, { recursive: true });
+      }
+    },
+  );
   it("pins a non-admin account and proves private ProgramData ACLs", async () => {
     const [module, install] = await Promise.all([
       readFile(MODULE, "utf8"),

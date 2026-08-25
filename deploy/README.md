@@ -49,9 +49,9 @@ credentials are deliberately omitted.
 | Ubuntu Hub host | Ubuntu 22.04.5 LTS, x86_64, systemd 249, ext4, about 41 GiB free; Node 24.19.0, Corepack 0.35.0 and pnpm 11.17.0 | Node was installed in a root-owned versioned directory and exposed at `/usr/bin/node` only after the upstream clearsigned checksum manifest and pinned release key were verified; `node-v24.19.0-linux-x64.tar.xz` SHA-256 is `14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647`; no Hub service or proxy was started |
 | HTTPS edge | Nginx 1.18 is active on existing ports 80/443; Certbot renewal is active | use an independent virtual host; never replace existing sites |
 | TLS / DNS | A valid certificate estate exists, but no dedicated Agent OS name is approved; strict HTTPS to the host address fails SAN validation | a dedicated FQDN and matching trusted certificate are a field dependency |
-| Windows Worker host | Windows 11 Home build 26200, x64, NTFS, about 311 GiB total / 200 GiB free | use native Task Scheduler and explicit NTFS ACLs; do not rely on POSIX modes |
+| Windows Worker host | reachable Windows 11 Pro build 26200, ARM64, NTFS, with AMD64 user-mode emulation; the prior x64 target is unavailable | use `support_arm64_host_amd64_worker`; pinned asset staging and lifecycle evidence remain pending |
 | Windows runtime | PowerShell 5.1, Node 24.19.0, Corepack 0.35.0; pnpm absent | activate the repository-pinned pnpm through Corepack before install |
-| Vendor CLI | Grok 1.0.5 resolves to a concrete `grok.exe`; cached authentication material exists | cached material is not proof of a valid online login; SVR-04 must perform a scoped live check |
+| Vendor CLI | no Grok executable is present on the reachable ARM64 field host | stage a pinned AMD64 Grok asset before any scoped live check |
 | Remote administration | OpenSSH 9.5p2; `sshd` is Automatic but its service is stopped while a separate process currently listens | repair and verify service-owned SSH startup before reboot testing |
 | Windows control plane | Task Scheduler is running; `schtasks.exe`, `sc.exe`, `icacls.exe` and `taskkill.exe` exist; the current operator is an administrator | installation is possible, but the Worker must run as a fixed non-administrator account |
 
@@ -145,6 +145,18 @@ write, then advances an admin-only `intent → layout → release → config →
 committed` journal. Admin upgrades use a target-hash journal and adopt only the
 same or next phase after a crash; other unfinished upgrades fail closed.
 
+The current architecture allowlist is either native AMD64 host/Worker, or a
+Windows 11 ARM64 host with Win32-confirmed AMD64 user-mode emulation and pinned
+AMD64 PowerShell, Node and Grok assets (`support_arm64_host_amd64_worker`). The
+bootstrap verifies its shared architecture helper's source-root/admin-only ACL,
+owner, ancestry, single-link identity and caller-supplied release SHA before
+dot-sourcing it, then verifies the MSI package architecture as well as its signer and hash.
+Lifecycle code uses Win32 native/process machine APIs and reads each PE machine;
+it does not trust architecture environment variables. Unknown machines, absent
+emulation, an ARM64 Worker process or an asset/declaration mismatch stop before
+publication or Task mutation. This code contract does not substitute for the
+pending real ARM64 asset-staging and lifecycle field gate.
+
 The Worker host creates Node suspended, assigns it to a kill-on-close Job Object,
 then resumes it. Session and request stores publish one same-directory candidate
 through `ReplaceFileW`, or `MoveFileExW` with write-through for first creation,
@@ -155,6 +167,21 @@ ACL, Task Scheduler, Job Object and NTFS kill/reboot evidence remain field gates
 
 All state paths are absolute. Example files contain placeholders only and stay
 out of deployed secret directories.
+
+Windows `worker.json` additionally declares `hostArchitecture` as `AMD64` or
+`ARM64` and `workerArchitecture` as exactly `AMD64`. These declarations are
+verified against Win32 machine evidence and cannot authorize another machine.
+The minimum architecture fragment is:
+
+```json
+{
+  "hostArchitecture": "ARM64",
+  "workerArchitecture": "AMD64"
+}
+```
+
+The complete private configuration also supplies the fixed PowerShell, Node and
+Grok paths; those files must all be descriptor-read as AMD64 before use.
 
 ### Hub
 
