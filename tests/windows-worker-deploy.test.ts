@@ -294,7 +294,10 @@ public static class Probe {
   });
 
   it("preflights before mutation and exposes an adoptable install fault matrix", async () => {
-    const install = await readFile(INSTALL, "utf8");
+    const [install, windowsModule] = await Promise.all([
+      readFile(INSTALL, "utf8"),
+      readFile(MODULE, "utf8"),
+    ]);
     const firstRootWrite = install.indexOf("New-Item -ItemType Directory -Path $root");
     expect(install.indexOf("Get-AgentOSTreeDigest -Root $PSScriptRoot")).toBeLessThan(
       firstRootWrite,
@@ -312,6 +315,15 @@ public static class Probe {
     expect(install).toContain("Write-InstallJournal -Phase intent");
     expect(install).toContain("-AllowStartIfOnBatteries");
     expect(install).toContain("-DontStopIfGoingOnBatteries");
+    expect(install).toContain("Set-AgentOSBatchLogonRight -WorkerSid $workerSid");
+    expect(windowsModule).toContain("SeBatchLogonRight");
+    expect(windowsModule).toContain("LsaAddAccountRights");
+    expect(windowsModule).toContain(
+      "Assert-AgentOSBatchLogonRight -WorkerSid $workerSid",
+    );
+    expect(windowsModule).toContain("$_.ExecutablePath.Equals($powerShellPath");
+    expect(windowsModule).toContain("$_.CommandLine.Contains($hostPath");
+    expect(windowsModule).toContain("$_.ExecutablePath.Equals($nodePath");
     expect(install.indexOf("if ($journalNeedsIntentRebind)")).toBeLessThan(
       install.indexOf("$journal -and $journal.phase -eq 'committed'"),
     );

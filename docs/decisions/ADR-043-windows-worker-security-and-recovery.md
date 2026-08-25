@@ -46,6 +46,12 @@ ambiguous topology remain bound to the original transaction and fail closed.
 The Worker Task permits start while Windows reports battery power and does not
 stop on a battery transition. Host power source is not a Worker lifecycle
 signal; explicit lifecycle commands and Job Object teardown remain authoritative.
+Install grants only `SeBatchLogonRight` to the dedicated Worker SID through the
+local LSA policy API and every lifecycle assertion rechecks that right. Task
+registration is not accepted as evidence that Windows granted the logon right.
+Lifecycle process discovery matches the fixed PowerShell executable plus
+`worker-host.ps1`, or the fixed Node executable plus `workerEntry`. Merely
+mentioning the config path does not make a management command a Worker process.
 
 The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
 Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.

@@ -86,6 +86,131 @@ namespace AgentOS.Windows {
 '@
 }
 
+if (-not ('AgentOS.Windows.AccountRights' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
+
+namespace AgentOS.Windows {
+  public static class AccountRights {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LsaObjectAttributes {
+      public uint Length;
+      public IntPtr RootDirectory;
+      public IntPtr ObjectName;
+      public uint Attributes;
+      public IntPtr SecurityDescriptor;
+      public IntPtr SecurityQualityOfService;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LsaUnicodeString {
+      public ushort Length;
+      public ushort MaximumLength;
+      public IntPtr Buffer;
+    }
+    [DllImport("advapi32.dll")]
+    private static extern uint LsaOpenPolicy(
+      IntPtr systemName,
+      ref LsaObjectAttributes attributes,
+      uint desiredAccess,
+      out IntPtr policy
+    );
+    [DllImport("advapi32.dll")]
+    private static extern uint LsaAddAccountRights(
+      IntPtr policy,
+      IntPtr sid,
+      LsaUnicodeString[] rights,
+      uint count
+    );
+    [DllImport("advapi32.dll")]
+    private static extern uint LsaEnumerateAccountRights(
+      IntPtr policy,
+      IntPtr sid,
+      out IntPtr rights,
+      out uint count
+    );
+    [DllImport("advapi32.dll")]
+    private static extern uint LsaClose(IntPtr handle);
+    [DllImport("advapi32.dll")]
+    private static extern uint LsaFreeMemory(IntPtr buffer);
+    [DllImport("advapi32.dll")]
+    private static extern uint LsaNtStatusToWinError(uint status);
+
+    private const uint PolicyCreateAccount = 0x00000010;
+    private const uint PolicyLookupNames = 0x00000800;
+    private const uint StatusObjectNameNotFound = 0xC0000034;
+
+    private static void ThrowIfError(uint status) {
+      if (status != 0) throw new Win32Exception((int)LsaNtStatusToWinError(status));
+    }
+    private static IntPtr OpenPolicy(uint access) {
+      var attributes = new LsaObjectAttributes();
+      attributes.Length = (uint)Marshal.SizeOf<LsaObjectAttributes>();
+      IntPtr policy;
+      ThrowIfError(LsaOpenPolicy(IntPtr.Zero, ref attributes, access, out policy));
+      return policy;
+    }
+    private static IntPtr PinSid(SecurityIdentifier sid, out GCHandle pin) {
+      byte[] binary = new byte[sid.BinaryLength];
+      sid.GetBinaryForm(binary, 0);
+      pin = GCHandle.Alloc(binary, GCHandleType.Pinned);
+      return pin.AddrOfPinnedObject();
+    }
+    private static LsaUnicodeString NewString(string value) {
+      IntPtr buffer = Marshal.StringToHGlobalUni(value);
+      return new LsaUnicodeString {
+        Buffer = buffer,
+        Length = checked((ushort)(value.Length * 2)),
+        MaximumLength = checked((ushort)((value.Length + 1) * 2))
+      };
+    }
+    public static void Add(SecurityIdentifier sid, string right) {
+      IntPtr policy = IntPtr.Zero;
+      GCHandle sidPin = default(GCHandle);
+      LsaUnicodeString value = NewString(right);
+      try {
+        policy = OpenPolicy(PolicyLookupNames | PolicyCreateAccount);
+        IntPtr sidPointer = PinSid(sid, out sidPin);
+        ThrowIfError(LsaAddAccountRights(policy, sidPointer, new[] { value }, 1));
+      } finally {
+        if (value.Buffer != IntPtr.Zero) Marshal.FreeHGlobal(value.Buffer);
+        if (sidPin.IsAllocated) sidPin.Free();
+        if (policy != IntPtr.Zero) LsaClose(policy);
+      }
+    }
+    public static bool Contains(SecurityIdentifier sid, string right) {
+      IntPtr policy = IntPtr.Zero;
+      IntPtr rights = IntPtr.Zero;
+      GCHandle sidPin = default(GCHandle);
+      try {
+        policy = OpenPolicy(PolicyLookupNames);
+        IntPtr sidPointer = PinSid(sid, out sidPin);
+        uint count;
+        uint status = LsaEnumerateAccountRights(policy, sidPointer, out rights, out count);
+        if (status == StatusObjectNameNotFound) return false;
+        ThrowIfError(status);
+        int size = Marshal.SizeOf<LsaUnicodeString>();
+        for (uint index = 0; index < count; index++) {
+          var value = Marshal.PtrToStructure<LsaUnicodeString>(
+            IntPtr.Add(rights, checked((int)index * size))
+          );
+          string name = Marshal.PtrToStringUni(value.Buffer, value.Length / 2);
+          if (string.Equals(name, right, StringComparison.Ordinal)) return true;
+        }
+        return false;
+      } finally {
+        if (rights != IntPtr.Zero) LsaFreeMemory(rights);
+        if (sidPin.IsAllocated) sidPin.Free();
+        if (policy != IntPtr.Zero) LsaClose(policy);
+      }
+    }
+  }
+}
+'@
+}
+
 function Assert-AgentOSFixedPath {
   param(
     [Parameter(Mandatory)][string]$Path,
@@ -120,6 +245,19 @@ function Assert-AgentOSFixedPath {
     throw "Agent OS expected a directory: $Path"
   }
   return $item
+}
+
+function Assert-AgentOSBatchLogonRight {
+  param([Parameter(Mandatory)][Security.Principal.SecurityIdentifier]$WorkerSid)
+  if (-not [AgentOS.Windows.AccountRights]::Contains($WorkerSid, 'SeBatchLogonRight')) {
+    throw 'Agent OS Worker account lacks SeBatchLogonRight'
+  }
+}
+
+function Set-AgentOSBatchLogonRight {
+  param([Parameter(Mandatory)][Security.Principal.SecurityIdentifier]$WorkerSid)
+  [AgentOS.Windows.AccountRights]::Add($WorkerSid, 'SeBatchLogonRight')
+  Assert-AgentOSBatchLogonRight -WorkerSid $WorkerSid
 }
 
 function Assert-AgentOSPrivateAcl {
@@ -664,11 +802,20 @@ function Get-AgentOSWorkerProcesses {
   param([Parameter(Mandatory)][string]$ConfigPath)
   $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $workerEntry = [string]$config.workerEntry
+  $nodePath = [string]$config.nodePath
+  $powerShellPath = [string]$config.environment.AGENT_OS_PWSH_BIN
+  $hostPath = Join-Path `
+    ([IO.Path]::GetDirectoryName([string]$config.environment.AGENT_OS_WINDOWS_REPLACE_SCRIPT)) `
+    'worker-host.ps1'
   return @(
     Get-CimInstance -ClassName Win32_Process -ErrorAction Stop | Where-Object {
-      $_.CommandLine -and
-      ($_.CommandLine.Contains($ConfigPath, [StringComparison]::OrdinalIgnoreCase) -or
-       $_.CommandLine.Contains($workerEntry, [StringComparison]::OrdinalIgnoreCase))
+      $_.ExecutablePath -and $_.CommandLine -and (
+        ($_.ExecutablePath.Equals($powerShellPath, [StringComparison]::OrdinalIgnoreCase) -and
+         $_.CommandLine.Contains($hostPath, [StringComparison]::OrdinalIgnoreCase) -and
+         $_.CommandLine.Contains($ConfigPath, [StringComparison]::OrdinalIgnoreCase)) -or
+        ($_.ExecutablePath.Equals($nodePath, [StringComparison]::OrdinalIgnoreCase) -and
+         $_.CommandLine.Contains($workerEntry, [StringComparison]::OrdinalIgnoreCase))
+      )
     }
   )
 }
@@ -683,6 +830,7 @@ function Assert-AgentOSWorkerTask {
   )
   $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
   $workerSid = Assert-AgentOSWorkerAccount -WorkerAccount $WorkerAccount
+  Assert-AgentOSBatchLogonRight -WorkerSid $workerSid
   $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
   Assert-AgentOSWorkerReadAcl `
     -Path ([IO.Path]::GetDirectoryName($ConfigPath)) `
@@ -722,4 +870,4 @@ function Assert-AgentOSWorkerTask {
   return $task
 }
 
-Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSAdminTree, Assert-AgentOSConfiguredWorkerRelease, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerAccount, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSCanonicalReleaseManifest, Get-AgentOSExactTreeDigest, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
+Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSAdminTree, Assert-AgentOSBatchLogonRight, Assert-AgentOSConfiguredWorkerRelease, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerAccount, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSCanonicalReleaseManifest, Get-AgentOSExactTreeDigest, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSBatchLogonRight, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
