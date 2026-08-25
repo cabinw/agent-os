@@ -76,8 +76,11 @@ it; retaining an older artifact signature cannot bypass that state.
 Validity intervals require a separately established trustworthy host clock.
 The verifier never obtains time from the artifact or network. Missing trusted
 time, a time earlier than the durable greatest-observed second, an out-of-range
-time or a clock read/change during verification fails closed. Clock recovery is
-an explicit offline operator procedure and cannot reduce the durable value.
+time, a backwards clock read, or an ambiguous clock observation during
+verification fails closed. A nondecreasing clock may advance while a large
+artifact is hashed; validity is checked again at the final observation. Clock
+recovery is an explicit offline operator procedure and cannot reduce the
+durable value.
 
 ### Artifact envelope
 
