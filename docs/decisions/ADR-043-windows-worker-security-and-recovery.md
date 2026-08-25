@@ -86,6 +86,11 @@ The host creates Node with `CREATE_SUSPENDED`, assigns it to a kill-on-close Job
 Object and only then resumes its primary thread. Vendor children inherit that
 boundary. The child receives an allowlisted environment and fixed executable
 paths; credentials mount outside the workspace.
+The host resolves the dedicated Worker's `USERPROFILE`, `HOME`, `APPDATA` and
+`LOCALAPPDATA` from Windows special folders, validates their fixed containment
+and passes only those profile paths to the sanitized Worker. Vendor CLIs can
+find their own per-account login without copying credentials into ProgramData
+or admitting the caller's ambient environment.
 `AGENT_OS_ENABLED_ADAPTERS` may narrow a Worker to a non-empty unique subset of
 the built-in adapters. Only that subset admits CLI paths, credentials and
 workspace roots; unknown or duplicate ids fail closed. Omission retains the

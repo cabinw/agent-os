@@ -117,6 +117,15 @@ describe("Windows Worker deployment contract", () => {
     expect(host).toContain("$start.Environment['AGENT_OS_PWSH_BIN']");
     expect(host).toContain("$start.Environment['AGENT_OS_GROK_BIN']");
     expect(host).not.toMatch(/-AssetPaths[^\n]*(?:workerEntry|\.ps1|\.mjs)/u);
+    expect(host).toContain("[Environment+SpecialFolder]::UserProfile");
+    expect(host).toContain("[Environment+SpecialFolder]::ApplicationData");
+    expect(host).toContain("[Environment+SpecialFolder]::LocalApplicationData");
+    expect(host).toContain("USERPROFILE = $userProfile");
+    expect(host).toContain("HOME = $userProfile");
+    expect(host).toContain("Worker profile environment escapes USERPROFILE");
+    expect(host.indexOf("$vendorProfileEnvironment")).toBeLessThan(
+      host.indexOf("$start.Environment['AGENT_OS_JOB_ASSIGNMENT_GATE']"),
+    );
   });
 
   it.runIf(Boolean(CSC && MONO))(

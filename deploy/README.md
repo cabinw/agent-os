@@ -137,6 +137,13 @@ file grant the Worker read/execute only. Installation and health checks verify
 the exact protected DACL and owner; `mode: 0600` and `chmod` are not Windows
 evidence.
 
+The scheduled host resolves `USERPROFILE`, `HOME`, `APPDATA` and
+`LOCALAPPDATA` from the dedicated Worker account's Windows special folders and
+validates that the application-data paths remain inside that profile. These are
+the only profile variables admitted to the sanitized Worker environment, so a
+vendor CLI can discover its own login without placing vendor credentials in the
+Worker config or mutable workspace.
+
 Windows PowerShell 5.1 is only the offline bootstrap entry. It admits one pinned
 PowerShell 7.4 MSI after SHA-256, Authenticode signer-thumbprint, single-link,
 ancestry and private-stage checks. All lifecycle scripts require 7.4. Installation

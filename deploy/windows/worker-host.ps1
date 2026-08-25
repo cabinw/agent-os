@@ -272,6 +272,24 @@ foreach ($name in @('SystemRoot', 'WINDIR', 'TEMP', 'TMP')) {
     $start.Environment[$name] = [Environment]::GetEnvironmentVariable($name)
   }
 }
+$userProfile = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
+$vendorProfileEnvironment = [ordered]@{
+  USERPROFILE = $userProfile
+  HOME = $userProfile
+  APPDATA = [Environment]::GetFolderPath([Environment+SpecialFolder]::ApplicationData)
+  LOCALAPPDATA = [Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData)
+}
+foreach ($pair in $vendorProfileEnvironment.GetEnumerator()) {
+  if ([string]::IsNullOrEmpty($pair.Value)) {
+    throw "Worker profile environment is unavailable: $($pair.Key)"
+  }
+  $null = Assert-AgentOSFixedPath -Path $pair.Value -Kind Directory
+  if ($pair.Key -ne 'USERPROFILE' -and $pair.Key -ne 'HOME' -and
+      -not (Test-AgentOSContainedPath -Root $userProfile -Path $pair.Value)) {
+    throw "Worker profile environment escapes USERPROFILE: $($pair.Key)"
+  }
+  $start.Environment[$pair.Key] = $pair.Value
+}
 foreach ($property in $config.environment.PSObject.Properties) {
   if (-not $allowedEnvironment.Contains($property.Name) -or
       -not ($property.Value -is [string]) -or [string]::IsNullOrEmpty($property.Value)) {
