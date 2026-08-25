@@ -24,14 +24,28 @@ describe("offline publisher trust contract", () => {
 
   it("requires monotonic rotation, revocation and same-descriptor publication", () => {
     for (const requirement of [
-      "greatest accepted epoch and policy SHA-256",
+      "greatest accepted epoch, policy SHA-256",
       "same epoch",
       "Revocation takes effect",
       "copy from that same descriptor",
       "Verification is repeated after taking the deployment lock",
+      "separate durable acceptance record",
+      "same-sequence fork is",
+      "greatest trusted wall-clock second",
     ]) {
       expect(adr).toContain(requirement);
     }
+  });
+
+  it("fixes the verifier execution closure outside candidate runtimes", () => {
+    for (const requirement of [
+      "statically linked native executable",
+      "no script interpreter, dynamic loader",
+      "Candidate Node, OpenSSL, PATH",
+    ]) {
+      expect(adr).toContain(requirement);
+    }
+    expect(adr).toMatch(/Provisioning authenticates\s+its exact SHA-256/u);
   });
 
   it("keeps deployment status fail-closed until the launcher exists", () => {
