@@ -26,6 +26,33 @@ const BUILTIN_EXECUTABLE_ENV = Object.freeze({
   kimi: "AGENT_OS_KIMI_BIN",
 });
 
+function enabledAdapterCatalog(environment, adapterCatalog) {
+  const configured = environment.AGENT_OS_ENABLED_ADAPTERS;
+  if (configured === undefined) return adapterCatalog;
+  let ids;
+  try {
+    ids = JSON.parse(configured);
+  } catch (error) {
+    throw new Error("AGENT_OS_ENABLED_ADAPTERS must be a JSON array", { cause: error });
+  }
+  if (
+    !Array.isArray(ids) ||
+    ids.length === 0 ||
+    ids.some((id) => typeof id !== "string" || id.trim() !== id || id === "") ||
+    new Set(ids).size !== ids.length
+  ) {
+    throw new Error("AGENT_OS_ENABLED_ADAPTERS must contain unique adapter ids");
+  }
+  const byId = new Map(
+    adapterCatalog.map((AdapterClass) => [AdapterClass?.id, AdapterClass]),
+  );
+  const selected = ids.map((id) => byId.get(id));
+  if (selected.some((AdapterClass) => typeof AdapterClass !== "function")) {
+    throw new Error("AGENT_OS_ENABLED_ADAPTERS names an unavailable adapter");
+  }
+  return selected;
+}
+
 function required(environment, name) {
   const value = environment[name];
   if (typeof value !== "string" || value.trim() === "") {
@@ -217,7 +244,8 @@ export function createRunnerWorker({
       }),
     };
   }
-  const adapterIds = adapterCatalog.map((AdapterClass) => AdapterClass?.id);
+  const selectedAdapterCatalog = enabledAdapterCatalog(environment, adapterCatalog);
+  const adapterIds = selectedAdapterCatalog.map((AdapterClass) => AdapterClass?.id);
   if (
     adapterIds.some((id) => typeof id !== "string" || id.trim() === "") ||
     new Set(adapterIds).size !== adapterIds.length
@@ -256,7 +284,7 @@ export function createRunnerWorker({
 
   const builtinClasses = new Set(ADAPTERS);
   const vendorExecutables = new Map();
-  for (const AdapterClass of adapterCatalog) {
+  for (const AdapterClass of selectedAdapterCatalog) {
     if (!builtinClasses.has(AdapterClass)) continue;
     const name = BUILTIN_EXECUTABLE_ENV[AdapterClass.id];
     if (!name)
@@ -272,7 +300,7 @@ export function createRunnerWorker({
 
   mkdirSync(workspaceRoot, { recursive: true, mode: 0o700 });
   mkdirSync(credentialRoot, { recursive: true, mode: 0o700 });
-  for (const AdapterClass of adapterCatalog) {
+  for (const AdapterClass of selectedAdapterCatalog) {
     mkdirSync(join(workspaceRoot, AdapterClass.id), {
       recursive: true,
       mode: 0o700,

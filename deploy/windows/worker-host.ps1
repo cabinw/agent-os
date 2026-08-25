@@ -208,6 +208,7 @@ $allowedEnvironment = [Collections.Generic.HashSet[string]]::new(
   [string[]]@(
     'AGENT_CWD', 'SESSION_PATH', 'AGENT_OS_AGENT_TOKENS',
     'AGENT_OS_CLAUDE_BIN', 'AGENT_OS_CODEX_BIN', 'AGENT_OS_CREDENTIAL_ROOT',
+    'AGENT_OS_ENABLED_ADAPTERS',
     'AGENT_OS_GROK_BIN', 'AGENT_OS_KIMI_BIN', 'AGENT_OS_RUNNER_ID',
     'AGENT_OS_PWSH_BIN', 'AGENT_OS_RUNNER_TOKEN', 'AGENT_OS_URL',
     'AGENT_OS_WINDOWS_REPLACE_SCRIPT'
@@ -242,7 +243,32 @@ foreach ($pair in $expectedEnvironmentPaths.GetEnumerator()) {
     throw "Worker environment path is outside the fixed Agent OS root: $($pair.Key)"
   }
 }
-foreach ($name in @('AGENT_OS_CLAUDE_BIN', 'AGENT_OS_CODEX_BIN', 'AGENT_OS_GROK_BIN', 'AGENT_OS_KIMI_BIN')) {
+$adapterExecutables = @{
+  claude = 'AGENT_OS_CLAUDE_BIN'
+  codex = 'AGENT_OS_CODEX_BIN'
+  grok = 'AGENT_OS_GROK_BIN'
+  kimi = 'AGENT_OS_KIMI_BIN'
+}
+$enabledAdapters = @($adapterExecutables.Keys)
+if ($start.Environment.ContainsKey('AGENT_OS_ENABLED_ADAPTERS')) {
+  try {
+    $parsedAdapters = ConvertFrom-Json `
+      -InputObject $start.Environment['AGENT_OS_ENABLED_ADAPTERS'] -NoEnumerate
+  } catch {
+    throw 'AGENT_OS_ENABLED_ADAPTERS must be a JSON array'
+  }
+  if (-not ($parsedAdapters -is [Array])) {
+    throw 'AGENT_OS_ENABLED_ADAPTERS must be a JSON array'
+  }
+  $enabledAdapters = @($parsedAdapters)
+}
+if ($enabledAdapters.Count -eq 0 -or
+    @($enabledAdapters | Where-Object { -not ($_ -is [string]) -or -not $adapterExecutables.ContainsKey($_) }).Count -ne 0 -or
+    @($enabledAdapters | Sort-Object -Unique).Count -ne $enabledAdapters.Count) {
+  throw 'AGENT_OS_ENABLED_ADAPTERS must contain unique available adapter ids'
+}
+foreach ($adapter in $enabledAdapters) {
+  $name = $adapterExecutables[$adapter]
   $null = Assert-AgentOSTrustedExecutable -Path $start.Environment[$name] -WorkerSid $workerSid
 }
 $null = Assert-AgentOSTrustedExecutable -Path $start.Environment['AGENT_OS_PWSH_BIN'] -WorkerSid $workerSid

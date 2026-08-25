@@ -53,6 +53,10 @@ The host creates Node with `CREATE_SUSPENDED`, assigns it to a kill-on-close Job
 Object and only then resumes its primary thread. Vendor children inherit that
 boundary. The child receives an allowlisted environment and fixed executable
 paths; credentials mount outside the workspace.
+`AGENT_OS_ENABLED_ADAPTERS` may narrow a Worker to a non-empty unique subset of
+the built-in adapters. Only that subset admits CLI paths, credentials and
+workspace roots; unknown or duplicate ids fail closed. Omission retains the
+all-adapter contract for existing deployments.
 
 Session and request JSON stores write an exclusive same-directory candidate,
 flush it, publish through `ReplaceFileW` or write-through `MoveFileExW`, and only

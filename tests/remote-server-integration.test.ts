@@ -468,6 +468,45 @@ describe("Remote Runner production composition", () => {
     }
   });
 
+  it("starts a Worker with only its explicitly enabled trusted adapter", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "agent-os-selected-adapter-"));
+    const environment = {
+      AGENT_OS_URL: "https://hub.example.invalid",
+      AGENT_OS_RUNNER_TOKEN: RUNNER_TOKEN,
+      AGENT_OS_RUNNER_ID: HOST_ID,
+      AGENT_OS_ENABLED_ADAPTERS: JSON.stringify(["grok"]),
+      AGENT_OS_AGENT_TOKENS: JSON.stringify({ grok: AGENT_TOKENS.grok }),
+      AGENT_OS_GROK_BIN: process.execPath,
+      AGENT_CWD: join(scratch, "workspaces"),
+      SESSION_PATH: join(scratch, "state", "sessions.json"),
+      AGENT_OS_CREDENTIAL_ROOT: join(scratch, "state", "credentials"),
+    };
+    try {
+      const { runner } = createRunnerWorker({ environment: { ...environment } });
+      expect(await exists(join(scratch, "workspaces", "grok"))).toBe(true);
+      expect(await exists(join(scratch, "workspaces", "codex"))).toBe(false);
+      await runner.close();
+
+      for (const [selection, message] of [
+        ["[]", /must contain unique adapter ids/],
+        ['["grok","grok"]', /must contain unique adapter ids/],
+        ['["unknown"]', /names an unavailable adapter/],
+        ["not-json", /must be a JSON array/],
+      ] as const) {
+        expect(() =>
+          createRunnerWorker({
+            environment: {
+              ...environment,
+              AGENT_OS_ENABLED_ADAPTERS: selection,
+            },
+          }),
+        ).toThrow(message);
+      }
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
   it("fails closed for unknown mode and incomplete remote credentials", async () => {
     const cases = [
       {

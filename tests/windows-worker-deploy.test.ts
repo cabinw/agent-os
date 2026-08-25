@@ -108,6 +108,10 @@ describe("Windows Worker deployment contract", () => {
       install.indexOf("New-Item -ItemType Directory -Path $root"),
     );
     expect(host).toContain("Assert-AgentOSRuntimeArchitecture");
+    expect(host).toContain("AGENT_OS_ENABLED_ADAPTERS");
+    expect(host).toContain("$enabledAdapters = @($adapterExecutables.Keys)");
+    expect(host).toContain("$name = $adapterExecutables[$adapter]");
+    expect(host).not.toContain("foreach ($name in @('AGENT_OS_CLAUDE_BIN'");
     expect(host).toContain("$start.Environment['AGENT_OS_PWSH_BIN']");
     expect(host).toContain("$start.Environment['AGENT_OS_GROK_BIN']");
     expect(host).not.toMatch(/-AssetPaths[^\n]*(?:workerEntry|\.ps1|\.mjs)/u);

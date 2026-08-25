@@ -236,10 +236,13 @@ quotes before injecting the value.
 | `AGENT_OS_RUNNER_ID` | same stable host identity as the Hub |
 | `AGENT_OS_RUNNER_TOKEN` | same dedicated Runner secret as the Hub |
 | `AGENT_OS_AGENT_TOKENS` | same explicit scoped Agent map as the Hub |
+| `AGENT_OS_ENABLED_ADAPTERS` | optional non-empty JSON array of unique adapters installed on this Worker; omitted means all built-ins |
 | `AGENT_CWD` | workspace root above |
 | `SESSION_PATH` | vendor session path above |
 
-The Worker removes Agent OS control-plane variables before vendor execution.
+Only enabled adapters require trusted fixed CLI paths and scoped Agent tokens;
+unknown, duplicate or empty adapter selections fail closed. The Worker removes
+Agent OS control-plane variables before vendor execution.
 SVR-04 must narrow all remaining child environment variables to an allowlist,
 resolve trusted CLI paths at startup and prove each child sees only its current
 scoped Agent credential.
