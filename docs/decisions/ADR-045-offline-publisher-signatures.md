@@ -25,6 +25,16 @@ single-link `0400` regular file; the launcher is a single-link `0555` regular
 file. No CLI option or environment variable can replace either production
 path.
 
+The launcher is a statically linked native executable built with its audited
+Ed25519/SHA-256 implementation. It has no script interpreter, dynamic loader,
+plugin, trust store or configuration search path. Provisioning authenticates
+its exact SHA-256 from the offline-root bundle before installation. At runtime
+it clears the environment except a fixed locale, opens its own fixed path and
+the root key with no-follow semantics, and validates device/inode, owner,
+single-link mode and every ancestor before reading policy or artifact input.
+Candidate Node, OpenSSL, PATH, loader variables and candidate libraries never
+participate in root or publisher verification.
+
 The launcher is the only entry that may admit a cold or replacement
 administrator kit. Running `bootstrap-admin.sh` directly cannot establish
 publisher authenticity and is rejected once publisher enforcement is enabled.
@@ -54,13 +64,20 @@ keys are invalid. The detached root signature is exactly 64 raw Ed25519 bytes.
 Policy, signature and the durable accepted-policy record are root-only,
 single-link regular files.
 
-The durable record pins the greatest accepted epoch and policy SHA-256. A lower
+The durable policy record pins the greatest accepted epoch, policy SHA-256 and
+greatest trusted wall-clock second observed during acceptance. A lower
 epoch, a different policy at the same epoch, a broken predecessor link or a
 revoked/expired/not-yet-active publisher key fails closed. A newer policy is
 published candidate→file fsync→rename→directory fsync only after its root
 signature and predecessor are verified. At least two publisher keys may overlap
 during rotation. Revocation takes effect at the first accepted policy carrying
 it; retaining an older artifact signature cannot bypass that state.
+
+Validity intervals require a separately established trustworthy host clock.
+The verifier never obtains time from the artifact or network. Missing trusted
+time, a time earlier than the durable greatest-observed second, an out-of-range
+time or a clock read/change during verification fails closed. Clock recovery is
+an explicit offline operator procedure and cannot reduce the durable value.
 
 ### Artifact envelope
 
@@ -85,6 +102,16 @@ and signature size are bounded to 1 KiB and 64 bytes. Logs and evidence contain
 only artifact type, policy epoch, key id, sequence, byte count, SHA-256 and
 result code; PEM, envelope bytes and signatures are never logged.
 
+Each artifact type has a separate durable acceptance record under
+`/var/lib/agent-os/publisher/accepted/`. The record contains type, greatest
+accepted sequence, envelope SHA-256, artifact SHA-256, byte count, policy epoch
+and accepted time. A lower sequence is a replay and is rejected. The same
+sequence is accepted only as an idempotent retry when every recorded field and
+the already-published artifact identity match exactly; a same-sequence fork is
+rejected. A greater sequence must use the currently accepted policy and pass
+the complete verification flow. Admin-kit and Hub-release sequences never
+advance each other.
+
 ### Verification and publication order
 
 The fixed launcher performs these steps before any privileged candidate is
@@ -102,7 +129,11 @@ published:
    `O_EXCL` staging file while hashing again, fsync the file, and require both
    hashes plus final descriptor identity/size to match;
 7. publish the staged copy by rename and parent-directory fsync; only that copy
-   may be extracted or used as an administrator-kit source.
+   may be extracted or used as an administrator-kit source; and
+8. write the artifact acceptance record as an owner-only candidate, fsync it,
+   rename it and fsync `accepted/` before reporting success. A crash after
+   artifact publication but before record publication is recovered only by the
+   exact same-sequence idempotent path; it never admits different bytes.
 
 Path replacement, truncation, append, inode/device change, short read, policy
 change or clock/epoch ambiguity before publication rejects and removes only the
@@ -116,6 +147,11 @@ The implementation is not accepted until focused tests prove:
 - wrong key, signature, digest, size, type, epoch, sequence and validity time;
 - revoked key, policy rollback, same-epoch fork, missing predecessor and root
   signature failure;
+- per-type sequence rollback, same-sequence fork, exact same-sequence retry,
+  independent type high-water marks and publication-before-record recovery;
+- absent/untrusted/backwards/changing wall clock and durable time rollback;
+- alternate interpreter, candidate Node/OpenSSL, PATH/loader injection,
+  dynamically linked launcher and launcher/root-key ancestor replacement;
 - symlink, hardlink, unsafe ancestor, special file and oversized metadata;
 - replace/truncate/append/inode-swap after the first hash and during copy;
 - candidate/file/directory fsync failure and SIGKILL at each publication phase;
@@ -139,6 +175,9 @@ type, size, policy epoch, sequence or the bytes copied after verification.
 
 **Use long-lived single publisher keys.** Rejected: there is no bounded overlap
 or durable revocation path.
+
+**Treat a valid old signature as permanently replayable.** Rejected: signature
+validity does not express deployment order; the per-type durable sequence does.
 
 ## Consequences
 
