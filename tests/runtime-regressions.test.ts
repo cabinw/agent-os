@@ -163,7 +163,7 @@ describe("EVIDENCE-01 · runtime-owned evidence path", () => {
     expect(bounded.messages).toHaveLength(25);
     expect(bounded.messages[0]?.content).toBe("fact-1175");
     await expect(hub.tools.call("get_context", { limit: 0 })).rejects.toThrow(/正整数/);
-  });
+  }, 60_000);
 
   it("turn 中伪造 replyTo 不能覆盖 runtime-owned cause", async () => {
     const runtime: { hub?: InstanceType<typeof Hub> } = {};

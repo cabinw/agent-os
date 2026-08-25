@@ -257,7 +257,9 @@ describe("Hub Runner 边界", () => {
     });
     expect(await made.hub.quiescent()).toBe(false);
     await settle(made.hub);
-    expect(await made.hub.quiescent()).toBe(false);
+    // The mainline Runner now completes this fake dispatch into review during
+    // settle; review is durable and has no active writer, so it is quiescent.
+    expect(await made.hub.quiescent()).toBe(true);
   });
 
   it("execute 和 reset 只调用 Runner，Hub 不实例化或保存 vendor adapter", async () => {
