@@ -109,6 +109,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-041](decisions/ADR-041-privileged-admin-kit-migration.md) | Allowlisted, journaled replacement of the privileged Hub administrator kit |
 | [ADR-042](decisions/ADR-042-interrupted-runner-dispatch-recovery.md) | Hub boot reuses the stored started id to resume interrupted Runner dispatch |
 | [ADR-043](decisions/ADR-043-windows-worker-security-and-recovery.md) | Windows Worker ACL, Job Object, journaling and NTFS publication boundary |
+| [ADR-044](decisions/ADR-044-allowlisted-admin-kit-generation-upgrade.md) | Explicit 25-file administrator-kit generation edges and atomic rollback |
 
 ## Assets
 
