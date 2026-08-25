@@ -163,8 +163,14 @@ pending real ARM64 asset-staging and lifecycle field gate.
 The Worker host creates Node suspended, assigns it to a kill-on-close Job Object,
 then resumes it. Session and request stores publish one same-directory candidate
 through `ReplaceFileW`, or `MoveFileExW` with write-through for first creation,
-before updating memory. These are code and fault-injection contracts. Effective
-ACL, Task Scheduler, Job Object and NTFS kill/reboot evidence remain field gates.
+before updating memory. A new publisher removes only matching single-link
+regular candidates left by a killed predecessor; suspicious aliases fail
+closed. Windows readers retry only transient `ENOENT` at 1/4/10/25 ms. The
+protected ProgramData field gate passed six cross-process replacements, 52,984
+concurrent reads with zero invalid results, stale-candidate recovery,
+hard-link/junction rejection and zero residue. Reboot consistency remains a
+field gate; disk-full behavior stays in safe fault injection rather than filling
+the production volume.
 
 ## Configuration contract
 

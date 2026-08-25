@@ -94,7 +94,12 @@ all-adapter contract for existing deployments.
 Session and request JSON stores write an exclusive same-directory candidate,
 flush it, publish through `ReplaceFileW` or write-through `MoveFileExW`, and only
 then replace in-memory state. Publication failure removes the candidate and does
-not advance memory.
+not advance memory. Before the next publication, the single Worker process
+removes matching single-link regular candidates left by a killed predecessor;
+a reparse point, hard link or other unexpected candidate type fails closed for
+operator review. Windows startup reads retry only `ENOENT` after 1, 4, 10 and
+25 milliseconds. Other errors remain immediate failures, and exhausting the
+bounded window retains the ordinary absent-store result.
 
 ## Alternatives
 
@@ -124,6 +129,8 @@ the next version transition.
   runtime trees are not executable deployment artifacts.
 - Candidate, journal and release topology is part of the recovery protocol and
   must not be deleted manually.
+- Transient `ENOENT` is a measured `ReplaceFileW` observation, not permission to
+  retry malformed JSON, ACL failures or unbounded I/O errors.
 - Local compilation and fault injection do not complete acceptance. A real
   Windows host must still prove effective ACLs, Task lifecycle, Job containment,
   NTFS kill/reboot consistency and zero vendor-process or credential residue.

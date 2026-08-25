@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { RUNNER_ERROR_CODES, RUNNER_EVENT_KINDS } from "./contract.mjs";
-import { publishDurableFile } from "./durable-file.mjs";
+import { publishDurableFile, readDurableFile } from "./durable-file.mjs";
 
 const FORMAT_VERSION = 1;
 const STATES = new Set([
@@ -149,7 +149,7 @@ export class RequestStore {
 
     try {
       mkdirSync(dirname(path), { recursive: true });
-      const parsed = JSON.parse(readFileSync(path, "utf8"));
+      const parsed = JSON.parse(readDurableFile(path));
       if (
         parsed?.version !== FORMAT_VERSION ||
         parsed.requests === null ||

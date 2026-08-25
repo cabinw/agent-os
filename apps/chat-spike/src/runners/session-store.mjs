@@ -1,7 +1,7 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { RUNNER_ERROR_CODES, RunnerDispatchError, runnerError } from "./contract.mjs";
-import { publishDurableFile } from "./durable-file.mjs";
+import { publishDurableFile, readDurableFile } from "./durable-file.mjs";
 
 const FORMAT_VERSION = 1;
 
@@ -60,7 +60,7 @@ export class SessionStore {
 
     try {
       mkdirSync(dirname(path), { recursive: true });
-      const raw = readFileSync(path, "utf8");
+      const raw = readDurableFile(path);
       const parsed = JSON.parse(raw);
       if (
         parsed?.version !== FORMAT_VERSION ||

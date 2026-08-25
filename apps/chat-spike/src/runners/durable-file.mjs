@@ -4,21 +4,74 @@ import {
   constants,
   closeSync,
   fsyncSync,
+  lstatSync,
   openSync,
+  readFileSync,
+  readdirSync,
   renameSync,
   unlinkSync,
   writeSync,
 } from "node:fs";
-import { dirname } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 const DEFAULT_OPS = Object.freeze({
   closeSync,
   fsyncSync,
+  lstatSync,
   openSync,
+  readdirSync,
   renameSync,
   unlinkSync,
   writeSync,
 });
+
+const WINDOWS_READ_RETRY_DELAYS_MS = Object.freeze([1, 4, 10, 25]);
+const SLEEP_BUFFER = new Int32Array(new SharedArrayBuffer(4));
+
+function sleepSync(milliseconds) {
+  Atomics.wait(SLEEP_BUFFER, 0, 0, milliseconds);
+}
+
+export function readDurableFile(
+  path,
+  {
+    platform = process.platform,
+    readFile = readFileSync,
+    sleep = sleepSync,
+    retryDelays = WINDOWS_READ_RETRY_DELAYS_MS,
+  } = {},
+) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return readFile(path, "utf8");
+    } catch (error) {
+      if (
+        error?.code !== "ENOENT" ||
+        platform !== "win32" ||
+        attempt >= retryDelays.length
+      ) {
+        throw error;
+      }
+      sleep(retryDelays[attempt]);
+    }
+  }
+}
+
+function removeStaleCandidates(ops, targetPath) {
+  const directory = dirname(targetPath);
+  const prefix = `${basename(targetPath)}.`;
+  for (const entry of ops.readdirSync(directory, { withFileTypes: true })) {
+    if (!entry.name.startsWith(prefix) || !entry.name.endsWith(".candidate")) {
+      continue;
+    }
+    const candidatePath = join(directory, entry.name);
+    const stat = ops.lstatSync(candidatePath);
+    if (!entry.isFile() || !stat.isFile() || stat.nlink !== 1) {
+      throw new Error("unsafe stale durable candidate requires operator review");
+    }
+    ops.unlinkSync(candidatePath);
+  }
+}
 
 function writeAll(ops, fd, body) {
   const bytes = Buffer.from(body, "utf8");
@@ -68,6 +121,7 @@ export function publishDurableFile(
   body,
   { platform = process.platform, ops = DEFAULT_OPS, windowsReplace } = {},
 ) {
+  removeStaleCandidates(ops, targetPath);
   const candidatePath = `${targetPath}.${process.pid}.${randomUUID()}.candidate`;
   let candidateFd;
   try {
