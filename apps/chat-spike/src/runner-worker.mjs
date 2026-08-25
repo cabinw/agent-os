@@ -384,5 +384,5 @@ export async function runRunnerWorker({ logger = console, ...options } = {}) {
 
 const isMain =
   process.argv[1] !== undefined &&
-  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
 if (isMain) await runRunnerWorker();

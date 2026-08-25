@@ -27,6 +27,13 @@ directory before configuration publication or Task registration. Configuration
 must name the exact entry and working directory in that release. Lifecycle and
 admin-upgrade validation remeasure the same exact tree.
 
+The admitted Worker artifact is a reproducible single-file ESM bundle. Its
+builder first proves the canonical 26-file source inventory still matches the
+repository, then includes the locked third-party dependency graph. The runtime
+manifest admits only `runner-worker.bundle.mjs`; an archive of bare sources is
+rejected because Node module resolution would otherwise escape the exact-tree
+release or fail at startup.
+
 PowerShell 5.1 may only stage a pinned, signed PowerShell 7.4 installer. Install
 and admin upgrade use admin-only phase journals, fixed candidates and exact
 endpoint fingerprints. A retry adopts only an allowed phase transition. Admin
@@ -87,6 +94,8 @@ the next version transition.
   operations.
 - Application runtime replacement requires a separate digest-bound release
   transaction; an admin-only upgrade cannot silently change it.
+- Release publication requires the deterministic Worker bundle gate; source-only
+  runtime trees are not executable deployment artifacts.
 - Candidate, journal and release topology is part of the recovery protocol and
   must not be deleted manually.
 - Local compilation and fault injection do not complete acceptance. A real

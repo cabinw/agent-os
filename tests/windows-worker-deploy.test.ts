@@ -16,6 +16,8 @@ const UNINSTALL = "deploy/windows/uninstall-worker.ps1";
 const UPGRADE = "deploy/windows/upgrade-worker-admin.ps1";
 const BOOTSTRAP = "deploy/windows/bootstrap-powershell.ps1";
 const WORKER_RUNTIME_MANIFEST = "deploy/windows/worker-runtime.manifest";
+const WORKER_RUNTIME_SOURCES = "deploy/windows/worker-runtime.sources";
+const BUILD_WORKER_RUNTIME = "scripts/build-windows-worker-release.mjs";
 const CSC = [
   "/Library/Frameworks/Mono.framework/Versions/Current/Commands/csc",
   "/usr/bin/csc",
@@ -356,22 +358,59 @@ public static class Probe {
     expect(module).toContain("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]");
   });
 
-  it("freezes every Worker application module in the canonical runtime manifest", async () => {
-    const [manifestText, sourceEntries, install, upgrade] = await Promise.all([
-      readFile(WORKER_RUNTIME_MANIFEST, "utf8"),
-      readdir("apps/chat-spike/src", { recursive: true }),
-      readFile(INSTALL, "utf8"),
-      readFile(UPGRADE, "utf8"),
-    ]);
+  it("freezes a dependency-complete bundle from every canonical Worker source", async () => {
+    const [manifestText, sourcesText, sourceEntries, install, upgrade] =
+      await Promise.all([
+        readFile(WORKER_RUNTIME_MANIFEST, "utf8"),
+        readFile(WORKER_RUNTIME_SOURCES, "utf8"),
+        readdir("apps/chat-spike/src", { recursive: true }),
+        readFile(INSTALL, "utf8"),
+        readFile(UPGRADE, "utf8"),
+      ]);
     const manifest = manifestText.trim().split(/\r?\n/u);
+    const sources = sourcesText.trim().split(/\r?\n/u);
     const expected = sourceEntries
       .filter((relative) => relative.endsWith(".mjs"))
       .map((relative) => `apps\\chat-spike\\src\\${relative.replaceAll("/", "\\")}`)
       .sort();
-    expect(manifest).toEqual(expected);
-    expect(manifest).toHaveLength(26);
+    expect(sources).toEqual(expected);
+    expect(sources).toHaveLength(26);
+    expect(manifest).toEqual(["runner-worker.bundle.mjs"]);
     for (const source of [install, upgrade]) {
       expect(source).toContain("'worker-runtime.manifest'");
+    }
+  });
+
+  it("builds the same self-contained Worker release twice", async () => {
+    const root = mkdtempSync(join(tmpdir(), "agent-os-worker-bundle-"));
+    try {
+      const first = join(root, "first");
+      const second = join(root, "second");
+      for (const output of [first, second]) {
+        const result = spawnSync(process.execPath, [BUILD_WORKER_RUNTIME, output], {
+          cwd: process.cwd(),
+          encoding: "utf8",
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(JSON.parse(result.stdout)).toMatchObject({ files: 1, sources: 26 });
+      }
+      const firstBundle = await readFile(join(first, "runner-worker.bundle.mjs"));
+      const secondBundle = await readFile(join(second, "runner-worker.bundle.mjs"));
+      expect(firstBundle.equals(secondBundle)).toBe(true);
+      expect(firstBundle.length).toBeGreaterThan(100_000);
+      expect(firstBundle.length).toBeLessThan(2_000_000);
+      expect(firstBundle.toString("utf8")).not.toContain("/private/tmp/");
+
+      const probe = spawnSync(
+        process.execPath,
+        [join(first, "runner-worker.bundle.mjs")],
+        { encoding: "utf8", env: {} },
+      );
+      expect(probe.status).not.toBe(0);
+      expect(`${probe.stdout}${probe.stderr}`).toContain("AGENT_OS_URL is required");
+      expect(`${probe.stdout}${probe.stderr}`).not.toContain("ERR_MODULE_NOT_FOUND");
+    } finally {
+      rmSync(root, { recursive: true });
     }
   });
 

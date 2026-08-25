@@ -174,30 +174,32 @@ out of deployed secret directories.
 Windows `worker.json` additionally declares `hostArchitecture` as `AMD64` or
 `ARM64` and `workerArchitecture` as exactly `AMD64`. These declarations are
 verified against Win32 machine evidence and cannot authorize another machine.
-The fragment below is abbreviated and is not an installable manifest. The
-canonical 26-file list is `deploy/windows/worker-runtime.manifest`; release
-packaging converts those repository-relative paths to the protected source tree
-and passes that exact list to install and upgrade.
+The 26-file repository input inventory is
+`deploy/windows/worker-runtime.sources`. Release preparation verifies it against
+the complete application source tree, then esbuild bundles those sources and
+the locked third-party dependency graph into one self-contained ESM file. The
+installable exact-tree allowlist is `deploy/windows/worker-runtime.manifest` and
+contains only that generated bundle. Source-only archives are invalid releases.
 
 Release preparation regenerates and reviews that file from tracked sources; it
 does not accept an operator-authored partial list:
 
 ```sh
-git ls-files 'apps/chat-spike/src/*.mjs' 'apps/chat-spike/src/**/*.mjs' \
-  | LC_ALL=C sort | sed 's#/#\\#g'
+pnpm run build:windows-worker -- <new-empty-output-directory>
 ```
 
-The command output must byte-match `deploy/windows/worker-runtime.manifest`.
-Installation then computes the canonical exact-tree digest over the protected
-source and binds that digest and manifest into `worker.json` and the journal.
+The builder refuses a stale source inventory or non-empty output directory and
+emits one file, byte count and SHA-256. Release assembly stages that one output
+under the canonical manifest. Installation computes its exact-tree digest and
+binds that digest and manifest into `worker.json` and the journal.
 
 ```json
 {
   "hostArchitecture": "ARM64",
   "workerArchitecture": "AMD64",
   "workerReleaseSha256": "<64-lowercase-hex>",
-  "workerReleaseFiles": ["<canonical 26-file manifest; abbreviated>"],
-  "workerEntry": "C:\\ProgramData\\AgentOS\\releases\\worker-runtime-<sha256>\\apps\\chat-spike\\src\\runner-worker.mjs",
+  "workerReleaseFiles": ["runner-worker.bundle.mjs"],
+  "workerEntry": "C:\\ProgramData\\AgentOS\\releases\\worker-runtime-<sha256>\\runner-worker.bundle.mjs",
   "workingDirectory": "C:\\ProgramData\\AgentOS\\releases\\worker-runtime-<sha256>"
 }
 ```
