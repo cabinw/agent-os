@@ -36,6 +36,8 @@ describe("Windows Worker deployment contract", () => {
     expect(bootstrap).toContain("SignerCertificate.Thumbprint");
     expect(bootstrap).toContain("BootstrapFile]::LinkCount");
     expect(bootstrap).toContain("path ancestry contains a reparse point");
+    expect(bootstrap).toContain("[IO.Path]::GetDirectoryName($cursor)");
+    expect(bootstrap).not.toContain("Split-Path -LiteralPath $cursor -Parent");
     expect(bootstrap).toContain("AgentOSBootstrap");
     expect(bootstrap).toContain("Assert-ApprovedMsi -Path $stagePath");
     expect(bootstrap).toContain("Assert-BootstrapAcl -Path $stagePath");

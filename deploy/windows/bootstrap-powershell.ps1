@@ -53,7 +53,7 @@ function Assert-BootstrapFile {
     if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
       throw 'PowerShell bootstrap path ancestry contains a reparse point'
     }
-    $parent = Split-Path -LiteralPath $cursor -Parent
+    $parent = [IO.Path]::GetDirectoryName($cursor)
     if (-not $parent -or $parent -ceq $cursor) { break }
     $cursor = $parent
   }
