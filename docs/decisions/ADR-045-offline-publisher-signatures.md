@@ -138,9 +138,22 @@ published:
    artifact publication but before record publication is recovered only by the
    exact same-sequence idempotent path; it never admits different bytes.
 
+Hub application install and upgrade invoke the fixed verifier under an empty,
+fixed environment before their deployment lock or any extraction, maintenance
+or service action. A root-only, single-link `0400` SHA-256 record pins the
+static verifier executable provisioned by the offline bundle. The shell entry
+strictly parses one redacted success line and replaces the caller archive with
+the verifier-published absolute path; caller archive bytes are never consumed
+after verification. Verifier failure output is suppressed to a fixed deploy
+error and cannot relay envelope, signature or artifact bytes.
+
 Path replacement, truncation, append, inode/device change, short read, policy
 change or clock/epoch ambiguity before publication rejects and removes only the
-owned candidate. Verification is repeated after taking the deployment lock.
+owned candidate. The native verifier holds its publisher transaction lock for
+the complete high-water and publication flow. After the Hub entry takes its
+separate deployment lock, `stage_release` repeats SHA-256 verification while
+copying only the published artifact; it does not repeat signature verification
+against caller-controlled paths.
 
 ### Acceptance gate
 

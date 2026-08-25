@@ -118,6 +118,7 @@ source "$SCRIPT_DIR/lib.sh"
 
 archive=
 checksum=
+envelope=
 target_revision=
 readonly FIXED_SNAPSHOT_HOOK="$(rooted /usr/libexec/agent-os/hub/pre-upgrade-snapshot)"
 readonly LEGACY_QUIESCENCELESS_SERVER_SHA256=9aa52cb59c508239316baf1fbc4eca083cbce578624bc891a2dfd4d121df1df5
@@ -140,7 +141,7 @@ legacy_offline_quiescence=false
 
 usage() {
   printf '%s\n' \
-    'usage: upgrade.sh --archive FILE --sha256 HEX --revision ID [--snapshot-hook FILE]' >&2
+    'usage: upgrade.sh --archive FILE --envelope FILE --revision ID [--snapshot-hook FILE]' >&2
 }
 
 exact_legacy_application_requires_offline_quiescence() {
@@ -249,11 +250,11 @@ trap finish EXIT
 
 while (($# > 0)); do
   case "$1" in
-    --archive | --sha256 | --revision | --snapshot-hook)
+    --archive | --envelope | --revision | --snapshot-hook)
       (($# >= 2)) || { usage; exit 2; }
       case "$1" in
         --archive) archive=$2 ;;
-        --sha256) checksum=$2 ;;
+        --envelope) envelope=$2 ;;
         --revision) target_revision=$2 ;;
         --snapshot-hook)
           snapshot_hook=$2
@@ -266,7 +267,7 @@ while (($# > 0)); do
   esac
 done
 
-[[ -n "$archive" && -n "$checksum" && -n "$target_revision" ]] || {
+[[ -n "$archive" && -n "$envelope" && -n "$target_revision" ]] || {
   usage
   exit 2
 }
@@ -274,6 +275,7 @@ require_privilege
 require_fixed_admin_execution
 require_commands install find chmod mv ln readlink awk date tr grep
 require_pinned_node
+verify_published_hub_release "$archive" "$envelope"
 if [[ "$snapshot_hook_overridden" == true && -z "$TEST_ROOT" && \
   "$snapshot_hook" != "$FIXED_SNAPSHOT_HOOK" ]]; then
   die 'production upgrades only execute the fixed audited snapshot hook'

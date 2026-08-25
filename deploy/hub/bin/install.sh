@@ -118,6 +118,7 @@ source "$SCRIPT_DIR/lib.sh"
 
 archive=
 checksum=
+envelope=
 install_revision=
 source_env=
 STAGING_PATH=
@@ -138,7 +139,7 @@ service_enable_attempted=false
 
 usage() {
   printf '%s\n' \
-    'usage: install.sh --archive FILE --sha256 HEX --revision ID --env-file FILE' >&2
+    'usage: install.sh --archive FILE --envelope FILE --revision ID --env-file FILE' >&2
 }
 
 cleanup_environment_candidate() {
@@ -227,11 +228,11 @@ trap finish EXIT
 
 while (($# > 0)); do
   case "$1" in
-    --archive | --sha256 | --revision | --env-file)
+    --archive | --envelope | --revision | --env-file)
       (($# >= 2)) || { usage; exit 2; }
       case "$1" in
         --archive) archive=$2 ;;
-        --sha256) checksum=$2 ;;
+        --envelope) envelope=$2 ;;
         --revision) install_revision=$2 ;;
         --env-file) source_env=$2 ;;
       esac
@@ -241,7 +242,7 @@ while (($# > 0)); do
   esac
 done
 
-[[ -n "$archive" && -n "$checksum" && -n "$install_revision" && -n "$source_env" ]] || {
+[[ -n "$archive" && -n "$envelope" && -n "$install_revision" && -n "$source_env" ]] || {
   usage
   exit 2
 }
@@ -249,6 +250,7 @@ require_privilege
 require_fixed_admin_execution
 require_commands install find chmod chown mv ln readlink awk tr
 require_pinned_node
+verify_published_hub_release "$archive" "$envelope"
 acquire_deploy_lock
 require_clean_maintenance_state
 ensure_layout

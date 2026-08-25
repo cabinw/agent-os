@@ -820,6 +820,18 @@ func sanitizeEnvironment() error {
 	return nil
 }
 
+func successLine(record artifactRecord, stateRoot string) string {
+	published := filepath.Join(stateRoot, "staging", fmt.Sprintf("%s-%d-%s", record.typeName, record.sequence, record.artifactHash))
+	return fmt.Sprintf(
+		"publisher_verifier result=ok artifact_type=%s sequence=%d artifact_sha256=%s artifact_bytes=%d published_path=%s",
+		record.typeName,
+		record.sequence,
+		record.artifactHash,
+		record.bytes,
+		published,
+	)
+}
+
 func main() {
 	if err := sanitizeEnvironment(); err != nil {
 		fmt.Fprintf(os.Stderr, "publisher_verifier result=%s\n", err.Error())
@@ -830,10 +842,10 @@ func main() {
 		os.Exit(2)
 	}
 	cfg := config{rootKey: productionRootKey, policy: productionPolicy, policySig: productionPolicySig, stateRoot: productionState, trustBoundary: "/", expectedUID: 0, now: time.Now().Unix(), readClock: func() int64 { return time.Now().Unix() }}
-	_, err := verifyArtifact(cfg, os.Args[5], os.Args[7], os.Args[7]+".sig", os.Args[3])
+	record, err := verifyArtifact(cfg, os.Args[5], os.Args[7], os.Args[7]+".sig", os.Args[3])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "publisher_verifier result=%s\n", err.Error())
 		os.Exit(1)
 	}
-	fmt.Println("publisher_verifier result=ok")
+	fmt.Println(successLine(record, productionState))
 }

@@ -353,6 +353,82 @@ verify_archive() {
   [[ "$actual" == "$normalized_expected" ]] || die 'release archive checksum mismatch'
 }
 
+verify_published_hub_release() {
+  local caller_archive=$1 envelope=$2 verifier verifier_pin expected_uid expected_gid
+  local output published_path artifact_hash artifact_bytes sequence current mode pinned_hash trust_root
+  verifier="$(rooted /usr/libexec/agent-os/publisher/verify)"
+  verifier_pin="$(rooted /etc/agent-os/publisher/verifier.sha256)"
+  expected_uid="$(admin_contract_uid)" || die 'publisher verifier owner cannot be determined'
+  expected_gid="$(admin_contract_gid)" || die 'publisher verifier group cannot be determined'
+  trust_root=${TEST_ROOT:-/}
+  current="$verifier"
+  while :; do
+    [[ ! -L "$current" ]] || die 'publisher verifier path contains a symbolic link'
+    if [[ "$current" == "$verifier" ]]; then
+      [[ -f "$current" && -x "$current" && \
+        "$(stat_value '%u' '%u' "$current")" == "$expected_uid" && \
+        "$(stat_value '%g' '%g' "$current")" == "$expected_gid" && \
+        "$(stat_value '%h' '%l' "$current")" == 1 && \
+        "$(stat_value '%a' '%Lp' "$current")" == 555 ]] ||
+        die 'publisher verifier executable contract is invalid'
+    else
+      [[ -d "$current" && \
+        "$(stat_value '%u' '%u' "$current")" == "$expected_uid" ]] ||
+        die 'publisher verifier ancestor contract is invalid'
+      mode="$(stat_value '%a' '%Lp' "$current")"
+      mode_is_safe "$mode" || die 'publisher verifier ancestor is group/world writable'
+    fi
+    [[ "$current" == "$trust_root" ]] && break
+    current="$(dirname -- "$current")"
+  done
+  current="$(dirname -- "$verifier_pin")"
+  while :; do
+    [[ ! -L "$current" && -d "$current" && \
+      "$(stat_value '%u' '%u' "$current")" == "$expected_uid" ]] ||
+      die 'publisher verifier pin ancestor contract is invalid'
+    mode="$(stat_value '%a' '%Lp' "$current")"
+    mode_is_safe "$mode" || die 'publisher verifier pin ancestor is group/world writable'
+    [[ "$current" == "$trust_root" ]] && break
+    current="$(dirname -- "$current")"
+  done
+  [[ -f "$verifier_pin" && ! -L "$verifier_pin" && \
+    "$(stat_value '%u' '%u' "$verifier_pin")" == "$expected_uid" && \
+    "$(stat_value '%g' '%g' "$verifier_pin")" == "$expected_gid" && \
+    "$(stat_value '%a' '%Lp' "$verifier_pin")" == 400 && \
+    "$(stat_value '%h' '%l' "$verifier_pin")" == 1 && \
+    "$(stat_value '%s' '%z' "$verifier_pin")" == 65 ]] ||
+    die 'publisher verifier pin contract is invalid'
+  pinned_hash="$(/bin/cat -- "$verifier_pin")"
+  [[ "$pinned_hash" =~ ^[a-f0-9]{64}$ && "$(sha256_file "$verifier")" == "$pinned_hash" ]] ||
+    die 'publisher verifier executable digest is not allowlisted'
+  [[ -f "$caller_archive" && ! -L "$caller_archive" ]] ||
+    die 'release archive must be a regular file'
+  [[ -f "$envelope" && ! -L "$envelope" && -f "$envelope.sig" && ! -L "$envelope.sig" ]] ||
+    die 'release publisher envelope or signature is missing'
+  output="$(
+    /usr/bin/env -i \
+      PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin \
+      LANG=C LC_ALL=C TZ=UTC \
+      "$verifier" verify \
+      --artifact-type hub-release \
+      --artifact "$caller_archive" \
+      --envelope "$envelope" 2>&1
+  )" || die 'release publisher verification failed'
+  [[ "$output" != *$'\n'* && "$output" =~ ^publisher_verifier\ result=ok\ artifact_type=hub-release\ sequence=([1-9][0-9]*)\ artifact_sha256=([a-f0-9]{64})\ artifact_bytes=([1-9][0-9]*)\ published_path=([^[:space:]]+)$ ]] ||
+    die 'release publisher verifier output is invalid'
+  sequence=${BASH_REMATCH[1]}
+  artifact_hash=${BASH_REMATCH[2]}
+  artifact_bytes=${BASH_REMATCH[3]}
+  published_path=${BASH_REMATCH[4]}
+  [[ "$published_path" == "$(rooted /var/lib/agent-os/publisher/staging)/hub-release-${sequence}-${artifact_hash}" && \
+    -f "$published_path" && ! -L "$published_path" && \
+    "$(stat_value '%h' '%l' "$published_path")" == 1 && \
+    "$(stat_value '%s' '%z' "$published_path")" == "$artifact_bytes" ]] ||
+    die 'verified release publication path is invalid'
+  archive=$published_path
+  checksum=$artifact_hash
+}
+
 install_directory() {
   local mode=$1 owner=$2 group=$3 path=$4
   if [[ -n "$TEST_ROOT" ]]; then

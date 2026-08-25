@@ -6673,6 +6673,40 @@ fixed_bin="$fixed_root/bin"
   -f "$fixed_bin/tree-digest.mjs" && -f "$fixed_bin/capacity-check.mjs" ]] ||
   fail 'bootstrap did not install the fixed admin kit'
 
+publisher_root="$test_root/usr/libexec/agent-os/publisher"
+publisher_config="$test_root/etc/agent-os/publisher"
+publisher_state="$test_root/var/lib/agent-os/publisher/staging"
+install -d -m 0700 "$publisher_root" "$publisher_config" "$publisher_state"
+publisher_verifier="$publisher_root/verify"
+cat >"$publisher_verifier" <<PUBLISHER_VERIFY
+#!/bin/bash -p
+set -Eeuo pipefail
+artifact=
+while ((\$# > 0)); do
+  case "\$1" in
+    --artifact) artifact=\$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+[[ -f "\$artifact" && ! -L "\$artifact" ]]
+hash=\$(sha256sum "\$artifact" | awk '{print \\$1}')
+bytes=\$(stat -c '%s' "\$artifact")
+published="$publisher_state/hub-release-1-\$hash"
+if [[ ! -e "\$published" ]]; then
+  /bin/cp -- "\$artifact" "\$published"
+  chmod 0600 "\$published"
+fi
+printf 'publisher_verifier result=ok artifact_type=hub-release sequence=1 artifact_sha256=%s artifact_bytes=%s published_path=%s\n' \
+  "\$hash" "\$bytes" "\$published"
+PUBLISHER_VERIFY
+chmod 0555 "$publisher_verifier"
+sha256_file "$publisher_verifier" >"$publisher_config/verifier.sha256"
+chmod 0400 "$publisher_config/verifier.sha256"
+envelope="$temporary/release.envelope"
+printf '%s\n' test-envelope >"$envelope"
+printf '%s\n' test-signature >"$envelope.sig"
+chmod 0600 "$envelope" "$envelope.sig"
+
 wrong_version_node="$temporary/wrong-version-node"
 cat >"$wrong_version_node" <<'WRONG_VERSION_NODE'
 #!/usr/bin/env bash
@@ -6815,29 +6849,29 @@ MOCK_CANDIDATE_GID=2101 \
 
 expect_failure \
   'application/source install helper ran outside the fixed admin kit' \
-  bash "$HUB_ROOT/bin/install.sh" --archive "$archive" --sha256 "$checksum" \
+  bash "$HUB_ROOT/bin/install.sh" --archive "$archive" --envelope "$envelope" \
   --revision source-rejected --env-file "$good_env"
 
 invalid_archive="$temporary/admin-content.tar.gz"
 invalid_checksum="$(sha256_file "$invalid_archive")"
 expect_failure \
-  'install accepted a wrong checksum' \
+  'install accepted legacy checksum-only authentication' \
   bash "$fixed_bin/install.sh" --archive "$archive" \
   --sha256 0000000000000000000000000000000000000000000000000000000000000000 \
   --revision bad-checksum --env-file "$good_env"
 expect_failure \
   'install accepted an unsafe archive with a valid checksum' \
-  bash "$fixed_bin/install.sh" --archive "$invalid_archive" --sha256 "$invalid_checksum" \
+  bash "$fixed_bin/install.sh" --archive "$invalid_archive" --envelope "$envelope" \
   --revision bad-archive --env-file "$good_env"
 expect_failure \
   'install accepted an invalid credential file' \
-  bash "$fixed_bin/install.sh" --archive "$archive" --sha256 "$checksum" \
+  bash "$fixed_bin/install.sh" --archive "$archive" --envelope "$envelope" \
   --revision bad-config --env-file "$temporary/short.env"
 cp "$good_env" "$temporary/hardlinked-env"
 ln "$temporary/hardlinked-env" "$temporary/hardlinked-env-peer"
 expect_failure \
   'install accepted a multiply-linked credential source' \
-  bash "$fixed_bin/install.sh" --archive "$archive" --sha256 "$checksum" \
+  bash "$fixed_bin/install.sh" --archive "$archive" --envelope "$envelope" \
   --revision bad-config-hardlink --env-file "$temporary/hardlinked-env"
 [[ ! -e "$test_root/etc/agent-os/hub.env" && ! -e "$test_root/opt/agent-os/current" ]] ||
   fail 'offline install rejection committed configuration or a pointer'
@@ -6845,7 +6879,7 @@ expect_failure \
 ln -s releases/legacy-history "$test_root/opt/agent-os/previous"
 expect_failure \
   'fresh install accepted an existing previous pointer' \
-  bash "$fixed_bin/install.sh" --archive "$archive" --sha256 "$checksum" \
+  bash "$fixed_bin/install.sh" --archive "$archive" --envelope "$envelope" \
   --revision previous-rejected --env-file "$good_env"
 [[ "$(readlink "$test_root/opt/agent-os/previous")" == releases/legacy-history ]] ||
   fail 'fresh install rejection changed an existing previous pointer'
@@ -6854,7 +6888,7 @@ rm -f -- "$test_root/opt/agent-os/previous"
 # Every install commit boundary must leave the same verified immutable release
 # reusable while removing all published configuration, pointers and unit state.
 install_revision_one() {
-  bash "$fixed_bin/install.sh" --archive "$archive" --sha256 "$checksum" \
+  bash "$fixed_bin/install.sh" --archive "$archive" --envelope "$envelope" \
     --revision revision-1 --env-file "$good_env"
 }
 
@@ -9174,13 +9208,13 @@ export AGENT_OS_MOCK_REAL_SNAPSHOT_HOOK="$real_snapshot_hook"
 
 upgrade() {
   local revision=$1
-  bash "$fixed_bin/upgrade.sh" --archive "$archive" --sha256 "$checksum" \
+  bash "$fixed_bin/upgrade.sh" --archive "$archive" --envelope "$envelope" \
     --revision "$revision"
 }
 
 upgrade_with_snapshot_hook() {
   local revision=$1 hook=$2
-  bash "$fixed_bin/upgrade.sh" --archive "$archive" --sha256 "$checksum" \
+  bash "$fixed_bin/upgrade.sh" --archive "$archive" --envelope "$envelope" \
     --revision "$revision" --snapshot-hook "$hook"
 }
 

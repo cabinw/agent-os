@@ -28,7 +28,7 @@ describe("offline publisher trust contract", () => {
       "same epoch",
       "Revocation takes effect",
       "copy from that same descriptor",
-      "Verification is repeated after taking the deployment lock",
+      "stage_release` repeats SHA-256 verification",
       "separate durable acceptance record",
       "same-sequence fork is",
       "greatest trusted wall-clock second",
@@ -48,11 +48,12 @@ describe("offline publisher trust contract", () => {
     expect(adr).toMatch(/Provisioning authenticates\s+its exact SHA-256/u);
   });
 
-  it("keeps deployment status fail-closed until the launcher exists", () => {
-    expect(deploy).toContain("ADR-045 acceptance contract fixed");
-    expect(deploy).toContain("remain unimplemented");
-    expect(deploy).not.toContain(
-      "authenticated release/admin-kit publisher and signature verification | implemented",
+  it("distinguishes the implemented release entry from cold admin admission", () => {
+    expect(deploy).toContain("Application-release install and upgrade now execute");
+    expect(deploy).toContain("SHA-256-only admission is rejected");
+    expect(deploy).toContain("Cold admin-kit admission is not wired yet");
+    expect(deploy).toContain(
+      "application release verifier core and install/upgrade admission implemented",
     );
   });
 });
