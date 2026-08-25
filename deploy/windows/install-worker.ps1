@@ -364,7 +364,9 @@ $action = New-ScheduledTaskAction -Execute $PowerShellPath -Argument (
   '-NoLogo -NoProfile -NonInteractive -File "{0}" -ConfigPath "{1}"' -f $hostPath, $configPath
 )
 $trigger = New-ScheduledTaskTrigger -AtStartup
-$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
+$settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) `
+  -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `
+  -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $taskPrincipal = New-ScheduledTaskPrincipal -UserId $workerSid.Value -LogonType Password -RunLevel Limited
 $task = New-ScheduledTask -Action $action -Trigger $trigger -Settings $settings -Principal $taskPrincipal
 if (-not (Get-ScheduledTask -TaskName 'AgentOS Worker' -ErrorAction SilentlyContinue)) {

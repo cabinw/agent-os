@@ -43,6 +43,9 @@ An install stopped at `intent` may atomically rebind a replacement admin/config
 digest only while Task, published config, releases root and every non-layout
 entry are absent and Worker/runtime identity is unchanged. Later phases or
 ambiguous topology remain bound to the original transaction and fail closed.
+The Worker Task permits start while Windows reports battery power and does not
+stop on a battery transition. Host power source is not a Worker lifecycle
+signal; explicit lifecycle commands and Job Object teardown remain authoritative.
 
 The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
 Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.

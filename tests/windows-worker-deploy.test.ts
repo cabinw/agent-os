@@ -310,6 +310,8 @@ public static class Probe {
     expect(install).toContain("$journal.phase -cne 'intent'");
     expect(install).toContain("$unexpectedIntentEntries.Count -ne 0");
     expect(install).toContain("Write-InstallJournal -Phase intent");
+    expect(install).toContain("-AllowStartIfOnBatteries");
+    expect(install).toContain("-DontStopIfGoingOnBatteries");
     expect(install.indexOf("if ($journalNeedsIntentRebind)")).toBeLessThan(
       install.indexOf("$journal -and $journal.phase -eq 'committed'"),
     );
