@@ -982,6 +982,7 @@ ADMIN_MIGRATION_SCAN_FORMATS=()
 ADMIN_MIGRATION_SCAN_TRANSACTIONS=()
 readonly ADMIN_MIGRATION_ATTEMPT_WIDTH=6
 readonly ADMIN_MIGRATION_MAX_ATTEMPT=999999
+readonly ADMIN_MIGRATION_MAX_HISTORY_EDGES=32
 ADMIN_MIGRATION_CONTRACT_KIND=legacy
 ADMIN_MIGRATION_ALLOWED_OLD_DIGEST=$LEGACY_ADMIN_PRODUCTION_SHA256
 ADMIN_MIGRATION_ALLOWED_NEW_DIGEST=
@@ -1016,6 +1017,8 @@ configure_admin_migration_contract() {
       history=("${@:6}")
       ((${#history[@]} >= 2 && ${#history[@]} % 2 == 0)) ||
         die 'admin generation history allowlist is invalid'
+      ((${#history[@]} / 2 <= ADMIN_MIGRATION_MAX_HISTORY_EDGES)) ||
+        die 'admin generation history allowlist exceeds the fixed bound'
       for ((history_index = 0; history_index < ${#history[@]}; history_index += 2)); do
         history_transaction=${history[$history_index]}
         history_digest=${history[$((history_index + 1))]}

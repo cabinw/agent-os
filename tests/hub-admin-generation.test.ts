@@ -18,15 +18,18 @@ const bootstrap = "deploy/hub/bootstrap-admin.sh";
 const library = "deploy/hub/bin/lib.sh";
 const digestHelper = "deploy/hub/admin-generation-digest.mjs";
 const executionFixture = "tests/fixtures/hub-admin-generation-execution.sh";
-const oldAdmin = "f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8";
-const newAdmin = "50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36";
+const oldAdmin = "50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36";
+const newAdmin = "e140e2124db426a7805eccd5c67a2e91c19a827e73ea79d6a1a210cb19c57e0f";
 const oldRuntime = "ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440";
 const newRuntime = oldRuntime;
-const predecessor = "7a332db8154e10f9fb0de500474db2ad2e02e98c8b59f6fe5a46e990b5c95112";
+const predecessor = "7b9ee35e2f422fbf2699ad404f03f6a7b02fdf82a2ea104b8fc1e8b0f4f00b03";
 const predecessorTransaction =
-  "upgrade-admin-migration-444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6-attempt-000001";
-const ancestor = "8ff2613d3a952cc35f4954b8cfccb0206e1514d094cdec2ee3c774d44e5e853f";
+  "upgrade-admin-migration-f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8-attempt-000001";
+const ancestor = "7a332db8154e10f9fb0de500474db2ad2e02e98c8b59f6fe5a46e990b5c95112";
 const ancestorTransaction =
+  "upgrade-admin-migration-444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6-attempt-000001";
+const rootAncestor = "8ff2613d3a952cc35f4954b8cfccb0206e1514d094cdec2ee3c774d44e5e853f";
+const rootAncestorTransaction =
   "upgrade-admin-migration-1f064246a0f547571aa832b374baae377a8bbfb3b8b10733ed530b459d168220-attempt-000001";
 const roots: string[] = [];
 
@@ -181,7 +184,7 @@ function runLibraryScript(script: string) {
     [
       "-p",
       "-c",
-      `source "$LIB"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$PREDECESSOR" "$ANCESTOR_TRANSACTION" "$ANCESTOR"; ${script}`,
+      `source "$LIB"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$PREDECESSOR" "$ANCESTOR_TRANSACTION" "$ANCESTOR" "$ROOT_ANCESTOR_TRANSACTION" "$ROOT_ANCESTOR"; ${script}`,
     ],
     {
       encoding: "utf8",
@@ -200,6 +203,8 @@ function runLibraryScript(script: string) {
         PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
         PREDECESSOR: predecessor,
         PREDECESSOR_TRANSACTION: predecessorTransaction,
+        ROOT_ANCESTOR: rootAncestor,
+        ROOT_ANCESTOR_TRANSACTION: rootAncestorTransaction,
       },
     },
   );
@@ -215,11 +220,12 @@ describe("allowlisted Hub admin generation upgrade", () => {
       newRuntime,
       predecessor,
       ancestor,
+      rootAncestor,
     ]) {
       expect(source).toContain(value);
       expect(readFileSync(library, "utf8")).not.toContain(value);
     }
-    expect(source).toContain("--upgrade-generation hub-admin-25-20260825-g2");
+    expect(source).toContain("--upgrade-generation hub-admin-25-20260825-g3");
     expect(source).not.toContain("--expected-next-sha256");
   });
 
@@ -227,7 +233,7 @@ describe("allowlisted Hub admin generation upgrade", () => {
     const result = digest();
     expect(result.status, result.stderr).toBe(0);
     expect(result.value).toEqual({
-      admin: { entryCount: 28, fileCount: 25, totalBytes: 547712, treeSha256: newAdmin },
+      admin: { entryCount: 28, fileCount: 25, totalBytes: 547900, treeSha256: newAdmin },
       runtime: { entryCount: 5, fileCount: 5, totalBytes: 9204, treeSha256: oldRuntime },
     });
   });
@@ -303,7 +309,7 @@ describe("allowlisted Hub admin generation upgrade", () => {
 
   it("accepts every exact retained ancestor and rejects a changed ancestor", () => {
     const exact = runLibraryScript(
-      'mkdir -p "$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION" "$RECOVERY_ROOT/$ANCESTOR_TRANSACTION"; predecessor_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION")"; ancestor_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$ANCESTOR_TRANSACTION")"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$predecessor_digest" "$ANCESTOR_TRANSACTION" "$ancestor_digest"; verify_admin_generation_history_allowlist',
+      'mkdir -p "$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION" "$RECOVERY_ROOT/$ANCESTOR_TRANSACTION" "$RECOVERY_ROOT/$ROOT_ANCESTOR_TRANSACTION"; predecessor_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION")"; ancestor_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$ANCESTOR_TRANSACTION")"; root_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$ROOT_ANCESTOR_TRANSACTION")"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$predecessor_digest" "$ANCESTOR_TRANSACTION" "$ancestor_digest" "$ROOT_ANCESTOR_TRANSACTION" "$root_digest"; verify_admin_generation_history_allowlist',
     );
     expect(exact.status, exact.stderr).toBe(0);
 
@@ -312,6 +318,14 @@ describe("allowlisted Hub admin generation upgrade", () => {
     );
     expect(changed.status).toBe(1);
     expect(changed.stderr).toContain("predecessor history changed");
+  });
+
+  it("rejects an unbounded compile-time history allowlist", () => {
+    const result = runLibraryScript(
+      'args=(); for index in $(seq 1 33); do printf -v digest "%064x" "$index"; printf -v transaction "upgrade-admin-migration-%064x-attempt-000001" "$index"; args+=("$transaction" "$digest"); done; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "${args[@]}"',
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("exceeds the fixed bound");
   });
 
   it("stages and switches whole trees under the durable phase journal", () => {
