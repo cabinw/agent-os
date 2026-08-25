@@ -302,6 +302,20 @@ function Get-AgentOSRoot {
   return Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'AgentOS'
 }
 
+function Assert-AgentOSWorkerAccount {
+  param([Parameter(Mandatory)][string]$WorkerAccount)
+
+  $account = Get-LocalUser -Name $WorkerAccount -ErrorAction Stop
+  if (-not $account.Enabled) {
+    throw 'Agent OS Worker account must be enabled'
+  }
+  $administrators = Get-LocalGroupMember -Group 'Administrators' -ErrorAction Stop
+  if ($administrators.SID.Value -contains $account.Sid.Value) {
+    throw 'Agent OS Worker account must not be an administrator'
+  }
+  return $account.Sid
+}
+
 function Test-AgentOSContainedPath {
   param(
     [Parameter(Mandatory)][string]$Root,
@@ -496,16 +510,47 @@ function Assert-AgentOSReleaseTree {
       [Security.Principal.SecurityIdentifier]
     ).Value
     if ($ownerSid -ne 'S-1-5-32-544') { throw "Agent OS release owner changed: $target" }
+    $allowed = @($WorkerSid.Value, 'S-1-5-18', 'S-1-5-32-544')
+    $seen = [Collections.Generic.HashSet[string]]::new(
+      [StringComparer]::OrdinalIgnoreCase
+    )
+    $writeMask = [Security.AccessControl.FileSystemRights](
+      [Security.AccessControl.FileSystemRights]::WriteData -bor
+      [Security.AccessControl.FileSystemRights]::AppendData -bor
+      [Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor
+      [Security.AccessControl.FileSystemRights]::WriteAttributes -bor
+      [Security.AccessControl.FileSystemRights]::Delete -bor
+      [Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+      [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+      [Security.AccessControl.FileSystemRights]::TakeOwnership
+    )
+    $expectedInheritance = if ($kind -eq 'Directory') {
+      [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+    } else { [Security.AccessControl.InheritanceFlags]::None }
     foreach ($rule in $acl.Access) {
       $sid = $rule.IdentityReference.Translate(
         [Security.Principal.SecurityIdentifier]
       ).Value
-      if ($sid -notin @($WorkerSid.Value, 'S-1-5-18', 'S-1-5-32-544')) {
-        throw "Agent OS release ACL contains an unauthorized principal: $target"
+      if ($rule.IsInherited -or $rule.AccessControlType -ne 'Allow' -or
+          $sid -notin $allowed -or -not $seen.Add($sid) -or
+          $rule.InheritanceFlags -ne $expectedInheritance -or
+          $rule.PropagationFlags -ne [Security.AccessControl.PropagationFlags]::None) {
+        throw "Agent OS release ACL contains an unauthorized rule: $target"
       }
-      if ($sid -eq $WorkerSid.Value -and
-          ($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]'Write, Modify, FullControl, ChangePermissions, TakeOwnership') -ne 0) {
-        throw "Agent OS release is writable by the Worker: $target"
+      if ($sid -eq $WorkerSid.Value) {
+        if (($rule.FileSystemRights -band $writeMask) -ne 0 -or
+            ($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::ReadAndExecute) -ne
+              [Security.AccessControl.FileSystemRights]::ReadAndExecute) {
+          throw "Agent OS release grants unsafe Worker rights: $target"
+        }
+      } elseif (($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne
+                [Security.AccessControl.FileSystemRights]::FullControl) {
+        throw "Agent OS release omits administrator control: $target"
+      }
+    }
+    foreach ($sid in $allowed) {
+      if (-not $seen.Contains($sid)) {
+        throw "Agent OS release ACL is missing a required principal: $target"
       }
     }
   }
@@ -566,9 +611,7 @@ function Assert-AgentOSWorkerTask {
     [Parameter(Mandatory)][string]$ConfigPath
   )
   $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
-  $workerSid = ([Security.Principal.NTAccount]$WorkerAccount).Translate(
-    [Security.Principal.SecurityIdentifier]
-  )
+  $workerSid = Assert-AgentOSWorkerAccount -WorkerAccount $WorkerAccount
   $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
   Assert-AgentOSWorkerReadAcl `
     -Path (Split-Path -LiteralPath $ConfigPath -Parent) `
@@ -608,4 +651,4 @@ function Assert-AgentOSWorkerTask {
   return $task
 }
 
-Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSAdminTree, Assert-AgentOSConfiguredWorkerRelease, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSCanonicalReleaseManifest, Get-AgentOSExactTreeDigest, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
+Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSAdminTree, Assert-AgentOSConfiguredWorkerRelease, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerAccount, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSCanonicalReleaseManifest, Get-AgentOSExactTreeDigest, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath

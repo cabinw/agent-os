@@ -15,9 +15,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'AgentOS.Windows.psm1') -Force
 
-$account = Get-LocalUser -Name $WorkerAccount -ErrorAction Stop
-if (-not $account.Enabled) { throw 'Agent OS Worker account must be enabled' }
-$workerSid = $account.Sid
+$workerSid = Assert-AgentOSWorkerAccount -WorkerAccount $WorkerAccount
 if ($WorkerCredential.UserName -cne $WorkerAccount) {
   throw 'Worker credential identity does not match WorkerAccount'
 }

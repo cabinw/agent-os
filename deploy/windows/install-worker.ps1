@@ -19,13 +19,7 @@ $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
   throw 'Agent OS Worker installation requires an elevated administrator token'
 }
-$account = Get-LocalUser -Name $WorkerAccount -ErrorAction Stop
-if (-not $account.Enabled) { throw 'Agent OS Worker account must be enabled' }
-$workerSid = $account.Sid
-$administrators = Get-LocalGroupMember -Group 'Administrators' -ErrorAction Stop
-if ($administrators.SID.Value -contains $workerSid.Value) {
-  throw 'Agent OS Worker account must not be an administrator'
-}
+$workerSid = Assert-AgentOSWorkerAccount -WorkerAccount $WorkerAccount
 if ($WorkerCredential.UserName -cne $WorkerAccount) {
   throw 'Worker credential identity does not match WorkerAccount'
 }

@@ -183,10 +183,20 @@ public static class Probe {
     expect(module).toContain("function Assert-AgentOSAdminAcl");
     expect(module).toContain("function Set-AgentOSWorkerReadAcl");
     expect(module).toContain("function Assert-AgentOSWorkerReadAcl");
+    expect(module).toContain("function Assert-AgentOSWorkerAccount");
+    expect(module).toContain("Get-LocalGroupMember -Group 'Administrators'");
+    expect(module).toContain("must not be an administrator");
+    expect(module).toContain("function Assert-AgentOSReleaseTree");
+    expect(module).toContain("release ACL is missing a required principal");
+    expect(module).toContain("release grants unsafe Worker rights");
+    expect(module).toContain("release omits administrator control");
+    expect(module).toContain("$rule.IsInherited");
     expect(module).toContain("function Get-AgentOSCanonicalReleaseManifest");
     expect(module).toContain("function Get-AgentOSExactTreeDigest");
     expect(module).toContain("function Assert-AgentOSConfiguredWorkerRelease");
-    expect(install).toContain("must not be an administrator");
+    expect(install).toContain(
+      "Assert-AgentOSWorkerAccount -WorkerAccount $WorkerAccount",
+    );
     expect(install).toContain("RunLevel Limited");
     expect(install).toContain("Assert-AgentOSWorkerReadAcl -Path $configPath");
     expect(install).toContain("Set-AgentOSAdminAcl -Path $configCandidate");
