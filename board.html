@@ -240,8 +240,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 401,
-  "updatedAt": "2026-08-25 17:51 CST",
+  "revision": 402,
+  "updatedAt": "2026-08-25 17:53 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-03",
   "verification": {"testsPassed":975,"testsTotal":975,"filesPassed":51,"filesTotal":51,"gatePassed":9,"gateTotal":9,"lintErrors":0,"checkedAt":"2026-08-25 13:54 CST"},
@@ -407,6 +407,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-25 17:53","kind":"decision","entity":"SVR-04","title":"服务器工程师切换到Windows短路门禁，停止重复Ubuntu全量验收","detail":"协作路径调整为Windows安全实现/服务生命周期→Windows smoke→双机主链；每个checkpoint按earned/total、命令exit、测试数和脱敏证据即时回报。主任务独占Ubuntu manifest 404f9a8c门禁，服务器工程师不得重复运行Debian/Ubuntu全量gate。当前只是调度变更，SVR-04 18%、SVR-06 45%与总体96.33%均不虚增。"},
     {"at":"2026-08-25 17:51","kind":"problem","entity":"PROB-SVR03-DUPLICATE-GATE","title":"79分钟延迟归因为两套完整门禁争用，现已收敛为唯一权威进程","detail":"两个独立目录曾并发执行同一重型故障矩阵，重复消耗CPU与磁盘；重复门禁已退出。当前仅PID 38662在manifest 404f9a8c exact tree运行，活跃阶段为migration-attempt-two-source。问题已记录但不计功能完成度，总体保持96.33%。"},
     {"at":"2026-08-25 16:17","kind":"progress","entity":"SVR-03","title":"当前WIP完整Debian门禁PASS，SVR-03即时升至81%","detail":"164文件manifest 404f9a8c在复制前后与容器内逐项一致；官方node:24.19.0-bookworm以非root node用户完成全部migration/rollback/restore/forensic/SIGKILL/Open-FD集成矩阵，exit0并显式hub deploy gate: PASS。五个recover-old namespace move窗口与每窗wrong-tree/tampered/symlink/hardlink拒绝均越过；运行后manifest仍164/164、测试根0、验收进程0，本地WIP也未变化。状态/snapshot实现27→30，SVR-03 78→81，总体96.29→96.33%；Ubuntu实机尚未计分。"},
     {"at":"2026-08-25 15:42","kind":"problem","entity":"PROB-SVR03-LATEST-GATE","title":"远端验收树哈希不一致，current-extra-stage结果作废","detail":"主任务经SSH与临时只读副本逐文件确认：远端verify/lib为57875bca/1583490d，本地当前WIP为f6ddaf17/550efbc0，且两份源码存在实质差异；远端无运行中gate、测试根残留0。该执行不计为有效验收，不据此修产品或加分；服务器任务已被要求先产出完整manifest并逐项对齐。总体保持96.29%。"},
