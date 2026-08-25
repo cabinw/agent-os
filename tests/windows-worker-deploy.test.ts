@@ -193,6 +193,10 @@ public static class Probe {
     expect(module).toContain("release grants unsafe Worker rights");
     expect(module).toContain("release omits administrator control");
     expect(module).toContain("$rule.IsInherited");
+    expect(module).toContain("admin tree ancestry can replace the protected root");
+    expect(module).toContain("DeleteSubdirectoriesAndFiles");
+    expect(module).toContain("PropagationFlags]::InheritOnly");
+    expect(module).toContain("$checkedDirectParent");
     expect(module).toContain("function Get-AgentOSCanonicalReleaseManifest");
     expect(module).toContain("function Get-AgentOSExactTreeDigest");
     expect(module).toContain("function Assert-AgentOSConfiguredWorkerRelease");

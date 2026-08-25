@@ -397,26 +397,32 @@ function Get-AgentOSExactTreeDigest {
 function Assert-AgentOSAdminTree {
   param([Parameter(Mandatory)][string]$Path)
   $null = Assert-AgentOSFixedPath -Path $Path -Kind Directory
+  Assert-AgentOSAdminAcl -Path $Path
+  foreach ($entry in @(Get-ChildItem -LiteralPath $Path -Force -Recurse)) {
+    Assert-AgentOSAdminAcl -Path $entry.FullName
+  }
   $untrusted = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545')
-  $writeMask = [Security.AccessControl.FileSystemRights]'Write, Modify, FullControl, ChangePermissions, TakeOwnership'
-  $cursor = $Path
+  $destructiveMask = [Security.AccessControl.FileSystemRights](
+    [Security.AccessControl.FileSystemRights]::Delete -bor
+    [Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+    [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+    [Security.AccessControl.FileSystemRights]::TakeOwnership
+  )
+  $cursor = [IO.Path]::GetDirectoryName($Path)
   while ($cursor) {
     foreach ($rule in (Get-Acl -LiteralPath $cursor -ErrorAction Stop).Access) {
       $sid = $rule.IdentityReference.Translate(
         [Security.Principal.SecurityIdentifier]
       ).Value
       if ($rule.AccessControlType -eq 'Allow' -and $sid -in $untrusted -and
-          ($rule.FileSystemRights -band $writeMask) -ne 0) {
-        throw 'Agent OS admin tree ancestry is writable by an untrusted principal'
+          ($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0 -and
+          ($rule.FileSystemRights -band $destructiveMask) -ne 0) {
+        throw "Agent OS admin tree ancestry can replace the protected root: $cursor"
       }
     }
     $parent = [IO.Path]::GetDirectoryName($cursor)
     if (-not $parent -or $parent -ceq $cursor) { break }
     $cursor = $parent
-  }
-  Assert-AgentOSAdminAcl -Path $Path
-  foreach ($entry in @(Get-ChildItem -LiteralPath $Path -Force -Recurse)) {
-    Assert-AgentOSAdminAcl -Path $entry.FullName
   }
 }
 
@@ -571,17 +577,28 @@ function Assert-AgentOSTrustedExecutable {
   }
   $untrusted = @($WorkerSid.Value, 'S-1-1-0', 'S-1-5-11', 'S-1-5-32-545')
   $writeMask = [Security.AccessControl.FileSystemRights]'Write, Modify, FullControl, ChangePermissions, TakeOwnership'
+  $destructiveMask = [Security.AccessControl.FileSystemRights](
+    [Security.AccessControl.FileSystemRights]::Delete -bor
+    [Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor
+    [Security.AccessControl.FileSystemRights]::ChangePermissions -bor
+    [Security.AccessControl.FileSystemRights]::TakeOwnership
+  )
   $cursor = $Path
+  $checkedDirectParent = $false
   while ($cursor) {
-    foreach ($rule in (Get-Acl -LiteralPath $cursor).Access) {
+    $acl = Get-Acl -LiteralPath $cursor
+    $effectiveMask = if ($checkedDirectParent) { $destructiveMask } else { $writeMask }
+    foreach ($rule in $acl.Access) {
       $sid = $rule.IdentityReference.Translate(
         [Security.Principal.SecurityIdentifier]
       ).Value
       if ($rule.AccessControlType -eq 'Allow' -and $sid -in $untrusted -and
-          ($rule.FileSystemRights -band $writeMask) -ne 0) {
+          ($rule.PropagationFlags -band [Security.AccessControl.PropagationFlags]::InheritOnly) -eq 0 -and
+          ($rule.FileSystemRights -band $effectiveMask) -ne 0) {
         throw "Agent OS executable ancestry is writable by an untrusted principal: $Path"
       }
     }
+    if ($cursor -cne $Path) { $checkedDirectParent = $true }
     $parent = [IO.Path]::GetDirectoryName($cursor)
     $grandparent = if ($parent) { [IO.Path]::GetDirectoryName($parent) } else { $null }
     if (-not $parent -or $parent -ceq $cursor -or -not $grandparent) { break }
