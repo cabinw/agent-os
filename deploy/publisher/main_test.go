@@ -243,6 +243,110 @@ func TestFinalClockExpiryRejectsBeforeCandidate(t *testing.T) {
 	}
 }
 
+func TestCopyCrossesExpiryAndRemovesOnlyNewCandidate(t *testing.T) {
+	f := makeFixture(t)
+	reads := 0
+	f.cfg.readClock = func() int64 {
+		reads++
+		if reads == 1 {
+			return 900
+		}
+		return 1001
+	}
+	_, err := verifyArtifact(f.cfg, f.artifact, f.envelope, f.signature, "hub-release")
+	if err == nil || err.Error() != "artifact_envelope_rejected" {
+		t.Fatalf("copy-cross-expiry result=%v reads=%d", err, reads)
+	}
+	entries, readErr := os.ReadDir(filepath.Join(f.cfg.stateRoot, "staging"))
+	if readErr != nil || len(entries) != 0 {
+		t.Fatalf("copy-cross-expiry left staging entries: %v %v", entries, readErr)
+	}
+}
+
+func TestRecordCandidateFsyncCrashIsAdoptedAcrossTimeAdvance(t *testing.T) {
+	f := makeFixture(t)
+	clock := int64(201)
+	f.cfg.readClock = func() int64 {
+		clock++
+		return clock
+	}
+	crashed := false
+	f.cfg.afterRecordCandidateSync = func(path string) error {
+		if path == filepath.Join(f.cfg.stateRoot, "accepted", "policy") && !crashed {
+			crashed = true
+			return reject("simulated_crash")
+		}
+		return nil
+	}
+	if _, err := verifyArtifact(f.cfg, f.artifact, f.envelope, f.signature, "hub-release"); err == nil || err.Error() != "publication_failed" {
+		t.Fatalf("candidate-fsync crash result=%v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(f.cfg.stateRoot, "accepted"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	foundCandidate := false
+	for _, entry := range entries {
+		foundCandidate = foundCandidate || strings.HasPrefix(entry.Name(), "policy.candidate-")
+	}
+	if !foundCandidate {
+		t.Fatal("candidate-fsync crash did not preserve its durable candidate")
+	}
+	f.cfg.afterRecordCandidateSync = nil
+	f.cfg.now = clock
+	result, err := verifyArtifact(f.cfg, f.artifact, f.envelope, f.signature, "hub-release")
+	if err != nil || result.sequence != 1 {
+		t.Fatalf("candidate adoption result=%+v err=%v", result, err)
+	}
+	entries, err = os.ReadDir(filepath.Join(f.cfg.stateRoot, "accepted"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), ".candidate-") {
+			t.Fatalf("candidate remained after adoption: %s", entry.Name())
+		}
+	}
+	policyHighWater, present, err := readPolicyRecord(filepath.Join(f.cfg.stateRoot, "accepted", "policy"), f.cfg)
+	if err != nil || !present || policyHighWater.time != clock {
+		t.Fatalf("adopted policy high-water=%+v present=%v err=%v clock=%d", policyHighWater, present, err, clock)
+	}
+}
+
+func TestArtifactRecordCandidateFsyncCrashIsAdopted(t *testing.T) {
+	f := makeFixture(t)
+	clock := int64(201)
+	f.cfg.readClock = func() int64 {
+		clock++
+		return clock
+	}
+	recordPath := filepath.Join(f.cfg.stateRoot, "accepted", "hub-release")
+	f.cfg.afterRecordCandidateSync = func(path string) error {
+		if path == recordPath {
+			return reject("simulated_crash")
+		}
+		return nil
+	}
+	if _, err := verifyArtifact(f.cfg, f.artifact, f.envelope, f.signature, "hub-release"); err == nil || err.Error() != "publication_failed" {
+		t.Fatalf("artifact-record candidate crash result=%v", err)
+	}
+	f.cfg.afterRecordCandidateSync = nil
+	f.cfg.now = clock
+	result, err := verifyArtifact(f.cfg, f.artifact, f.envelope, f.signature, "hub-release")
+	if err != nil || result.sequence != 1 {
+		t.Fatalf("artifact-record adoption result=%+v err=%v", result, err)
+	}
+	entries, err := os.ReadDir(filepath.Join(f.cfg.stateRoot, "accepted"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.Contains(entry.Name(), ".candidate-") {
+			t.Fatalf("artifact record candidate remained: %s", entry.Name())
+		}
+	}
+}
+
 func TestSameSequenceKeepsAcceptedTimeAndCorruptFinalFails(t *testing.T) {
 	f := makeFixture(t)
 	f.cfg.readClock = func() int64 { return 201 }
