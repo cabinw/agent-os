@@ -475,6 +475,24 @@ rollback command. A committed attempt can only finish forward; a rolled-back
 attempt can only finish rollback. A new attempt is allowed only after the prior
 rolled-back journal and forensic evidence pass exact validation.
 
+ADR-044 adds one compile-time 25-file generation edge. It accepts no digest
+from the operator:
+
+```bash
+sudo /root/agent-os-admin-kit/bootstrap-admin.sh \
+  --upgrade-generation hub-admin-25-20260825-g1
+
+sudo /root/agent-os-admin-kit/bootstrap-admin.sh \
+  --upgrade-generation hub-admin-25-20260825-g1 --rollback
+```
+
+The source, target, old/new runtime payload and optional ADR-041 predecessor
+history all have compiled identities. Unknown history or any changed source
+fails before the deployment lock. Target-Ubuntu phase-kill, forward and
+rollback acceptance remain pending, so this checkpoint is not yet authorized
+for a production host. See
+[ADR-044](../docs/decisions/ADR-044-allowlisted-admin-kit-generation-upgrade.md).
+
 `install.sh` creates or validates locked non-login service identities
 with no supplementary groups. It leaves both Nginx files as disabled
 `.example` files. Enabling them still depends on the approved FQDN, matching

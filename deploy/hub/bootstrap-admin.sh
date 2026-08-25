@@ -83,12 +83,24 @@ fi
 readonly SCRIPT_DIR="$(CDPATH= cd -- "$(/usr/bin/dirname -- "$BOOTSTRAP_SOURCE")" && pwd -P)"
 if [[ -z "$BOOTSTRAP_TEST_ROOT" ]]; then
   bootstrap_trusted_file "$SCRIPT_DIR/bin/lib.sh"
+  if [[ "${1:-}" == --upgrade-generation ]]; then
+    bootstrap_trusted_file "$SCRIPT_DIR/admin-generation-digest.mjs"
+  fi
 fi
 # shellcheck source=bin/lib.sh
 source "$SCRIPT_DIR/bin/lib.sh"
 
+readonly ADMIN_GENERATION_ID=hub-admin-25-20260825-g1
+readonly ADMIN_GENERATION_OLD_SHA256=444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6
+readonly ADMIN_GENERATION_NEW_SHA256=f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8
+readonly ADMIN_GENERATION_OLD_RUNTIME_SHA256=ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440
+readonly ADMIN_GENERATION_NEW_RUNTIME_SHA256=ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440
+readonly ADMIN_GENERATION_PREDECESSOR_TRANSACTION=upgrade-admin-migration-1f064246a0f547571aa832b374baae377a8bbfb3b8b10733ed530b459d168220-attempt-000001
+readonly ADMIN_GENERATION_PREDECESSOR_SHA256=8ff2613d3a952cc35f4954b8cfccb0206e1514d094cdec2ee3c774d44e5e853f
+
 replace_cold=false
 migrate_installed=false
+migrate_generation=false
 migration_action=forward
 expected_current_digest=
 if (($# == 0)); then
@@ -106,10 +118,23 @@ elif (($# == 4)) && \
   migrate_installed=true
   migration_action=rollback
   expected_current_digest=$3
+elif (($# == 2)) && \
+  [[ "$1" == --upgrade-generation && "$2" == "$ADMIN_GENERATION_ID" ]]; then
+  migrate_installed=true
+  migrate_generation=true
+  expected_current_digest=$ADMIN_GENERATION_OLD_SHA256
+elif (($# == 3)) && \
+  [[ "$1" == --upgrade-generation && "$2" == "$ADMIN_GENERATION_ID" && \
+    "$3" == --rollback ]]; then
+  migrate_installed=true
+  migrate_generation=true
+  migration_action=rollback
+  expected_current_digest=$ADMIN_GENERATION_OLD_SHA256
 else
   printf '%s\n' \
     'usage: bootstrap-admin.sh [--replace-cold --expected-current-sha256 HEX]' \
-    '       bootstrap-admin.sh --migrate-installed --expected-current-sha256 HEX [--rollback]' >&2
+    '       bootstrap-admin.sh --migrate-installed --expected-current-sha256 HEX [--rollback]' \
+    '       bootstrap-admin.sh --upgrade-generation hub-admin-25-20260825-g1 [--rollback]' >&2
   exit 2
 fi
 
@@ -117,6 +142,16 @@ require_privilege
 require_commands install chmod find mv
 require_pinned_node
 if [[ "$migrate_installed" == true ]]; then
+  if [[ "$migrate_generation" == true ]]; then
+    configure_admin_migration_contract \
+      generation \
+      "$ADMIN_GENERATION_OLD_SHA256" \
+      "$ADMIN_GENERATION_NEW_SHA256" \
+      "$ADMIN_GENERATION_OLD_RUNTIME_SHA256" \
+      "$ADMIN_GENERATION_NEW_RUNTIME_SHA256" \
+      "$ADMIN_GENERATION_PREDECESSOR_TRANSACTION" \
+      "$ADMIN_GENERATION_PREDECESSOR_SHA256"
+  fi
   # Reject the operator pin, source or legacy runtime before even creating the
   # deployment lock. Re-run the same preflight after taking the lock to close
   # the read/check race before the first durable migration mutation.

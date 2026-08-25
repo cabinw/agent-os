@@ -634,6 +634,13 @@ verify_legacy_admin_kit() {
   expected_gid="$(admin_contract_gid)" || return 1
   validate_checksum "$expected_digest"
   expected_digest="$(printf '%s' "$expected_digest" | tr 'A-F' 'a-f')"
+  if [[ "${ADMIN_MIGRATION_CONTRACT_KIND:-legacy}" == generation ]]; then
+    [[ "$expected_digest" == "$ADMIN_MIGRATION_ALLOWED_OLD_DIGEST" ]] || return 1
+    verify_exact_admin_migration_kit "$root" || return 1
+    actual_digest="$(canonical_root_tree_sha256_for "$root")" || return 1
+    [[ "$actual_digest" == "$expected_digest" ]]
+    return
+  fi
   [[ "$expected_digest" == "$LEGACY_ADMIN_PRODUCTION_SHA256" ]] || return 1
   [[ -d "$root" && ! -L "$root" ]] || return 1
   [[ "$(stat_value '%u' '%u' "$root")" == "$expected_uid" && \
@@ -899,6 +906,115 @@ ADMIN_MIGRATION_SCAN_FORMATS=()
 ADMIN_MIGRATION_SCAN_TRANSACTIONS=()
 readonly ADMIN_MIGRATION_ATTEMPT_WIDTH=6
 readonly ADMIN_MIGRATION_MAX_ATTEMPT=999999
+ADMIN_MIGRATION_CONTRACT_KIND=legacy
+ADMIN_MIGRATION_ALLOWED_OLD_DIGEST=$LEGACY_ADMIN_PRODUCTION_SHA256
+ADMIN_MIGRATION_ALLOWED_NEW_DIGEST=
+ADMIN_MIGRATION_ALLOWED_OLD_RUNTIME_DIGEST=$LEGACY_RUNTIME_PRODUCTION_SHA256
+ADMIN_MIGRATION_ALLOWED_NEW_RUNTIME_DIGEST=
+ADMIN_MIGRATION_ALLOWED_PREDECESSOR_TRANSACTION=
+ADMIN_MIGRATION_ALLOWED_PREDECESSOR_DIGEST=
+
+configure_admin_migration_contract() {
+  local kind=$1 old_digest=$2 new_digest=${3:-}
+  local old_runtime_digest=${4:-} new_runtime_digest=${5:-}
+  local predecessor_transaction=${6:-} predecessor_digest=${7:-}
+  validate_checksum "$old_digest"
+  old_digest="$(printf '%s' "$old_digest" | tr 'A-F' 'a-f')"
+  case "$kind" in
+    legacy)
+      [[ "$old_digest" == "$LEGACY_ADMIN_PRODUCTION_SHA256" && -z "$new_digest" && \
+        -z "$old_runtime_digest" && -z "$new_runtime_digest" ]] ||
+        die 'legacy admin migration allowlist is invalid'
+      old_runtime_digest=$LEGACY_RUNTIME_PRODUCTION_SHA256
+      ;;
+    generation)
+      validate_checksum "$new_digest"
+      validate_checksum "$old_runtime_digest"
+      validate_checksum "$new_runtime_digest"
+      validate_checksum "$predecessor_digest"
+      new_digest="$(printf '%s' "$new_digest" | tr 'A-F' 'a-f')"
+      old_runtime_digest="$(printf '%s' "$old_runtime_digest" | tr 'A-F' 'a-f')"
+      new_runtime_digest="$(printf '%s' "$new_runtime_digest" | tr 'A-F' 'a-f')"
+      [[ "$old_digest" != "$new_digest" ]] ||
+        die 'admin generation upgrade requires distinct tree digests'
+      [[ "$predecessor_transaction" =~ ^upgrade-admin-migration-[a-f0-9]{64}-attempt-[0-9]{6}$ ]] ||
+        die 'admin generation predecessor identity is invalid'
+      ;;
+    *) die 'admin migration contract kind is invalid' ;;
+  esac
+  ADMIN_MIGRATION_CONTRACT_KIND=$kind
+  ADMIN_MIGRATION_ALLOWED_OLD_DIGEST=$old_digest
+  ADMIN_MIGRATION_ALLOWED_NEW_DIGEST=$new_digest
+  ADMIN_MIGRATION_ALLOWED_OLD_RUNTIME_DIGEST=$old_runtime_digest
+  ADMIN_MIGRATION_ALLOWED_NEW_RUNTIME_DIGEST=$new_runtime_digest
+  ADMIN_MIGRATION_ALLOWED_PREDECESSOR_TRANSACTION=$predecessor_transaction
+  ADMIN_MIGRATION_ALLOWED_PREDECESSOR_DIGEST=$predecessor_digest
+}
+
+admin_migration_expected_old_is_allowed() {
+  local digest=$1
+  digest="$(printf '%s' "$digest" | tr 'A-F' 'a-f')"
+  [[ "$digest" == "$ADMIN_MIGRATION_ALLOWED_OLD_DIGEST" ]]
+}
+
+admin_migration_runtime_edge_is_allowed() {
+  local old_digest=$1 new_digest=$2
+  if [[ "$ADMIN_MIGRATION_CONTRACT_KIND" == legacy ]]; then
+    [[ "$old_digest" == "$LEGACY_RUNTIME_PRODUCTION_SHA256" ]]
+    return
+  fi
+  [[ "$old_digest" == "$ADMIN_MIGRATION_ALLOWED_OLD_RUNTIME_DIGEST" && \
+    "$new_digest" == "$ADMIN_MIGRATION_ALLOWED_NEW_RUNTIME_DIGEST" ]]
+}
+
+verify_admin_generation_history_allowlist() {
+  local migration name digest
+  local -a migrations=()
+  [[ "$ADMIN_MIGRATION_CONTRACT_KIND" == generation ]] || return 0
+  [[ -d "$RECOVERY_ROOT" && ! -L "$RECOVERY_ROOT" ]] || return 0
+  shopt -s nullglob
+  migrations=("$RECOVERY_ROOT"/upgrade-admin-migration-*)
+  shopt -u nullglob
+  for migration in "${migrations[@]+"${migrations[@]}"}"; do
+    name=${migration##*/}
+    [[ -d "$migration" && ! -L "$migration" ]] ||
+      die 'admin generation history root is unsafe'
+    if [[ "$name" == "$ADMIN_MIGRATION_ALLOWED_PREDECESSOR_TRANSACTION" ]]; then
+      digest="$(canonical_root_tree_sha256_for "$migration")" ||
+        die 'admin generation predecessor history cannot be fingerprinted'
+      [[ "$digest" == "$ADMIN_MIGRATION_ALLOWED_PREDECESSOR_DIGEST" ]] ||
+        die 'admin generation predecessor history changed'
+      continue
+    fi
+    parse_admin_migration_transaction "$ADMIN_MIGRATION_ALLOWED_OLD_DIGEST" "$name" ||
+      die 'admin generation history contains an unallowlisted transaction'
+  done
+}
+
+verify_admin_generation_source_allowlist() {
+  local summary
+  local -a admin_manifest=() runtime_manifest=()
+  [[ "$ADMIN_MIGRATION_CONTRACT_KIND" == generation ]] || return 0
+  while IFS= read -r summary; do admin_manifest+=("$summary"); done < <(admin_files)
+  while IFS= read -r summary; do runtime_manifest+=("$summary"); done < <(legacy_runtime_files)
+  summary="$("$NODE_BIN" "$DEPLOY_SOURCE_ROOT/admin-generation-digest.mjs" \
+    "$DEPLOY_SOURCE_ROOT" "${admin_manifest[@]}" --runtime \
+    "${runtime_manifest[@]}")" || die 'admin generation source cannot be fingerprinted'
+  "$NODE_BIN" -e '
+    const value = JSON.parse(process.argv[1]);
+    const hash = /^[a-f0-9]{64}$/u;
+    if (
+      !hash.test(value?.admin?.treeSha256 ?? "") ||
+      value.admin.treeSha256 !== process.argv[2] ||
+      value?.admin?.fileCount !== 25 ||
+      value?.admin?.entryCount !== 28 ||
+      value?.runtime?.treeSha256 !== process.argv[3] ||
+      value?.runtime?.fileCount !== 5
+    ) process.exit(1);
+  ' "$summary" "$ADMIN_MIGRATION_ALLOWED_NEW_DIGEST" \
+    "$ADMIN_MIGRATION_ALLOWED_NEW_RUNTIME_DIGEST" ||
+    die 'admin generation source does not match the explicit allowlist'
+}
 
 admin_migration_attempt_token() {
   local attempt=$1
@@ -911,8 +1027,8 @@ set_admin_migration_attempt_paths() {
   local expected_digest=$1 attempt=$2 format=$3 short token
   validate_checksum "$expected_digest"
   expected_digest="$(printf '%s' "$expected_digest" | tr 'A-F' 'a-f')"
-  [[ "$expected_digest" == "$LEGACY_ADMIN_PRODUCTION_SHA256" ]] ||
-    die 'installed admin migration supports only the allowlisted legacy release'
+  admin_migration_expected_old_is_allowed "$expected_digest" ||
+    die 'installed admin migration old generation is not allowlisted'
   token="$(admin_migration_attempt_token "$attempt")" ||
     die 'admin migration attempt is invalid'
   short=${expected_digest:0:32}
@@ -1110,8 +1226,12 @@ load_admin_migration_journal() {
       -n "$ADMIN_MIGRATION_NEW_DIGEST" && \
       -n "$ADMIN_MIGRATION_OLD_RUNTIME_DIGEST" && \
       -n "$ADMIN_MIGRATION_NEW_RUNTIME_DIGEST" && \
-      "$ADMIN_MIGRATION_OLD_RUNTIME_DIGEST" == \
-        "$LEGACY_RUNTIME_PRODUCTION_SHA256" ]] || return 1
+      ("$ADMIN_MIGRATION_CONTRACT_KIND" != generation || \
+        "$ADMIN_MIGRATION_NEW_DIGEST" == "$ADMIN_MIGRATION_ALLOWED_NEW_DIGEST") ]] ||
+      return 1
+    admin_migration_runtime_edge_is_allowed \
+      "$ADMIN_MIGRATION_OLD_RUNTIME_DIGEST" \
+      "$ADMIN_MIGRATION_NEW_RUNTIME_DIGEST" || return 1
   fi
 }
 
@@ -1232,21 +1352,26 @@ cleanup_admin_migration_journal_temporaries() {
 
 scan_admin_migration_attempts() {
   local expected_digest=$1 allow_latest_temporaries=${2:-false}
-  local migration name attempt format index allow_temporaries=false
+  local migration name attempt format index allow_temporaries=false short
   local previous_transaction=none previous_terminal=none previous_digest=none
   local -a migrations=()
   validate_checksum "$expected_digest"
   expected_digest="$(printf '%s' "$expected_digest" | tr 'A-F' 'a-f')"
-  [[ "$expected_digest" == "$LEGACY_ADMIN_PRODUCTION_SHA256" ]] ||
-    die 'admin migration history uses an unsupported legacy digest'
+  admin_migration_expected_old_is_allowed "$expected_digest" ||
+    die 'admin migration history uses an unsupported old generation'
   ADMIN_MIGRATION_SCAN_MAX_ATTEMPT=0
   ADMIN_MIGRATION_SCAN_ROOTS=()
   ADMIN_MIGRATION_SCAN_FORMATS=()
   ADMIN_MIGRATION_SCAN_TRANSACTIONS=()
   [[ -d "$RECOVERY_ROOT" && ! -L "$RECOVERY_ROOT" ]] || return 0
+  short=${expected_digest:0:32}
   shopt -s nullglob
-  migrations=("$RECOVERY_ROOT"/upgrade-admin-migration-*)
+  migrations=("$RECOVERY_ROOT"/upgrade-admin-migration-"$expected_digest"-attempt-*)
   shopt -u nullglob
+  if [[ -e "$RECOVERY_ROOT/upgrade-admin-migration-$short" || \
+    -L "$RECOVERY_ROOT/upgrade-admin-migration-$short" ]]; then
+    migrations+=("$RECOVERY_ROOT/upgrade-admin-migration-$short")
+  fi
   for migration in "${migrations[@]+"${migrations[@]}"}"; do
     name=${migration##*/}
     parse_admin_migration_transaction "$expected_digest" "$name" ||
@@ -2019,8 +2144,10 @@ verify_admin_migration_runtime_payloads() {
 verify_admin_migration_runtime_payload_digests() {
   [[ -n "$ADMIN_MIGRATION_OLD_RUNTIME_DIGEST" && \
     -n "$ADMIN_MIGRATION_NEW_RUNTIME_DIGEST" ]] || return 1
-  [[ "$ADMIN_MIGRATION_OLD_RUNTIME_DIGEST" == \
-      "$LEGACY_RUNTIME_PRODUCTION_SHA256" && \
+  admin_migration_runtime_edge_is_allowed \
+    "$ADMIN_MIGRATION_OLD_RUNTIME_DIGEST" \
+    "$ADMIN_MIGRATION_NEW_RUNTIME_DIGEST" || return 1
+  [[ \
     "$(canonical_root_tree_sha256_for "$ADMIN_MIGRATION_ROOT/old-runtime")" == \
       "$ADMIN_MIGRATION_OLD_RUNTIME_DIGEST" && \
     "$(tree_sha256_for "$ADMIN_MIGRATION_ROOT/new-runtime")" == \
@@ -2057,8 +2184,8 @@ record_admin_migration_metadata() {
   digest="$(printf '%s' "$digest" | tr 'A-F' 'a-f')"
   old_runtime_digest="$(printf '%s' "$old_runtime_digest" | tr 'A-F' 'a-f')"
   new_runtime_digest="$(printf '%s' "$new_runtime_digest" | tr 'A-F' 'a-f')"
-  [[ "$old_runtime_digest" == "$LEGACY_RUNTIME_PRODUCTION_SHA256" ]] ||
-    die 'legacy runtime payload is not an allowlisted migration source'
+  admin_migration_runtime_edge_is_allowed "$old_runtime_digest" "$new_runtime_digest" ||
+    die 'admin runtime payload is not an allowlisted generation edge'
   printf -v body \
     'version=1\ntransaction=%s\nnew_admin_sha256=%s\nold_runtime_sha256=%s\nnew_runtime_sha256=%s\n' \
     "$ADMIN_MIGRATION_TRANSACTION" \
@@ -2191,13 +2318,17 @@ prepare_admin_migration_payloads() {
   prepare_admin_migration_runtime_payloads
   digest="$(tree_sha256_for "$ADMIN_MIGRATION_STAGE")" ||
     die 'admin migration staging kit cannot be fingerprinted'
+  if [[ "$ADMIN_MIGRATION_CONTRACT_KIND" == generation && \
+    "$digest" != "$ADMIN_MIGRATION_ALLOWED_NEW_DIGEST" ]]; then
+    die 'admin migration staged generation does not match the explicit allowlist'
+  fi
   old_runtime_digest="$(canonical_root_tree_sha256_for \
     "$ADMIN_MIGRATION_ROOT/old-runtime")" ||
     die 'legacy runtime payload cannot be fingerprinted'
-  [[ "$old_runtime_digest" == "$LEGACY_RUNTIME_PRODUCTION_SHA256" ]] ||
-    die 'legacy runtime payload does not match the supported source release'
   new_runtime_digest="$(tree_sha256_for "$ADMIN_MIGRATION_ROOT/new-runtime")" ||
     die 'new runtime payload cannot be fingerprinted'
+  admin_migration_runtime_edge_is_allowed "$old_runtime_digest" "$new_runtime_digest" ||
+    die 'admin migration runtime payload does not match the explicit allowlist'
   record_admin_migration_metadata \
     "$digest" \
     "$old_runtime_digest" \
@@ -2459,12 +2590,14 @@ preflight_installed_admin_migration() {
   local -a migrations=()
   validate_checksum "$expected_digest"
   expected_digest="$(printf '%s' "$expected_digest" | tr 'A-F' 'a-f')"
-  [[ "$expected_digest" == "$LEGACY_ADMIN_PRODUCTION_SHA256" ]] ||
-    die 'installed admin migration supports only the allowlisted legacy release'
+  admin_migration_expected_old_is_allowed "$expected_digest" ||
+    die 'installed admin migration old generation is not allowlisted'
   verify_admin_source "$DEPLOY_SOURCE_ROOT"
+  verify_admin_generation_source_allowlist
   verify_admin_migration_carrier_contract ||
     die 'installed legacy migration carrier directories are unsafe'
   verify_admin_migration_identity_contract
+  verify_admin_generation_history_allowlist
   select_admin_migration_attempt "$expected_digest" "$action"
   if [[ -d "$RECOVERY_ROOT" && ! -L "$RECOVERY_ROOT" ]]; then
     shopt -s nullglob
