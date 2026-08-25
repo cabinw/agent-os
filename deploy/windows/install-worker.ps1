@@ -104,6 +104,7 @@ $journalCandidate = Join-Path $root '.install-worker.json.candidate'
 $hostPath = Join-Path $releaseRoot 'worker-host.ps1'
 $existingTask = Get-ScheduledTask -TaskName 'AgentOS Worker' -ErrorAction SilentlyContinue
 $journal = $null
+$journalNeedsIntentRebind = $false
 if (Test-Path -LiteralPath $journalPath) {
   $null = Assert-AgentOSFixedPath -Path $journalPath -Kind File
   Assert-AgentOSAdminAcl -Path $journalPath
@@ -111,12 +112,23 @@ if (Test-Path -LiteralPath $journalPath) {
   $journalKeys = @($journal.PSObject.Properties.Name | Sort-Object)
   if (($journalKeys -join ',') -cne 'adminSha256,configSha256,kind,phase,taskName,version,workerReleaseSha256,workerSid' -or
       $journal.version -ne 1 -or $journal.kind -cne 'install-worker' -or
-      $journal.adminSha256 -cne $ExpectedAdminSha256 -or
-      $journal.configSha256 -cne $secretConfigSha256 -or
       $journal.workerReleaseSha256 -cne $ExpectedWorkerReleaseSha256 -or
       $journal.workerSid -cne $workerSid.Value -or $journal.taskName -cne 'AgentOS Worker' -or
       $journal.phase -notin @('intent', 'layout', 'release', 'runtime', 'config', 'task', 'committed')) {
     throw 'existing Windows Worker install journal does not match this transaction'
+  }
+  if ($journal.adminSha256 -cne $ExpectedAdminSha256 -or
+      $journal.configSha256 -cne $secretConfigSha256) {
+    $unexpectedIntentEntries = @(Get-ChildItem -LiteralPath $root -Force | Where-Object {
+      $_.Name -notin @('.install-worker.json', '.install-worker.json.candidate', 'config', 'state')
+    })
+    if ($journal.phase -cne 'intent' -or $existingTask -or
+        (Test-Path -LiteralPath $configPath) -or
+        (Test-Path -LiteralPath $releasesRoot) -or
+        $unexpectedIntentEntries.Count -ne 0) {
+      throw 'existing Windows Worker install journal does not match this transaction'
+    }
+    $journalNeedsIntentRebind = $true
   }
 } else {
   if ($existingTask) { throw 'Agent OS Worker task already exists without an install journal' }
@@ -173,6 +185,10 @@ function Advance-InstallJournal {
   if ($phaseOrder.IndexOf([string]$journal.phase) -lt $phaseOrder.IndexOf($Phase)) {
     Write-InstallJournal -Phase $Phase
   }
+}
+
+if ($journalNeedsIntentRebind) {
+  Write-InstallJournal -Phase intent
 }
 
 if ($journal -and $journal.phase -eq 'committed') {

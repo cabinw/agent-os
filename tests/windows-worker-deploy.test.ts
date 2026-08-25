@@ -306,6 +306,13 @@ public static class Probe {
       firstRootWrite,
     );
     expect(install).toContain(".install-worker.json.candidate");
+    expect(install).toContain("$journalNeedsIntentRebind");
+    expect(install).toContain("$journal.phase -cne 'intent'");
+    expect(install).toContain("$unexpectedIntentEntries.Count -ne 0");
+    expect(install).toContain("Write-InstallJournal -Phase intent");
+    expect(install.indexOf("if ($journalNeedsIntentRebind)")).toBeLessThan(
+      install.indexOf("$journal -and $journal.phase -eq 'committed'"),
+    );
     expect(install).toContain(".installing");
     expect(install).not.toContain(".stage-$PID");
     for (const phase of [

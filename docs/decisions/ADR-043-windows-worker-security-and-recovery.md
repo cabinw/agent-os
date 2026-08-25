@@ -39,6 +39,10 @@ and admin upgrade use admin-only phase journals, fixed candidates and exact
 endpoint fingerprints. A retry adopts only an allowed phase transition. Admin
 upgrade journals are target-hash scoped so a committed A → B transaction does
 not block B → C.
+An install stopped at `intent` may atomically rebind a replacement admin/config
+digest only while Task, published config, releases root and every non-layout
+entry are absent and Worker/runtime identity is unchanged. Later phases or
+ambiguous topology remain bound to the original transaction and fail closed.
 
 The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
 Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.
