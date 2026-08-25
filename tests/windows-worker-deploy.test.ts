@@ -322,7 +322,7 @@ public static class Probe {
       "Assert-AgentOSBatchLogonRight -WorkerSid $workerSid",
     );
     expect(windowsModule).toContain("$_.ExecutablePath.Equals($powerShellPath");
-    expect(windowsModule).toContain("$_.CommandLine.Contains($hostPath");
+    expect(windowsModule).toContain("$_.CommandLine.EndsWith($expectedHostArguments");
     expect(windowsModule).toContain("$_.ExecutablePath.Equals($nodePath");
     expect(install.indexOf("if ($journalNeedsIntentRebind)")).toBeLessThan(
       install.indexOf("$journal -and $journal.phase -eq 'committed'"),

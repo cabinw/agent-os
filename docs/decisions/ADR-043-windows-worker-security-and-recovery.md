@@ -50,8 +50,9 @@ Install grants only `SeBatchLogonRight` to the dedicated Worker SID through the
 local LSA policy API and every lifecycle assertion rechecks that right. Task
 registration is not accepted as evidence that Windows granted the logon right.
 Lifecycle process discovery matches the fixed PowerShell executable plus
-`worker-host.ps1`, or the fixed Node executable plus `workerEntry`. Merely
-mentioning the config path does not make a management command a Worker process.
+the complete Task action argument suffix ending in `worker-host.ps1` and its
+config, or the fixed Node executable plus `workerEntry`. Merely mentioning the
+host or config path does not make a management command a Worker process.
 
 The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
 Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.

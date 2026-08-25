@@ -807,12 +807,13 @@ function Get-AgentOSWorkerProcesses {
   $hostPath = Join-Path `
     ([IO.Path]::GetDirectoryName([string]$config.environment.AGENT_OS_WINDOWS_REPLACE_SCRIPT)) `
     'worker-host.ps1'
+  $expectedHostArguments = '-NoLogo -NoProfile -NonInteractive -File "{0}" -ConfigPath "{1}"' -f `
+    $hostPath, $ConfigPath
   return @(
     Get-CimInstance -ClassName Win32_Process -ErrorAction Stop | Where-Object {
       $_.ExecutablePath -and $_.CommandLine -and (
         ($_.ExecutablePath.Equals($powerShellPath, [StringComparison]::OrdinalIgnoreCase) -and
-         $_.CommandLine.Contains($hostPath, [StringComparison]::OrdinalIgnoreCase) -and
-         $_.CommandLine.Contains($ConfigPath, [StringComparison]::OrdinalIgnoreCase)) -or
+         $_.CommandLine.EndsWith($expectedHostArguments, [StringComparison]::OrdinalIgnoreCase)) -or
         ($_.ExecutablePath.Equals($nodePath, [StringComparison]::OrdinalIgnoreCase) -and
          $_.CommandLine.Contains($workerEntry, [StringComparison]::OrdinalIgnoreCase))
       )
