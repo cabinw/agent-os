@@ -272,6 +272,27 @@ describe("allowlisted Hub admin generation upgrade", () => {
     expect(lock).toBeGreaterThan(preflight);
   });
 
+  it("re-authorizes only an exact rolled-back generation retry before resume", () => {
+    const source = readFileSync(bootstrap, "utf8");
+    expect(source).toContain("prepare_generation_rollback_retry_token() {");
+    expect(source).toContain(
+      'validate_or_create_recovery_start_token "$ADMIN_MIGRATION_TRANSACTION"',
+    );
+    const lockedPreflight = source.lastIndexOf(
+      'preflight_installed_admin_migration "$expected_current_digest" "$migration_action"',
+    );
+    const prepare = source.indexOf(
+      "prepare_generation_rollback_retry_token",
+      lockedPreflight,
+    );
+    const migrate = source.indexOf(
+      'migrate_installed_admin_kit "$expected_current_digest" "$migration_action"',
+      prepare,
+    );
+    expect(prepare).toBeGreaterThan(lockedPreflight);
+    expect(migrate).toBeGreaterThan(prepare);
+  });
+
   it("classifies the exact predecessor and rejects unknown generation history", () => {
     const source = readFileSync(library, "utf8");
     expect(source).toContain("verify_admin_generation_history_allowlist");

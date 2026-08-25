@@ -51,6 +51,12 @@ maintenance cleanup leaves the service disabled or guarded and is resumed by
 the same command. Rollback restores the complete old tree and runtime set; it
 does not infer a generation from the live namespace.
 
+If rollback has durably recorded `rolled_back` but its guarded service start
+failed, the separately delivered bootstrap validates that exact unfinished
+transaction under the deployment lock and republishes only its matching
+one-time recovery-start token before resuming. It does not authorize an
+unrecorded, committed or finalized transaction.
+
 ## Alternatives
 
 **Accept `--expected-current-sha256` and `--expected-next-sha256`.** Rejected:

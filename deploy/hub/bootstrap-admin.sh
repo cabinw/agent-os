@@ -107,6 +107,18 @@ migrate_installed=false
 migrate_generation=false
 migration_action=forward
 expected_current_digest=
+
+prepare_generation_rollback_retry_token() {
+  [[ "$migrate_generation" == true && "$migration_action" == rollback ]] ||
+    return 0
+  select_admin_migration_attempt "$expected_current_digest" rollback
+  if [[ -e "$ADMIN_MIGRATION_ROOT/rolled_back" && \
+    ! -e "$ADMIN_MIGRATION_ROOT/finalized" ]]; then
+    validate_or_create_recovery_start_token "$ADMIN_MIGRATION_TRANSACTION" ||
+      die 'admin generation rollback retry token is invalid'
+  fi
+}
+
 if (($# == 0)); then
   :
 elif (($# == 3)) && [[ "$1" == --replace-cold && "$2" == --expected-current-sha256 ]]; then
@@ -168,6 +180,7 @@ if [[ "$migrate_installed" == true ]]; then
   recover_admin_migration_temporaries \
     "$expected_current_digest" "$migration_action"
   preflight_installed_admin_migration "$expected_current_digest" "$migration_action"
+  prepare_generation_rollback_retry_token
   admin_migration_finish() {
     local result=$?
     trap - EXIT TERM INT HUP
