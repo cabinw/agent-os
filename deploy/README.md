@@ -120,7 +120,7 @@ and candidate UID/GID fails closed before layout publication.
 | --- | --- |
 | service identity | fixed local `<worker-account>`, non-administrator, owns the Grok login |
 | background manager | Task Scheduler, startup trigger, run whether logged on or not |
-| releases | `C:\ProgramData\AgentOS\releases\worker-admin-<sha256>` plus protected application releases; immutable after verification |
+| releases | `C:\ProgramData\AgentOS\releases\worker-admin-<sha256>` and exact-tree `worker-runtime-<sha256>`; immutable after verification |
 | active release | Scheduled Task action; changed only while the task is stopped |
 | secret configuration | `C:\ProgramData\AgentOS\config\worker.json`; Worker read-only, `SYSTEM` and Administrators full control |
 | state root | `C:\ProgramData\AgentOS\state` |
@@ -140,9 +140,12 @@ evidence.
 Windows PowerShell 5.1 is only the offline bootstrap entry. It admits one pinned
 PowerShell 7.4 MSI after SHA-256, Authenticode signer-thumbprint, single-link,
 ancestry and private-stage checks. All lifecycle scripts require 7.4. Installation
-preflights account, Task, source-tree and secret hashes before the first root
-write, then advances an admin-only `intent → layout → release → config → task →
-committed` journal. Admin upgrades use a target-hash journal and adopt only the
+preflights account, Task, admin source, canonical application manifest, exact
+application tree and secret hashes before the first root write, then advances an
+admin-only `intent → layout → release → runtime → config → task → committed`
+journal. Runtime candidates are admin-only, copied and rehashed file-by-file,
+ACL-frozen, and atomically moved to `worker-runtime-<sha256>` before Task
+registration. Admin upgrades use a target-hash journal and adopt only the
 same or next phase after a crash; other unfinished upgrades fail closed.
 
 The current architecture allowlist is either native AMD64 host/Worker, or a
@@ -171,12 +174,31 @@ out of deployed secret directories.
 Windows `worker.json` additionally declares `hostArchitecture` as `AMD64` or
 `ARM64` and `workerArchitecture` as exactly `AMD64`. These declarations are
 verified against Win32 machine evidence and cannot authorize another machine.
-The minimum architecture fragment is:
+The fragment below is abbreviated and is not an installable manifest. The
+canonical 26-file list is `deploy/windows/worker-runtime.manifest`; release
+packaging converts those repository-relative paths to the protected source tree
+and passes that exact list to install and upgrade.
+
+Release preparation regenerates and reviews that file from tracked sources; it
+does not accept an operator-authored partial list:
+
+```sh
+git ls-files 'apps/chat-spike/src/*.mjs' 'apps/chat-spike/src/**/*.mjs' \
+  | LC_ALL=C sort | sed 's#/#\\#g'
+```
+
+The command output must byte-match `deploy/windows/worker-runtime.manifest`.
+Installation then computes the canonical exact-tree digest over the protected
+source and binds that digest and manifest into `worker.json` and the journal.
 
 ```json
 {
   "hostArchitecture": "ARM64",
-  "workerArchitecture": "AMD64"
+  "workerArchitecture": "AMD64",
+  "workerReleaseSha256": "<64-lowercase-hex>",
+  "workerReleaseFiles": ["<canonical 26-file manifest; abbreviated>"],
+  "workerEntry": "C:\\ProgramData\\AgentOS\\releases\\worker-runtime-<sha256>\\apps\\chat-spike\\src\\runner-worker.mjs",
+  "workingDirectory": "C:\\ProgramData\\AgentOS\\releases\\worker-runtime-<sha256>"
 }
 ```
 

@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ const HEALTH = "deploy/windows/health-worker.ps1";
 const UNINSTALL = "deploy/windows/uninstall-worker.ps1";
 const UPGRADE = "deploy/windows/upgrade-worker-admin.ps1";
 const BOOTSTRAP = "deploy/windows/bootstrap-powershell.ps1";
+const WORKER_RUNTIME_MANIFEST = "deploy/windows/worker-runtime.manifest";
 const CSC = [
   "/Library/Frameworks/Mono.framework/Versions/Current/Commands/csc",
   "/usr/bin/csc",
@@ -182,6 +183,9 @@ public static class Probe {
     expect(module).toContain("function Assert-AgentOSAdminAcl");
     expect(module).toContain("function Set-AgentOSWorkerReadAcl");
     expect(module).toContain("function Assert-AgentOSWorkerReadAcl");
+    expect(module).toContain("function Get-AgentOSCanonicalReleaseManifest");
+    expect(module).toContain("function Get-AgentOSExactTreeDigest");
+    expect(module).toContain("function Assert-AgentOSConfiguredWorkerRelease");
     expect(install).toContain("must not be an administrator");
     expect(install).toContain("RunLevel Limited");
     expect(install).toContain("Assert-AgentOSWorkerReadAcl -Path $configPath");
@@ -198,6 +202,8 @@ public static class Probe {
     );
     expect(install).toContain("Get-AgentOSTreeDigest");
     expect(install).toContain("worker-admin-$ExpectedAdminSha256");
+    expect(install).toContain("worker-runtime-$ExpectedWorkerReleaseSha256");
+    expect(install).toContain("workerReleaseSha256 = $ExpectedWorkerReleaseSha256");
     expect(install).not.toContain("Join-Path $PSScriptRoot 'worker-host.ps1'");
     expect(install).not.toContain("ConvertFrom-SecureString");
     expect(install).toContain("Assert-AgentOSReleaseTree");
@@ -209,6 +215,8 @@ public static class Probe {
     expect(upgrade).toContain("requires zero related processes");
     expect(upgrade).toContain("Get-AgentOSTreeDigest");
     expect(upgrade).toContain("Assert-AgentOSReleaseTree");
+    expect(upgrade).toContain("Assert-AgentOSConfiguredWorkerRelease");
+    expect(upgrade).toContain("workerReleaseSha256 = $ExpectedWorkerReleaseSha256");
     expect(upgrade).toContain("Register-ScheduledTask");
     expect(upgrade).toContain(
       ".upgrade-worker-admin-$ExpectedAdminSha256.json.candidate",
@@ -258,7 +266,15 @@ public static class Probe {
     expect(install).toContain(".install-worker.json.candidate");
     expect(install).toContain(".installing");
     expect(install).not.toContain(".stage-$PID");
-    for (const phase of ["intent", "layout", "release", "config", "task", "committed"]) {
+    for (const phase of [
+      "intent",
+      "layout",
+      "release",
+      "runtime",
+      "config",
+      "task",
+      "committed",
+    ]) {
       expect(install).toContain(`'${phase}'`);
     }
     for (const boundary of [
@@ -271,6 +287,124 @@ public static class Probe {
       expect(install).toContain(boundary);
     }
   });
+
+  it("publishes an exact application runtime before config and Task mutation", async () => {
+    const [install, module, host, health, uninstall] = await Promise.all([
+      readFile(INSTALL, "utf8"),
+      readFile(MODULE, "utf8"),
+      readFile(HOST, "utf8"),
+      readFile(HEALTH, "utf8"),
+      readFile(UNINSTALL, "utf8"),
+    ]);
+    const firstRootWrite = install.indexOf("New-Item -ItemType Directory -Path $root");
+    expect(
+      install.indexOf("Assert-AgentOSAdminTree -Path $WorkerReleaseSource"),
+    ).toBeLessThan(firstRootWrite);
+    expect(
+      install.indexOf("Get-AgentOSExactTreeDigest `\n  -Root $WorkerReleaseSource"),
+    ).toBeLessThan(firstRootWrite);
+    expect(install).toContain("Windows Worker runtime source digest does not match");
+    expect(install).toContain("staged runtime file changed during retry");
+    expect(install).toContain("runtime file changed after candidate copy");
+    expect(install).toContain("both installed and staged runtime releases");
+    expect(install.indexOf("[IO.Directory]::Move($workerRuntimeStage")).toBeLessThan(
+      install.indexOf("Register-ScheduledTask"),
+    );
+    expect(install.indexOf("Advance-InstallJournal -Phase runtime")).toBeLessThan(
+      install.indexOf("Advance-InstallJournal -Phase config"),
+    );
+    expect(module).toContain("StringComparer]::OrdinalIgnoreCase");
+    expect(module).toContain("StringComparer.OrdinalIgnoreCase");
+    expect(module).toContain("manifest_case_collision");
+    expect(module).toContain("manifest_segment_unsafe");
+    expect(module).toContain("extra directory");
+    expect(module).toContain("Assert-AgentOSAdminAcl -Path $entry.FullName");
+    expect(module).toContain("Agent OS regular file must have exactly one link");
+    expect(health.indexOf("Assert-AgentOSWorkerTask")).toBeLessThan(
+      health.indexOf("Get-AgentOSWorkerProcesses"),
+    );
+    expect(host).toContain("Assert-AgentOSConfiguredWorkerRelease -Config $config");
+    expect(health).toContain("Assert-AgentOSWorkerTask");
+    expect(uninstall).toContain("Assert-AgentOSWorkerTask");
+    expect(module).toContain('segment == ".."');
+    expect(module).toContain('segment.EndsWith("."');
+    expect(module).toContain('segment.EndsWith(" "');
+    expect(module).toContain('"<>:\\"/\\\\|?*"');
+    expect(module).toContain("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]");
+  });
+
+  it("freezes every Worker application module in the canonical runtime manifest", async () => {
+    const [manifestText, sourceEntries, install, upgrade] = await Promise.all([
+      readFile(WORKER_RUNTIME_MANIFEST, "utf8"),
+      readdir("apps/chat-spike/src", { recursive: true }),
+      readFile(INSTALL, "utf8"),
+      readFile(UPGRADE, "utf8"),
+    ]);
+    const manifest = manifestText.trim().split(/\r?\n/u);
+    const expected = sourceEntries
+      .filter((relative) => relative.endsWith(".mjs"))
+      .map((relative) => `apps\\chat-spike\\src\\${relative.replaceAll("/", "\\")}`)
+      .sort();
+    expect(manifest).toEqual(expected);
+    expect(manifest).toHaveLength(26);
+    for (const source of [install, upgrade]) {
+      expect(source).toContain("'worker-runtime.manifest'");
+    }
+  });
+
+  it.runIf(Boolean(CSC && MONO))(
+    "executes the production Windows release-manifest rejection table",
+    async () => {
+      const module = await readFile(MODULE, "utf8");
+      const typeDefinition = module.match(
+        /'AgentOS\.Windows\.ReleaseManifest'[\s\S]*?Add-Type -TypeDefinition @'\n([\s\S]*?)\n'@/u,
+      )?.[1];
+      expect(typeDefinition).toBeTruthy();
+      const probe = `${typeDefinition}
+public static class Probe {
+  static void Try(string label, string[] files) {
+    try {
+      System.Console.WriteLine(label + "=" + string.Join(",", AgentOS.Windows.ReleaseManifest.Canonicalize(files)));
+    } catch (System.IO.InvalidDataException error) {
+      System.Console.WriteLine(label + "=" + error.Message);
+    }
+  }
+  public static void Main() {
+    Try("valid", new[]{@"lib\\b.mjs", @"apps\\a.mjs"});
+    Try("case", new[]{@"Foo\\entry.mjs", @"foo\\entry.mjs"});
+    Try("ads", new[]{@"entry.mjs:stream"});
+    Try("dot", new[]{@"dir.\\entry.mjs"});
+    Try("space", new[]{@"dir \\entry.mjs"});
+    Try("parent", new[]{@"..\\entry.mjs"});
+    Try("reserved", new[]{@"CON\\entry.mjs"});
+  }
+}
+`;
+      const root = mkdtempSync(join(tmpdir(), "agent-os-release-manifest-"));
+      try {
+        const source = join(root, "manifest.cs");
+        const executable = join(root, "manifest.exe");
+        writeFileSync(source, probe, { encoding: "utf8", mode: 0o600 });
+        const compile = spawnSync(CSC, ["/nologo", `/out:${executable}`, source], {
+          encoding: "utf8",
+        });
+        expect(compile.status, compile.stderr || compile.stdout).toBe(0);
+        const result = spawnSync(MONO, [executable], { encoding: "utf8" });
+        expect(result.status, result.stderr).toBe(0);
+        expect(result.stdout.trim().split(/\r?\n/u)).toEqual([
+          "valid=apps\\a.mjs,lib\\b.mjs",
+          "case=manifest_case_collision",
+          "ads=manifest_segment_unsafe",
+          "dot=manifest_segment_unsafe",
+          "space=manifest_segment_unsafe",
+          "parent=manifest_segment_unsafe",
+          "reserved=manifest_segment_unsafe",
+        ]);
+      } finally {
+        rmSync(root, { recursive: true });
+      }
+    },
+  );
 
   it("clears ambient env and binds the Worker tree to kill-on-close Job Object", async () => {
     const host = await readFile(HOST, "utf8");

@@ -17,6 +17,16 @@ to that account. `worker.json` is Worker-read-only; mutable state roots grant th
 Worker, `SYSTEM` and local Administrators exact protected access. Every admitted
 path rejects reparse ancestors and multi-link files where applicable.
 
+The application runtime is a separate exact-tree transaction endpoint named
+`worker-runtime-<sha256>`. Install accepts an explicit protected source and a
+canonical relative-file manifest. It rejects NTFS aliases, ADS, case-insensitive
+collisions, reparse points, hard links and every extra file or directory before
+the first persistent write. The install journal binds the runtime digest;
+admin-only per-file candidates are rehashed, ACL-frozen and moved as one
+directory before configuration publication or Task registration. Configuration
+must name the exact entry and working directory in that release. Lifecycle and
+admin-upgrade validation remeasure the same exact tree.
+
 PowerShell 5.1 may only stage a pinned, signed PowerShell 7.4 installer. Install
 and admin upgrade use admin-only phase journals, fixed candidates and exact
 endpoint fingerprints. A retry adopts only an allowed phase transition. Admin
@@ -71,6 +81,8 @@ the next version transition.
   PowerShell, Node and Grok remain pinned AMD64 artifacts under emulation.
 - Configuration rotation and admin upgrades are privileged stopped-state
   operations.
+- Application runtime replacement requires a separate digest-bound release
+  transaction; an admin-only upgrade cannot silently change it.
 - Candidate, journal and release topology is part of the recovery protocol and
   must not be deleted manually.
 - Local compilation and fault injection do not complete acceptance. A real
