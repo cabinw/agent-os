@@ -194,6 +194,14 @@ public static class Probe {
     expect(module).toContain("function Assert-AgentOSAdminAcl");
     expect(module).toContain("function Set-AgentOSWorkerReadAcl");
     expect(module).toContain("function Assert-AgentOSWorkerReadAcl");
+    const privateAcl = module.slice(
+      module.indexOf("function Assert-AgentOSPrivateAcl"),
+      module.indexOf("function Assert-AgentOSWorkerReadAcl"),
+    );
+    expect(privateAcl).toContain("$acl.GetOwner(");
+    expect(privateAcl).toContain("$acl.GetAccessRules(");
+    expect(privateAcl).toContain("$acl.SetOwner(");
+    expect(privateAcl).not.toContain("-Kind (\n    if");
     expect(module).toContain("function Assert-AgentOSWorkerAccount");
     expect(module).toContain("Get-LocalGroupMember -Group 'Administrators'");
     expect(module).toContain("must not be an administrator");

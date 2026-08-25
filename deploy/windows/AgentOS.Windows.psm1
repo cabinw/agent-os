@@ -128,12 +128,14 @@ function Assert-AgentOSPrivateAcl {
     [Parameter(Mandatory)][Security.Principal.SecurityIdentifier]$WorkerSid
   )
 
-  $null = Assert-AgentOSFixedPath -Path $Path -Kind (
-    if (Test-Path -LiteralPath $Path -PathType Container) { 'Directory' } else { 'File' }
-  )
+  $kind = if (Test-Path -LiteralPath $Path -PathType Container) { 'Directory' } else { 'File' }
+  $null = Assert-AgentOSFixedPath -Path $Path -Kind $kind
   $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
   if (-not $acl.AreAccessRulesProtected) {
     throw "Agent OS private ACL must disable inheritance: $Path"
+  }
+  if ($acl.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne 'S-1-5-32-544') {
+    throw "Agent OS private ACL owner changed: $Path"
   }
   $allowed = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::OrdinalIgnoreCase
@@ -144,10 +146,12 @@ function Assert-AgentOSPrivateAcl {
   $seen = [Collections.Generic.HashSet[string]]::new(
     [StringComparer]::OrdinalIgnoreCase
   )
-  foreach ($rule in $acl.Access) {
-    $sid = $rule.IdentityReference.Translate(
-      [Security.Principal.SecurityIdentifier]
-    ).Value
+  foreach ($rule in $acl.GetAccessRules(
+    $true,
+    $true,
+    [Security.Principal.SecurityIdentifier]
+  )) {
+    $sid = $rule.IdentityReference.Value
     if ($rule.AccessControlType -ne 'Allow' -or -not $allowed.Contains($sid)) {
       throw "Agent OS private ACL contains an unauthorized principal: $Path"
     }
@@ -172,6 +176,7 @@ function Set-AgentOSPrivateAcl {
 
   $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
   $acl.SetAccessRuleProtection($true, $false)
+  $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
   foreach ($rule in @($acl.Access)) { $null = $acl.RemoveAccessRuleAll($rule) }
   foreach ($sid in @($WorkerSid, 'S-1-5-18', 'S-1-5-32-544')) {
     $identity = [Security.Principal.SecurityIdentifier]::new([string]$sid)
