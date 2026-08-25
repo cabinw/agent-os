@@ -319,6 +319,8 @@ public static class Probe {
     expect(install).toContain("Set-AgentOSBatchLogonRight -WorkerSid $workerSid");
     expect(install).toContain("'job-assigned.gate'");
     expect(install).toContain("Set-AgentOSPrivateAcl -Path $jobGate");
+    expect(install).toContain("'worker-host-status.json'");
+    expect(install).toContain("Set-AgentOSPrivateAcl -Path $hostStatus");
     expect(windowsModule).toContain("SeBatchLogonRight");
     expect(windowsModule).toContain("LsaAddAccountRights");
     expect(install).toContain("Set-AgentOSWorkerExecutableAcl -Path $executable");
@@ -339,6 +341,9 @@ public static class Probe {
     expect(host).toContain("WriteAllText($gate, 'pending'");
     expect(host).toContain("WriteAllText($gate, 'assigned'");
     expect(host).toContain("WriteAllText($gate, 'closed'");
+    expect(host).toContain("Write-WorkerHostStatus -Phase 'host_error'");
+    expect(host).toContain("Write-WorkerHostStatus -Phase 'child_exit'");
+    expect(host).toContain("[Action[string]]{");
     expect(install.indexOf("if ($journalNeedsIntentRebind)")).toBeLessThan(
       install.indexOf("$journal -and $journal.phase -eq 'committed'"),
     );

@@ -61,6 +61,10 @@ Managed Node and adapter binaries grant the Worker only `ReadAndExecute`; each
 managed parent below `ProgramData` grants only `Traverse`. Lifecycle assertions
 recheck both while the existing trusted-owner and no-untrusted-write rules stay
 in force. Program Files executables retain their platform ACLs.
+Install also pre-creates a private `worker-host-status.json`. The host records
+only fixed phase names, child exit code and exception HResult; it never records
+arguments, paths, environment values or exception messages. This distinguishes
+create/assign/resume failures without widening the secret or log boundary.
 
 The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
 Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.

@@ -256,6 +256,16 @@ if (-not (Test-Path -LiteralPath $jobGate)) {
   Assert-AgentOSPrivateAcl -Path $jobGate -WorkerSid $workerSid
   [IO.File]::WriteAllText($jobGate, 'closed', [Text.UTF8Encoding]::new($false))
 }
+$hostStatus = Join-Path (Join-Path $root 'logs') 'worker-host-status.json'
+$initialHostStatus = '{"phase":"installed","previousPhase":null,"exitCode":null,"hresult":null}'
+if (-not (Test-Path -LiteralPath $hostStatus)) {
+  [IO.File]::WriteAllText($hostStatus, $initialHostStatus, [Text.UTF8Encoding]::new($false))
+  Set-AgentOSPrivateAcl -Path $hostStatus -WorkerSid $workerSid
+} else {
+  $null = Assert-AgentOSFixedPath -Path $hostStatus -Kind File
+  Assert-AgentOSPrivateAcl -Path $hostStatus -WorkerSid $workerSid
+  [IO.File]::WriteAllText($hostStatus, $initialHostStatus, [Text.UTF8Encoding]::new($false))
+}
 
 if (-not (Test-Path -LiteralPath $releaseRoot)) {
   if (-not (Test-Path -LiteralPath $stage)) {

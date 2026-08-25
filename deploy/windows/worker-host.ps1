@@ -285,22 +285,58 @@ Assert-AgentOSRuntimeArchitecture `
 $gate = Join-Path $runtimeRoot 'job-assigned.gate'
 $null = Assert-AgentOSFixedPath -Path $gate -Kind File
 Assert-AgentOSPrivateAcl -Path $gate -WorkerSid $workerSid
+$statusPath = Join-Path (Join-Path $agentRoot 'logs') 'worker-host-status.json'
+$null = Assert-AgentOSFixedPath -Path $statusPath -Kind File
+Assert-AgentOSPrivateAcl -Path $statusPath -WorkerSid $workerSid
+function Write-WorkerHostStatus {
+  param(
+    [Parameter(Mandatory)][string]$Phase,
+    [AllowNull()][string]$PreviousPhase,
+    [AllowNull()][Nullable[int]]$ExitCode,
+    [AllowNull()][Nullable[int]]$HResult
+  )
+  $status = [ordered]@{
+    phase = $Phase
+    previousPhase = $PreviousPhase
+    exitCode = $ExitCode
+    hresult = $HResult
+  }
+  [IO.File]::WriteAllText(
+    $statusPath,
+    ($status | ConvertTo-Json -Compress),
+    [Text.UTF8Encoding]::new($false)
+  )
+}
 [IO.File]::WriteAllText($gate, 'pending', [Text.UTF8Encoding]::new($false))
 $start.Environment['AGENT_OS_JOB_ASSIGNMENT_GATE'] = $gate
 [AgentOS.Windows.Job]::AssertQuotingContract()
 $job = [AgentOS.Windows.Job]::new()
 $process = $null
+$script:lastHostPhase = 'starting'
+Write-WorkerHostStatus -Phase $script:lastHostPhase
 try {
   $process = $job.StartSuspended(
     $start.FileName,
     $workerEntry,
     $start.WorkingDirectory,
     $start.Environment,
-    $null
+    [Action[string]]{
+      param($phase)
+      $script:lastHostPhase = $phase
+      Write-WorkerHostStatus -Phase $phase
+    }
   )
   [IO.File]::WriteAllText($gate, 'assigned', [Text.UTF8Encoding]::new($false))
+  $script:lastHostPhase = 'running'
+  Write-WorkerHostStatus -Phase $script:lastHostPhase
   $exitCode = $process.WaitForExit()
+  Write-WorkerHostStatus -Phase 'child_exit' -PreviousPhase $script:lastHostPhase `
+    -ExitCode $exitCode
   exit $exitCode
+} catch {
+  Write-WorkerHostStatus -Phase 'host_error' -PreviousPhase $script:lastHostPhase `
+    -HResult $_.Exception.HResult
+  throw
 } finally {
   if ($process) { $process.Dispose() }
   $job.Dispose()
