@@ -19,12 +19,15 @@ const library = "deploy/hub/bin/lib.sh";
 const digestHelper = "deploy/hub/admin-generation-digest.mjs";
 const executionFixture = "tests/fixtures/hub-admin-generation-execution.sh";
 const oldAdmin = "f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8";
-const newAdmin = "4c8a57bc59a2329995c2289fc55570ead0a514a967f6bdf3bb5f714462ee63c3";
+const newAdmin = "50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36";
 const oldRuntime = "ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440";
 const newRuntime = oldRuntime;
 const predecessor = "7a332db8154e10f9fb0de500474db2ad2e02e98c8b59f6fe5a46e990b5c95112";
 const predecessorTransaction =
   "upgrade-admin-migration-444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6-attempt-000001";
+const ancestor = "8ff2613d3a952cc35f4954b8cfccb0206e1514d094cdec2ee3c774d44e5e853f";
+const ancestorTransaction =
+  "upgrade-admin-migration-1f064246a0f547571aa832b374baae377a8bbfb3b8b10733ed530b459d168220-attempt-000001";
 const roots: string[] = [];
 
 afterEach(() => {
@@ -178,7 +181,7 @@ function runLibraryScript(script: string) {
     [
       "-p",
       "-c",
-      `source "$LIB"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$PREDECESSOR"; ${script}`,
+      `source "$LIB"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$PREDECESSOR" "$ANCESTOR_TRANSACTION" "$ANCESTOR"; ${script}`,
     ],
     {
       encoding: "utf8",
@@ -187,6 +190,8 @@ function runLibraryScript(script: string) {
         AGENT_OS_DEPLOY_TEST_NONCE: nonce,
         AGENT_OS_DEPLOY_TEST_ROOT: testRoot,
         AGENT_OS_NODE_BIN: process.execPath,
+        ANCESTOR: ancestor,
+        ANCESTOR_TRANSACTION: ancestorTransaction,
         LIB: join(process.cwd(), library),
         NEW_ADMIN: newAdmin,
         NEW_RUNTIME: newRuntime,
@@ -203,7 +208,14 @@ function runLibraryScript(script: string) {
 describe("allowlisted Hub admin generation upgrade", () => {
   it("pins the one reviewed admin/runtime/predecessor edge outside the installed tree", () => {
     const source = readFileSync(bootstrap, "utf8");
-    for (const value of [oldAdmin, newAdmin, oldRuntime, newRuntime, predecessor]) {
+    for (const value of [
+      oldAdmin,
+      newAdmin,
+      oldRuntime,
+      newRuntime,
+      predecessor,
+      ancestor,
+    ]) {
       expect(source).toContain(value);
       expect(readFileSync(library, "utf8")).not.toContain(value);
     }
@@ -215,7 +227,7 @@ describe("allowlisted Hub admin generation upgrade", () => {
     const result = digest();
     expect(result.status, result.stderr).toBe(0);
     expect(result.value).toEqual({
-      admin: { entryCount: 28, fileCount: 25, totalBytes: 546491, treeSha256: newAdmin },
+      admin: { entryCount: 28, fileCount: 25, totalBytes: 547712, treeSha256: newAdmin },
       runtime: { entryCount: 5, fileCount: 5, totalBytes: 9204, treeSha256: oldRuntime },
     });
   });
@@ -284,6 +296,19 @@ describe("allowlisted Hub admin generation upgrade", () => {
 
     const changed = runLibraryScript(
       'mkdir -p "$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION"; printf changed >"$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION/tampered"; verify_admin_generation_history_allowlist',
+    );
+    expect(changed.status).toBe(1);
+    expect(changed.stderr).toContain("predecessor history changed");
+  });
+
+  it("accepts every exact retained ancestor and rejects a changed ancestor", () => {
+    const exact = runLibraryScript(
+      'mkdir -p "$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION" "$RECOVERY_ROOT/$ANCESTOR_TRANSACTION"; predecessor_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$PREDECESSOR_TRANSACTION")"; ancestor_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$ANCESTOR_TRANSACTION")"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$predecessor_digest" "$ANCESTOR_TRANSACTION" "$ancestor_digest"; verify_admin_generation_history_allowlist',
+    );
+    expect(exact.status, exact.stderr).toBe(0);
+
+    const changed = runLibraryScript(
+      'mkdir -p "$RECOVERY_ROOT/$ANCESTOR_TRANSACTION"; printf changed >"$RECOVERY_ROOT/$ANCESTOR_TRANSACTION/tampered"; verify_admin_generation_history_allowlist',
     );
     expect(changed.status).toBe(1);
     expect(changed.stderr).toContain("predecessor history changed");

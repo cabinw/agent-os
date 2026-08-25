@@ -987,13 +987,14 @@ ADMIN_MIGRATION_ALLOWED_OLD_DIGEST=$LEGACY_ADMIN_PRODUCTION_SHA256
 ADMIN_MIGRATION_ALLOWED_NEW_DIGEST=
 ADMIN_MIGRATION_ALLOWED_OLD_RUNTIME_DIGEST=$LEGACY_RUNTIME_PRODUCTION_SHA256
 ADMIN_MIGRATION_ALLOWED_NEW_RUNTIME_DIGEST=
-ADMIN_MIGRATION_ALLOWED_PREDECESSOR_TRANSACTION=
-ADMIN_MIGRATION_ALLOWED_PREDECESSOR_DIGEST=
+ADMIN_MIGRATION_ALLOWED_HISTORY_TRANSACTIONS=()
+ADMIN_MIGRATION_ALLOWED_HISTORY_DIGESTS=()
 
 configure_admin_migration_contract() {
   local kind=$1 old_digest=$2 new_digest=${3:-}
   local old_runtime_digest=${4:-} new_runtime_digest=${5:-}
-  local predecessor_transaction=${6:-} predecessor_digest=${7:-}
+  local history_index history_transaction history_digest prior_index
+  local -a history=()
   validate_checksum "$old_digest"
   old_digest="$(printf '%s' "$old_digest" | tr 'A-F' 'a-f')"
   case "$kind" in
@@ -1007,14 +1008,25 @@ configure_admin_migration_contract() {
       validate_checksum "$new_digest"
       validate_checksum "$old_runtime_digest"
       validate_checksum "$new_runtime_digest"
-      validate_checksum "$predecessor_digest"
       new_digest="$(printf '%s' "$new_digest" | tr 'A-F' 'a-f')"
       old_runtime_digest="$(printf '%s' "$old_runtime_digest" | tr 'A-F' 'a-f')"
       new_runtime_digest="$(printf '%s' "$new_runtime_digest" | tr 'A-F' 'a-f')"
       [[ "$old_digest" != "$new_digest" ]] ||
         die 'admin generation upgrade requires distinct tree digests'
-      [[ "$predecessor_transaction" =~ ^upgrade-admin-migration-[a-f0-9]{64}-attempt-[0-9]{6}$ ]] ||
-        die 'admin generation predecessor identity is invalid'
+      history=("${@:6}")
+      ((${#history[@]} >= 2 && ${#history[@]} % 2 == 0)) ||
+        die 'admin generation history allowlist is invalid'
+      for ((history_index = 0; history_index < ${#history[@]}; history_index += 2)); do
+        history_transaction=${history[$history_index]}
+        history_digest=${history[$((history_index + 1))]}
+        [[ "$history_transaction" =~ ^upgrade-admin-migration-[a-f0-9]{64}-attempt-[0-9]{6}$ ]] ||
+          die 'admin generation predecessor identity is invalid'
+        validate_checksum "$history_digest"
+        for ((prior_index = 0; prior_index < history_index; prior_index += 2)); do
+          [[ "${history[$prior_index]}" != "$history_transaction" ]] ||
+            die 'admin generation history allowlist contains a duplicate transaction'
+        done
+      done
       ;;
     *) die 'admin migration contract kind is invalid' ;;
   esac
@@ -1023,8 +1035,16 @@ configure_admin_migration_contract() {
   ADMIN_MIGRATION_ALLOWED_NEW_DIGEST=$new_digest
   ADMIN_MIGRATION_ALLOWED_OLD_RUNTIME_DIGEST=$old_runtime_digest
   ADMIN_MIGRATION_ALLOWED_NEW_RUNTIME_DIGEST=$new_runtime_digest
-  ADMIN_MIGRATION_ALLOWED_PREDECESSOR_TRANSACTION=$predecessor_transaction
-  ADMIN_MIGRATION_ALLOWED_PREDECESSOR_DIGEST=$predecessor_digest
+  ADMIN_MIGRATION_ALLOWED_HISTORY_TRANSACTIONS=()
+  ADMIN_MIGRATION_ALLOWED_HISTORY_DIGESTS=()
+  if [[ "$kind" == generation ]]; then
+    for ((history_index = 0; history_index < ${#history[@]}; history_index += 2)); do
+      ADMIN_MIGRATION_ALLOWED_HISTORY_TRANSACTIONS+=("${history[$history_index]}")
+      ADMIN_MIGRATION_ALLOWED_HISTORY_DIGESTS+=(
+        "$(printf '%s' "${history[$((history_index + 1))]}" | tr 'A-F' 'a-f')"
+      )
+    done
+  fi
 }
 
 admin_migration_expected_old_is_allowed() {
@@ -1044,7 +1064,7 @@ admin_migration_runtime_edge_is_allowed() {
 }
 
 verify_admin_generation_history_allowlist() {
-  local migration name digest
+  local migration name digest history_index allowed
   local -a migrations=()
   [[ "$ADMIN_MIGRATION_CONTRACT_KIND" == generation ]] || return 0
   [[ -d "$RECOVERY_ROOT" && ! -L "$RECOVERY_ROOT" ]] || return 0
@@ -1055,13 +1075,18 @@ verify_admin_generation_history_allowlist() {
     name=${migration##*/}
     [[ -d "$migration" && ! -L "$migration" ]] ||
       die 'admin generation history root is unsafe'
-    if [[ "$name" == "$ADMIN_MIGRATION_ALLOWED_PREDECESSOR_TRANSACTION" ]]; then
-      digest="$(canonical_root_tree_sha256_for "$migration")" ||
-        die 'admin generation predecessor history cannot be fingerprinted'
-      [[ "$digest" == "$ADMIN_MIGRATION_ALLOWED_PREDECESSOR_DIGEST" ]] ||
-        die 'admin generation predecessor history changed'
-      continue
-    fi
+    allowed=false
+    for ((history_index = 0; history_index < ${#ADMIN_MIGRATION_ALLOWED_HISTORY_TRANSACTIONS[@]}; history_index += 1)); do
+      if [[ "$name" == "${ADMIN_MIGRATION_ALLOWED_HISTORY_TRANSACTIONS[$history_index]}" ]]; then
+        digest="$(canonical_root_tree_sha256_for "$migration")" ||
+          die 'admin generation predecessor history cannot be fingerprinted'
+        [[ "$digest" == "${ADMIN_MIGRATION_ALLOWED_HISTORY_DIGESTS[$history_index]}" ]] ||
+          die 'admin generation predecessor history changed'
+        allowed=true
+        break
+      fi
+    done
+    [[ "$allowed" == true ]] && continue
     parse_admin_migration_transaction "$ADMIN_MIGRATION_ALLOWED_OLD_DIGEST" "$name" ||
       die 'admin generation history contains an unallowlisted transaction'
   done

@@ -22,15 +22,19 @@ The identifier selects compile-time identities in `bootstrap-admin.sh`. The
 operator cannot supply an old or new digest. This edge fixes:
 
 - old 25-file administrator tree `f9063464…`;
-- new 25-file administrator tree `4c8a57bc…`;
+- new 25-file administrator tree `50363eb8…`;
 - old and new runtime payload `ccbc5110…` (the five runtime files are unchanged);
 - the optional ADR-041 predecessor transaction and its immutable journal
-  digest `7a332db8…`.
+  digest `7a332db8…`; and
+- the retained initial migration ancestor and its immutable journal digest
+  `8ff2613d…`.
 
 An absent predecessor is permitted for a host cold-installed at `f9063464…`.
-If predecessor history is present it must match the exact allowlist. Every
-other `upgrade-admin-migration-*` namespace is rejected. The trusted source is
-fingerprinted before the first deployment lock and again under that lock.
+If predecessor history is present, every retained ancestor must match the
+explicit transaction/digest allowlist. This includes the complete known chain,
+not only the direct predecessor. Every other `upgrade-admin-migration-*`
+namespace is rejected. The trusted source is fingerprinted before the first
+deployment lock and again under that lock.
 
 The generation path reuses one migration state machine from ADR-041. It
 disables automatic start, publishes persistent ingress and runtime guards,
