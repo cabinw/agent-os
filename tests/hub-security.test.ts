@@ -13,6 +13,8 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+// @ts-expect-error
+import { childProcessEnv } from "../apps/chat-spike/src/adapters/base.mjs";
 // @ts-expect-error — spike modules are plain .mjs, not part of tsc --build
 import { escapeHtml } from "../apps/chat-spike/src/html.mjs";
 // @ts-expect-error
@@ -283,6 +285,7 @@ describe("credential, HTML and local execution hardening", () => {
     expect(mounted.args).not.toContain("--always-approve");
     expect(mounted.args).toContain("--no-subagents");
     expect(mounted.args).toContain("--disable-web-search");
+    expect(childProcessEnv(mounted.env).GROK_FOLDER_TRUST).toBe("false");
 
     const configPath = join(dir, ".grok", "config.toml");
     const config = await readFile(configPath, "utf8");

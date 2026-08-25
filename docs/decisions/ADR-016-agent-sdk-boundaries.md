@@ -57,6 +57,9 @@ and MCP admission boundary; no second ingress exists.
 
 Adapters never retry a vendor invocation. The Runner records one terminal
 result for a dispatch id; a higher-level retry uses a new id linked by cause.
+Vendor-specific process environment is deny-by-default. The Grok workspace
+mount admits only the exact `GROK_FOLDER_TRUST=false` compatibility value;
+arbitrary vendor or control-plane variables remain rejected.
 
 ## Alternatives
 

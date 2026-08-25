@@ -26,6 +26,7 @@ function abortReason(signal, fallback = "Adapter 已取消") {
 }
 
 const SCOPED_AGENT_ENV = new Set(["AGENT_OS_URL", "AGENT_OS_TOKEN"]);
+const FIXED_VENDOR_ENV = new Map([["GROK_FOLDER_TRUST", "false"]]);
 const isAgentOsEnv = (name) => name.toUpperCase().startsWith("AGENT_OS_");
 const INHERITED_VENDOR_ENV = new Set([
   "APPDATA",
@@ -65,12 +66,16 @@ export function childProcessEnv(extra = {}) {
     ),
   );
   for (const [name, value] of Object.entries(extra)) {
-    if (!SCOPED_AGENT_ENV.has(name)) {
+    const fixedVendorValue = FIXED_VENDOR_ENV.get(name);
+    if (!SCOPED_AGENT_ENV.has(name) && fixedVendorValue === undefined) {
       const category = isAgentOsEnv(name) ? "控制面变量" : "非允许变量";
       throw new TypeError(`child process 不允许注入${category} ${name}`);
     }
     if (typeof value !== "string") {
       throw new TypeError(`child process env ${name} 必须是字符串`);
+    }
+    if (fixedVendorValue !== undefined && value !== fixedVendorValue) {
+      throw new TypeError(`child process env ${name} 必须固定为 ${fixedVendorValue}`);
     }
     environment[name] = value;
   }

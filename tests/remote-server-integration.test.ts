@@ -355,6 +355,12 @@ describe("Remote Runner production composition", () => {
       expect(() => childProcessEnv({ GITHUB_TOKEN: "injected" })).toThrow(
         /不允许注入非允许变量/,
       );
+      expect(childProcessEnv({ GROK_FOLDER_TRUST: "false" }).GROK_FOLDER_TRUST).toBe(
+        "false",
+      );
+      expect(() => childProcessEnv({ GROK_FOLDER_TRUST: "true" })).toThrow(
+        /必须固定为 false/,
+      );
     } finally {
       for (const [name, value] of previous) {
         if (value === undefined) delete process.env[name];
