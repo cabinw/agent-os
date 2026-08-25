@@ -73,6 +73,9 @@ describe("Windows Worker deployment contract", () => {
     expect(architecture).toContain("IsWow64Process2");
     expect(architecture).toContain("GetMachineTypeAttributes");
     expect(architecture).toContain("private const uint USER_ENABLED = 0x00000001;");
+    expect(architecture).toContain("var empty = new StringBuilder(1);");
+    expect(architecture).toContain("out fileTime, empty, ref length");
+    expect(architecture).not.toContain("out fileTime, null, ref length");
     expect(architecture).toContain("Process.GetCurrentProcess().MainModule.FileName");
     expect(architecture).toContain("return PEMachine(executable)");
     expect(architecture).not.toContain("processMachine == 0 ? nativeMachine");

@@ -97,10 +97,14 @@ namespace AgentOS.Windows {
         uint dataType;
         int integerValue;
         System.Runtime.InteropServices.ComTypes.FILETIME fileTime;
+        // MsiSummaryInfoGetPropertyW explicitly forbids a null value buffer
+        // when querying the required string length. A non-null empty buffer
+        // returns ERROR_MORE_DATA and the required length (excluding NUL).
+        var empty = new StringBuilder(1);
         uint length = 0;
         result = MsiSummaryInfoGetProperty(
           summary, PID_TEMPLATE, out dataType, out integerValue,
-          out fileTime, null, ref length
+          out fileTime, empty, ref length
         );
         if (result != ERROR_MORE_DATA || length == 0) return 0;
         var value = new StringBuilder((int)length + 1);
