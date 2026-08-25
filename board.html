@@ -240,11 +240,11 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 424,
-  "updatedAt": "2026-08-25 20:53 CST",
+  "revision": 425,
+  "updatedAt": "2026-08-25 20:57 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-03",
-  "verification": {"testsPassed":1230,"testsTotal":1230,"filesPassed":60,"filesTotal":60,"gatePassed":11,"gateTotal":11,"lintErrors":0,"checkedAt":"2026-08-25 20:02 CST"},
+  "verification": {"testsPassed":1238,"testsTotal":1238,"filesPassed":62,"filesTotal":62,"gatePassed":11,"gateTotal":11,"lintErrors":0,"checkedAt":"2026-08-25 20:57 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":38,"eventSchemaTotal":38,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
   "roadmapPhases": [
@@ -411,6 +411,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-25 20:57","kind":"verified","entity":"SVR-06","title":"新增publisher后主线62文件1238/1238全绿","detail":"全Vitest首轮除loopback受限文件外58文件全部通过；失败53项与hub-security suite均精确归因为沙箱listen 127.0.0.1 EPERM。随后只在允许loopback的环境复跑hub-security、hub-runtime、remote-runner、remote-server-integration四文件106/106，组合证据62文件1238/1238。未重复Vite/Cargo/Tauri；验证状态更新但不增加功能进度。"},
     {"at":"2026-08-25 20:53","kind":"progress","entity":"SVR-02","title":"发布者candidate崩溃恢复与copy跨expiry闭合，SVR-02升至98.6%","detail":"修订85d0bbf在same-descriptor第二次复制和最终identity后再次读取可信时钟，越过key/envelope expiry时拒绝并只清理本次candidate；policy/artifact record在file fsync后崩溃留下的candidate按epoch/hash/sequence/字段/时间范围精确收养，冲突证据不删除。主任务重新构建静态Linux amd64测试二进制并在Ubuntu完成12/12，主线契约5/5、gofmt/go vet全绿。Portable trust 15.5→15.6，SVR-02 98.5→98.6；总体6172.5→6172.6/6300，四舍五入仍为97.98%。入口接线未完成，问题保持open。"},
     {"at":"2026-08-25 20:49","kind":"progress","entity":"SVR-02","title":"静态发布者验证器核心通过Ubuntu 9/9，SVR-02升至98.5%","detail":"ADR-045与原生Go verifier核心550f7a6已集成并推送：Ed25519 policy/envelope、轮换撤销、per-type sequence、no-follow openat、全局flock、same-descriptor双hash、candidate冲突保留及脱敏结果落地。主任务独立构建Linux amd64 CGO=0静态ELF，Ubuntu 9/9、主线契约5/5、gofmt/go vet全绿。人工审计保留copy跨expiry、record candidate fsync恢复和入口接线三项，问题不关闭；Portable trust 15→15.5，SVR-02 98→98.5，总体6172→6172.5/6300（97.98%）。"},
     {"at":"2026-08-25 20:18","kind":"completed","entity":"SVR-03","title":"Ubuntu Open-FD三项真实探针通过，SVR-03升至99%","detail":"冻结root-owned探针树分别证明chroot进程根拒绝、O_TMPFILE在双扫描间linkat发布触发state_root_changed、活动systemd cgroup拒绝且stop后trimmed clean。首次cgroup执行发现active早于cgroup.events populated=1的真实就绪竞态；加入5秒有界等待、本地3/3+Biome/bash/node门禁通过后只重测失败项即通过。临时树/单元零残留，生产Hub保持active+enabled。状态实现32→34、真实验收9→10，SVR-03 96→99；总体6169→6172/6300（97.97%）。"},
