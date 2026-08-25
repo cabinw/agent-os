@@ -1,6 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { type Server, createServer as createHttpServer } from "node:http";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
@@ -755,6 +755,36 @@ describe("Hub runtime hardening", () => {
         fixture.child.kill("SIGKILL");
         await waitForExit(fixture);
       }
+    }
+  });
+
+  it("never becomes ready or appends when a restart sees a partial EventLog frame", async () => {
+    const scratch = await mkdtemp(join(tmpdir(), "agent-os-hub-corrupt-log-"));
+    const logPath = join(scratch, "events.jsonl");
+    const marker = "corrupt-frame-secret-must-not-leak";
+    const bytes = Buffer.from(`{"id":"${marker}"`);
+    await writeFile(logPath, bytes, { mode: 0o600 });
+    const environment = {
+      PORT: "0",
+      LOG_PATH: logPath,
+      AGENT_OS_REMOTE_STATE_PATH: join(scratch, "remote-placement.json"),
+      AGENT_OS_RUNNER_MODE: "remote",
+      AGENT_OS_RUNNER_ID: HOST_ID,
+      AGENT_OS_RUNNER_TOKEN: RUNNER_TOKEN,
+      AGENT_OS_HUMAN_TOKEN: HUMAN_TOKEN,
+      AGENT_OS_AGENT_TOKENS: JSON.stringify(AGENT_TOKENS),
+    };
+    try {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const server = spawnServer(environment);
+        expect(await waitForExit(server)).toEqual({ code: 1, signal: null });
+        expect(server.output.value).toContain("event log replay rejected");
+        expect(server.output.value).not.toContain("agent hub  →");
+        expect(server.output.value).not.toContain(marker);
+        expect(await readFile(logPath)).toEqual(bytes);
+      }
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
     }
   });
 

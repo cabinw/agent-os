@@ -1,6 +1,7 @@
 [Unit]
 Description=Agent OS isolated Hub candidate %i
 After=network.target
+RequiresMountsFor=/opt/agent-os /var/lib/agent-os/hub-candidates
 
 [Service]
 Type=simple
@@ -54,3 +55,5 @@ SystemCallArchitectures=native
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=agent-os-hub-candidate-%i
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=1000

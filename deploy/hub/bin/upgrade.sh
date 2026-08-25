@@ -120,6 +120,7 @@ archive=
 checksum=
 target_revision=
 readonly FIXED_SNAPSHOT_HOOK="$(rooted /usr/libexec/agent-os/hub/pre-upgrade-snapshot)"
+readonly LEGACY_QUIESCENCELESS_SERVER_SHA256=9aa52cb59c508239316baf1fbc4eca083cbce578624bc891a2dfd4d121df1df5
 snapshot_hook="$FIXED_SNAPSHOT_HOOK"
 snapshot_hook_overridden=false
 SNAPSHOT_HOOK_COPY=
@@ -134,25 +135,39 @@ candidate_cleanup_failed=false
 quarantine_on_failure=false
 target_release_preexisting=false
 operation_succeeded=false
+operation_transaction=
+legacy_offline_quiescence=false
 
 usage() {
   printf '%s\n' \
     'usage: upgrade.sh --archive FILE --sha256 HEX --revision ID [--snapshot-hook FILE]' >&2
 }
 
+exact_legacy_application_requires_offline_quiescence() {
+  local server expected_uid expected_gid
+  validate_revision "$current_revision"
+  server="$RELEASES_ROOT/$current_revision/apps/chat-spike/src/server.mjs"
+  expected_uid="$(admin_contract_uid)" || return 1
+  expected_gid="$(admin_contract_gid)" || return 1
+  [[ -f "$server" && ! -L "$server" && \
+    "$(stat_value '%u' '%u' "$server")" == "$expected_uid" && \
+    "$(stat_value '%g' '%g' "$server")" == "$expected_gid" && \
+    "$(stat_value '%a' '%Lp' "$server")" == 444 && \
+    "$(stat_value '%h' '%l' "$server")" == 1 && \
+    "$(sha256_file "$server")" == "$LEGACY_QUIESCENCELESS_SERVER_SHA256" ]]
+}
+
 recover_failed_commit() {
   local recovery_ok=true state_after=
-  [[ "$maintenance_enabled" == true ]] || return 0
 
   # Once maintenance begins, no process is allowed to remain attached to the
   # shared state until the entire recovery gate is signed off.
-  service_control stop "$SERVICE_NAME" >/dev/null 2>&1 || recovery_ok=false
-  service_is_inactive || recovery_ok=false
+  (stop_and_prove_writer_stopped) >/dev/null 2>&1 || recovery_ok=false
   if [[ -n "$state_before" ]]; then
     state_after="$(state_fingerprint 2>/dev/null || true)"
   fi
 
-  if [[ -n "$current_revision" ]]; then
+  if [[ "$recovery_ok" == true && -n "$current_revision" ]]; then
     if ! (activate_revision "$current_revision") >/dev/null; then
       printf '%s\n' 'Hub recovery could not restore the active release pointer' >&2
       recovery_ok=false
@@ -164,7 +179,8 @@ recover_failed_commit() {
     service_control daemon-reload >/dev/null 2>&1 || recovery_ok=false
   fi
 
-  if [[ "$quarantine_on_failure" == true && -n "$target_revision" ]]; then
+  if [[ "$recovery_ok" == true && "$quarantine_on_failure" == true && \
+    -n "$target_revision" ]]; then
     if ! (quarantine_release "$target_revision") >/dev/null; then
       printf '%s\n' 'Hub recovery could not quarantine the failed application release' >&2
       recovery_ok=false
@@ -178,7 +194,9 @@ recover_failed_commit() {
     -n "$state_after" &&
     "$state_before" == "$state_after"
   ]]; then
-    if service_control start "$SERVICE_NAME" >/dev/null 2>&1 &&
+    if [[ "$recovery_ok" == true ]] &&
+      (start_authorized_recovery_service "$DURABLE_BLOCK_TRANSACTION") \
+        >/dev/null 2>&1 &&
       (health_gate live) >/dev/null 2>&1 &&
       (service_enable) >/dev/null 2>&1; then
       if (maintenance_off) >/dev/null 2>&1; then
@@ -215,7 +233,7 @@ finish() {
   if [[ "$operation_succeeded" != true ]]; then
     if [[ "$candidate_cleanup_failed" == true ]]; then
       :
-    elif [[ "$maintenance_enabled" == true ]]; then
+    elif [[ "$DURABLE_RECOVERY_ACTIVE" == true || "$maintenance_enabled" == true ]]; then
       recover_failed_commit || result=1
     elif [[ "$quarantine_on_failure" == true && -n "$target_revision" ]]; then
       if ! (quarantine_release "$target_revision") >/dev/null; then
@@ -263,6 +281,7 @@ fi
 acquire_deploy_lock
 require_clean_maintenance_state
 ensure_layout
+require_installed_runtime_contract
 AGENT_OS_NODE_BIN="$NODE_BIN" "$ADMIN_ROOT/bin/validate-config.sh" "$ENV_FILE"
 prepare_snapshot_hook "$snapshot_hook"
 
@@ -284,22 +303,45 @@ candidate_preflight "$target_revision" || die 'isolated candidate failed exact l
 candidate_cleanup_revision=
 notice candidate_preflight ok
 
-maintenance_on
+if ! health_gate quiescent; then
+  exact_legacy_application_requires_offline_quiescence ||
+    die 'Hub has assigned, running, queued or inflight work'
+  legacy_offline_quiescence=true
+  notice legacy_offline_quiescence accepted
+fi
+operation_transaction="upgrade-$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}"
+durable_recovery_on state-upgrade prepared "$operation_transaction"
+maintenance_on_for_recovery
 maintenance_enabled=true
-service_control stop "$SERVICE_NAME" ||
-  die 'could not stop the active writer'
-service_is_inactive || die 'active writer did not reach a quiescent systemd state'
+if [[ "$legacy_offline_quiescence" != true ]] && ! health_gate quiescent; then
+  maintenance_off
+  maintenance_enabled=false
+  die 'Hub stopped being quiescent before the consistency point'
+fi
+stop_and_prove_writer_stopped ||
+  die 'could not stop the active writer or prove its cgroup and state descriptors clear'
 notice stop_writer ok
 
 state_before="$(state_fingerprint)" || die 'could not fingerprint stopped state'
+measurement="$($NODE_BIN "$ADMIN_ROOT/bin/state-snapshot.mjs" measure "$STATE_ROOT")" ||
+  die 'state measurement failed'
+read -r required_bytes required_inodes < <(
+  "$NODE_BIN" -e \
+    'const v=JSON.parse(process.argv[1]); process.stdout.write(`${v.totalBytes} ${v.entryCount}\n`)' \
+    "$measurement"
+)
+"$NODE_BIN" "$ADMIN_ROOT/bin/capacity-check.mjs" \
+  --state "$STATE_ROOT" \
+  --backup "$BACKUP_ROOT" \
+  --required-bytes "$required_bytes" \
+  --required-inodes "$required_inodes" >/dev/null ||
+  die 'pre-upgrade snapshot capacity gate failed'
 snapshot_path="$BACKUP_ROOT/pre-upgrade-$(date -u +%Y%m%dT%H%M%SZ)-${target_revision}-$$"
 [[ ! -e "$snapshot_path" && ! -L "$snapshot_path" ]] || die 'snapshot destination already exists'
-"$SNAPSHOT_HOOK_COPY" "$STATE_ROOT" "$snapshot_path" >/dev/null 2>&1 ||
+/bin/bash -p "$SNAPSHOT_HOOK_COPY" "$STATE_ROOT" "$snapshot_path" >/dev/null 2>&1 ||
   die 'pre-upgrade snapshot hook failed'
-[[ -d "$snapshot_path" && ! -L "$snapshot_path" ]] ||
-  die 'snapshot hook did not create a real destination directory'
-find "$snapshot_path" -type f -print -quit | grep -q . ||
-  die 'snapshot hook produced no file proof'
+"$NODE_BIN" "$ADMIN_ROOT/bin/state-snapshot.mjs" verify "$snapshot_path" >/dev/null ||
+  die 'pre-upgrade snapshot verification failed'
 state_after_snapshot="$(state_fingerprint)" || die 'state became unreadable after snapshot hook'
 [[ "$state_after_snapshot" == "$state_before" ]] ||
   die 'snapshot hook changed stopped source state'
@@ -307,7 +349,8 @@ notice snapshot ok
 
 activate_revision "$target_revision"
 service_control daemon-reload
-service_control start "$SERVICE_NAME" || die 'candidate failed to start on shared state'
+start_authorized_recovery_service "$DURABLE_BLOCK_TRANSACTION" ||
+  die 'candidate failed its authorized start on shared state'
 health_gate live || die 'candidate failed exact liveness on shared state'
 service_enable
 record_previous_revision "$current_revision"

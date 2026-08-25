@@ -37,7 +37,7 @@ for influence in \
   COREPACK_NPM_PASSWORD \
   COREPACK_ROOT \
   COREPACK_USE_LATEST; do
-  if [[ -n "${!influence:-}" ]]; then
+  if [[ -n "${!influence+x}" ]]; then
     printf 'Hub deployment failed: release packaging rejects inherited variable %s\n' \
       "$influence" >&2
     exit 1

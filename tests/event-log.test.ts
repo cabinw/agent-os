@@ -5,7 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 // @ts-expect-error — spike modules are plain .mjs, not part of tsc --build
 import { makeEvent, newEventId } from "../apps/chat-spike/src/events.mjs";
 // @ts-expect-error
-import { EventLog } from "../apps/chat-spike/src/log.mjs";
+import {
+  EVENT_LOG_REPLAY_FAILURE_MESSAGE,
+  EventLog,
+} from "../apps/chat-spike/src/log.mjs";
 // @ts-expect-error
 import { emptyThread, project, reduce } from "../apps/chat-spike/src/thread.mjs";
 
@@ -74,15 +77,13 @@ describe("EventLog", () => {
     expect(readFileSync(path, "utf8").startsWith(afterFirst)).toBe(true);
   });
 
-  it("崩溃后的半行被跳过，而不是让整个日志失效", () => {
+  it("崩溃后的半行使整个日志 fail closed", () => {
     const path = tmpLog();
     const log = new EventLog(path);
     log.append(msg("you", "human", "完整"));
     writeFileSync(path, `${readFileSync(path, "utf8")}{"id":"evt_hal`, "utf8");
 
-    const reopened = new EventLog(path);
-    expect(reopened.size).toBe(1);
-    expect(project(reopened.replay()).items).toHaveLength(1);
+    expect(() => new EventLog(path)).toThrow(EVENT_LOG_REPLAY_FAILURE_MESSAGE);
   });
 });
 

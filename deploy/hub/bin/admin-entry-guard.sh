@@ -44,7 +44,7 @@ guard_trusted_object() {
 readonly ENTRY_SOURCE=$1
 readonly ENTRY_NAME="${ENTRY_SOURCE##*/}"
 case "$ENTRY_NAME" in
-  install.sh | rollback.sh | upgrade.sh | validate-config.sh) ;;
+  install.sh | rollback.sh | state-admin.sh | upgrade.sh | validate-config.sh) ;;
   *) guard_fail 'admin entry is not allowlisted' ;;
 esac
 

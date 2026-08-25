@@ -245,9 +245,10 @@ Two rules it enforces, both testable:
 Live-only signals — token deltas, reasoning, progress — bypass the log by
 design. They are previews; the logged `message.sent` is the fact.
 
-`log.mjs` is the throwaway part: Phase 1.1b replaces JSONL with SQLite + WAL,
-transactional seq allocation, idempotency tokens and snapshots. Nothing above it
-knows how events are stored.
+`log.mjs` is the throwaway part: RM-1.1b replaces JSONL with SQLite + WAL,
+transactional seq allocation and idempotency tokens. RM-1.1d adds projection
+snapshots as a disposable sidecar cache. Nothing above this file knows how
+events are stored.
 
 ## What is deliberately absent
 

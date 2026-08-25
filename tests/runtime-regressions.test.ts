@@ -7,7 +7,10 @@ import { makeEvent } from "../apps/chat-spike/src/events.mjs";
 // @ts-expect-error
 import { Hub } from "../apps/chat-spike/src/hub.mjs";
 // @ts-expect-error
-import { EventLog } from "../apps/chat-spike/src/log.mjs";
+import {
+  EVENT_LOG_REPLAY_FAILURE_MESSAGE,
+  EventLog,
+} from "../apps/chat-spike/src/log.mjs";
 
 const dirs: string[] = [];
 
@@ -258,7 +261,7 @@ describe("EVIDENCE-01 · runtime-owned evidence path", () => {
 });
 
 describe("EventLog crash tail", () => {
-  it("损坏尾部后的首次 append 在再次重启后仍可重放", () => {
+  it("损坏尾部会阻止重启和继续追加", () => {
     const dir = mkdtempSync(join(tmpdir(), "agentos-tail-"));
     dirs.push(dir);
     const path = join(dir, "events.jsonl");
@@ -274,15 +277,6 @@ describe("EventLog crash tail", () => {
     first.append(event("before crash"));
     appendFileSync(path, '{"id":"evt_incomplete"');
 
-    const recovered = new EventLog(path);
-    expect(recovered.append(event("after crash")).seq).toBe(2);
-
-    const restarted = new EventLog(path);
-    expect(
-      restarted
-        .replay()
-        .map((item: { payload: { content: string } }) => item.payload.content),
-    ).toEqual(["before crash", "after crash"]);
-    expect(restarted.seq).toBe(2);
+    expect(() => new EventLog(path)).toThrow(EVENT_LOG_REPLAY_FAILURE_MESSAGE);
   });
 });

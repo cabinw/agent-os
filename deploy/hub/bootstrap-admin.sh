@@ -87,15 +87,64 @@ fi
 # shellcheck source=bin/lib.sh
 source "$SCRIPT_DIR/bin/lib.sh"
 
-if (($# != 0)); then
-  printf '%s\n' 'usage: bootstrap-admin.sh' >&2
+replace_cold=false
+migrate_installed=false
+migration_action=forward
+expected_current_digest=
+if (($# == 0)); then
+  :
+elif (($# == 3)) && [[ "$1" == --replace-cold && "$2" == --expected-current-sha256 ]]; then
+  replace_cold=true
+  expected_current_digest=$3
+elif (($# == 3)) && \
+  [[ "$1" == --migrate-installed && "$2" == --expected-current-sha256 ]]; then
+  migrate_installed=true
+  expected_current_digest=$3
+elif (($# == 4)) && \
+  [[ "$1" == --migrate-installed && "$2" == --expected-current-sha256 && \
+    "$4" == --rollback ]]; then
+  migrate_installed=true
+  migration_action=rollback
+  expected_current_digest=$3
+else
+  printf '%s\n' \
+    'usage: bootstrap-admin.sh [--replace-cold --expected-current-sha256 HEX]' \
+    '       bootstrap-admin.sh --migrate-installed --expected-current-sha256 HEX [--rollback]' >&2
   exit 2
 fi
 
 require_privilege
 require_commands install chmod find mv
 require_pinned_node
-acquire_deploy_lock
-ensure_layout
-install_admin_kit
+if [[ "$migrate_installed" == true ]]; then
+  # Reject the operator pin, source or legacy runtime before even creating the
+  # deployment lock. Re-run the same preflight after taking the lock to close
+  # the read/check race before the first durable migration mutation.
+  preflight_installed_admin_migration "$expected_current_digest" "$migration_action"
+  acquire_deploy_lock
+  recover_admin_migration_temporaries \
+    "$expected_current_digest" "$migration_action"
+  preflight_installed_admin_migration "$expected_current_digest" "$migration_action"
+  admin_migration_finish() {
+    local result=$?
+    trap - EXIT TERM INT HUP
+    if [[ "${ADMIN_MIGRATION_ACTIVE:-false}" == true && \
+      "${ADMIN_MIGRATION_COMPLETE:-false}" != true ]]; then
+      admin_migration_fail_closed || result=1
+    fi
+    exit "$result"
+  }
+  trap admin_migration_finish EXIT TERM INT HUP
+  migrate_installed_admin_kit "$expected_current_digest" "$migration_action"
+  ADMIN_MIGRATION_COMPLETE=true
+  ADMIN_MIGRATION_ACTIVE=false
+elif [[ "$replace_cold" == true ]]; then
+  acquire_deploy_lock
+  ensure_layout
+  replace_admin_kit_cold "$expected_current_digest"
+else
+  acquire_deploy_lock
+  ensure_layout
+  install_admin_kit
+fi
 notice bootstrap_admin ok

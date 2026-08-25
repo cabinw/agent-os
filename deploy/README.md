@@ -18,8 +18,11 @@ Worker. Protocol and ownership semantics remain canonical in
 - Human, Runner and per-Agent bearer values are distinct, 32–4096 characters
   from `[A-Za-z0-9_-]` and loaded only from restricted configuration.
 - The Hub and each Worker are single writers for their own state roots.
-- Logs, command output, evidence and backups contain no bearer, credential map,
-  vendor authentication material or raw vendor stderr.
+- Logs, command output and evidence must expose only fixed diagnostics plus
+  hashes, counts, stages and exit status; they must never expose bearer values,
+  file bodies or raw vendor stderr. State artifacts are high-sensitive root-only
+  data: the snapshot helpers copy every allowed regular state file without
+  content scanning and can copy a misplaced secret.
 
 ```text
 human / agent
@@ -92,6 +95,9 @@ Both health routes are loopback-only: their exact public locations return
 | event log | `/var/lib/agent-os/hub/events.jsonl` |
 | placement | `/var/lib/agent-os/hub/remote-placement.json` |
 | request replay | `/var/lib/agent-os/hub/remote-placement.json.requests/` |
+| state artifacts | `/var/backups/agent-os/hub`; root-owned `0700`, published artifact directories `0500`, files `0400` |
+| recovery journal | `/var/lib/agent-os-ops/private`; root-owned `0700`, transaction directories `0700`, entries `0400` |
+| persistent recovery block | `/var/lib/agent-os-ops/hub-block`; root-owned single-link regular file, `0444` |
 | logs | systemd journal; persistent journal policy belongs to the host |
 | deployment lock | `/run/agent-os/hub-deploy.lock`; root-owned global `flock` |
 | maintenance | `/run/agent-os/hub-maintenance`; blocks human, Agent and Runner ingress during promotion |
@@ -181,21 +187,115 @@ scoped Agent credential.
 | Worker | vendor session snapshot, LocalRunner request ledger | restore together on the same host identity and workspace root |
 | Worker | working copies | Git remote is the cross-host boundary; never copy them to the Hub |
 
-The current `EventLog` is a throwaway JSONL spike: it has no fsync transaction,
-consistent online snapshot or formal corruption boundary. Filesystem backup is
-for staging recovery drills only. Production durability depends on RM-1.1b and
-must not be claimed by deployment scripts.
+The staging EventLog now treats invalid UTF-8, a partial final frame, blank or
+surrounding-whitespace frames, malformed JSON, invalid event shape, sequence
+gaps, duplicate ids, mixed projects and invalid causal references as fatal. It
+never skips a malformed frame. Every append is fenced by `.write-intent` and
+`.write-committed` marker states around the frame and directory fsyncs. Either
+unresolved marker blocks restart because it cannot establish whether the caller
+observed success. Stop the Hub and preserve the raw state for offline
+adjudication; never delete a marker or treat `.write-committed` as implicit
+success.
 
-For every upgrade or recovery drill:
+The marker protocol still cannot atomically bind durable cleanup to the caller
+observing the return. A crash after marker removal is durable but before the
+return is observed can make a retry duplicate the semantic operation. The
+staging JSONL path has no operation-level idempotency key; this acknowledgement
+window remains blocked on RM-1.1b and must not be described as exactly-once.
 
-1. Stop the single writer; do not snapshot a live JSONL writer.
-2. Copy state into a new timestamped snapshot. Keep the source and prior
-   snapshot.
-3. Validate structure and replay from the copy.
-4. Restore into a new state directory, validate again, then repoint the stopped
-   service.
-5. Never overwrite the only copy. Release rollback does not imply state
-   rollback.
+This strictness does not give the JSONL and JSON files a shared transaction or
+make the spike production-durable. Production durability remains RM-1.1b.
+
+The fixed admin kit implements the staging stopped-state contract in
+[ADR-040](../docs/decisions/ADR-040-staging-state-snapshot-and-recovery.md).
+A strict artifact copies the three Hub filesets together, replays them offline,
+pins a canonical manifest/tree digest and is published only after file and
+directory fsync. Artifact directories are root-owned `0500`; contained data and
+control files are `0400`. Creation rejects links, special files, unknown
+temporary files, unstable traversal, active tasks and unresolved EventLog write
+markers. It never overwrites an artifact or the only state tree.
+
+Snapshot and materialization publication uses a target-scoped, owner-bound
+lease. The atomic lock link binds a private owner record containing PID and
+Linux `/proc` starttime. A live or uninspectable owner fails closed; only an
+explicitly absent PID or a different starttime may be reclaimed. SIGKILL leaves
+an auditable stale lease that the next invocation validates and reclaims. A
+symlink, extra hardlink, wrong owner/mode or malformed record is never repaired
+automatically.
+
+The helper is not content-aware: it copies every allowed regular file below the
+state root. Treat strict snapshots, raw forensic artifacts and recovery records
+as high-sensitive even when a secret does not belong there. Logs and acceptance
+evidence may contain only hashes, counts, stages and exit status; never print a
+secret canary or artifact content.
+
+Run only the fixed administrative entry points; each acquires the global deploy
+lock. Capture the exact snapshot id and manifest digest emitted by backup:
+
+```bash
+sudo /usr/libexec/agent-os/hub/bin/state-admin.sh capacity
+sudo /usr/libexec/agent-os/hub/bin/state-admin.sh backup --label <safe-label>
+
+sudo /usr/libexec/agent-os/hub/bin/state-admin.sh restore \
+  --snapshot <snapshot-id> \
+  --manifest-sha256 <exact-manifest-sha256>
+
+sudo /usr/libexec/agent-os/hub/bin/state-admin.sh recover-old \
+  --transaction <restore-transaction-id>
+```
+
+`capacity` is read-only. `backup`, `restore` and `recover-old` are the only
+state-mutating or crash-continuation paths.
+
+`restore --from-transaction <exact-parent>` is permitted only to bind a new,
+signed restore to the transaction named by an existing durable block. It is not
+a generic bypass. There is no supported direct state repoint, journal edit,
+marker deletion or unbound service start.
+
+If a failed upgrade or rollback leaves `/run/agent-os/hub-recovery-start`, do
+not delete it. First verify that it is the private `0400`, single-link regular
+token whose body exactly matches the transaction in `hub-block`. After repairing
+the cause of the failed start, retry the Hub start under that same transaction;
+the audited `ExecStartPre` consumes the token. Prove the Hub live, then stop and
+disable it again while retaining the parent block. Only then run the signed
+`restore --from-transaction <exact-parent>` path. A mismatched token or block is
+a hard refusal and requires preserving both artifacts for audit.
+
+A restore durably records `intent` before writer stop or pointer change. The
+intent pins its parent, target snapshot, manifest digest and canonical tree.
+After stop proof it preserves the current tree, records pinned `metadata`, then
+chains the parent block to this restore. Private intent, metadata and phase
+temporaries are renamed and their parent directory synced at every transition:
+
+```text
+prepared → staged → old_moved → new_activated → verified → committed
+```
+
+A strict precommit compensation ends in `rolled_back`. Only an orphan intent
+from a clean standalone `recovery-pre-*` parent may be proved replayable and
+ended in `aborted`; an explicit parent failure requires a new restore bound to
+that parent. `committed`, `rolled_back` and `aborted` are terminal. Recovery
+verifies the terminal tree, starts through an exact transaction-bound one-time
+token, checks liveness and enablement, then only finalizes cleanup. A committed
+restore is never compensated backward.
+
+When the old tree fails an eligible semantic check, restore first creates a raw
+`forensic-v1` preservation artifact. It can only be verified, never
+materialized. Recovery is forward-only toward the pinned strict target; after
+`old_moved`, the same journal must continue forward and must never reactivate
+the corrupt tree. The forensic artifact remains immutable evidence.
+
+The durable block is removed last. Volatile maintenance sentinels are removed
+and the runtime directory is synced while the block remains; the block removal
+and operations-directory fsync form the terminal cleanup boundary. Any earlier
+crash or failed sync leaves or republishes the exact block and the Hub remains
+closed.
+
+`events.jsonl` is authoritative. Never logrotate it, segment it,
+`copytruncate` it or prune it. Only journald and Nginx logs rotate. An already
+verified artifact may be removed only by a separately approved, explicit
+retention operation; deletion is never automatic. Same-disk artifacts remain
+staging rollback aids, not off-host disaster recovery.
 
 Do not upgrade during an in-flight task until restart reconciliation has a
 defined Task Engine policy. Current Hub restart tests prove transport replay
@@ -232,8 +332,9 @@ stop fails visibly.
 Upgrade first boots a clean-state candidate on `14173` with one-time bearer
 values. This proves only that the app can start; it does not validate live
 JSONL replay or a migration. The promotion state machine then enables
-maintenance for every proxied namespace, stops and proves the writer inactive,
-double-hashes state, runs the snapshot hook, verifies the source hash again,
+maintenance for every proxied namespace, stops the service, obtains the
+observable-reference proof defined below, double-hashes state, runs the
+snapshot hook, verifies the source hash again,
 switches code and gates on exact liveness. Only a fully signed-off activation
 updates `previous`, removes maintenance and lets the outbound Worker reconnect.
 
@@ -250,9 +351,11 @@ A candidate-stop failure occurs before promotion or live-state access. In that
 case the previously signed-off live Hub stays running and enabled, while normal
 plus hard maintenance block new public ingress; the candidate unit, one-time
 env, state and release are retained for explicit process cleanup. No new deploy
-operation may clear either fail-closed state. An audited recovery command is an
-SVR-03 blocker; manual sentinel deletion without proving the candidate inactive
-or restoring changed state is forbidden.
+operation may clear either fail-closed state. This is a release-lifecycle
+failure, not an invitation to use the state restore tool. A fsynced release
+transaction journal and explicit release recovery command remain blockers;
+manual sentinel deletion without proving the candidate inactive or restoring
+changed state is forbidden.
 
 ### Hub staging commands
 
@@ -333,7 +436,30 @@ Ownership and a supplied SHA-256 prove local integrity only; they do not
 authenticate the publisher. Signed admin-kit and
 application release manifests plus an audited publisher-key policy are still a
 production blocker. Admin-kit upgrade is a separate packaging/change-control
-workflow. `install.sh` creates or validates locked non-login service identities
+workflow governed by
+[ADR-041](../docs/decisions/ADR-041-privileged-admin-kit-migration.md). The only
+supported migration from the allowlisted legacy staging kit is:
+
+```bash
+sudo /root/agent-os-admin-kit/bootstrap-admin.sh \
+  --migrate-installed \
+  --expected-current-sha256 <allowlisted-legacy-tree-sha256>
+
+# Only to continue or finalize the selected failed attempt as rollback:
+sudo /root/agent-os-admin-kit/bootstrap-admin.sh \
+  --migrate-installed \
+  --expected-current-sha256 <allowlisted-legacy-tree-sha256> \
+  --rollback
+```
+
+Do not use cold bootstrap, copy individual files or delete a migration journal
+to recover an installed kit. Preserve the persistent block and journal, inspect
+only hashes, phases and service state, then rerun the matching forward or
+rollback command. A committed attempt can only finish forward; a rolled-back
+attempt can only finish rollback. A new attempt is allowed only after the prior
+rolled-back journal and forensic evidence pass exact validation.
+
+`install.sh` creates or validates locked non-login service identities
 with no supplementary groups. It leaves both Nginx files as disabled
 `.example` files. Enabling them still depends on the approved FQDN, matching
 certificate, `nginx -t` and a real query/log leakage check.
@@ -343,16 +469,52 @@ single-link lock file before checking the normal/hard maintenance sentinels.
 No configuration, release, pointer, unit, proxy or state-layout mutation occurs
 until that serialized fail-closed check succeeds.
 
-Production upgrade accepts only the fixed snapshot hook
+The audited staging upgrade path accepts only the fixed snapshot hook
 `/usr/libexec/agent-os/hub/pre-upgrade-snapshot`; a CLI override exists only in
 the isolated non-root test-root harness. The hook and every ancestor must be
 canonical, root-owned and non-writable, and the executable must be a
 single-link regular file. Upgrade copies it with no-follow checks to a private
-root-owned runtime file, revalidates that copy and executes only the copy as
-`HOOK <state-root> <new-snapshot-directory>` after systemd has stopped and
-proved the single writer inactive. A non-zero exit, empty destination or
-source-state hash change enters compensation. SVR-03 supplies and audits the
-fixed hook implementation.
+root-owned `0400`, single-link runtime file and revalidates the copy. Because
+the standard `/run` mount may be `noexec`, the copy is never executed directly;
+the fixed `/bin/bash -p` interpreter reads it as
+`bash -p HOOK <state-root> <new-snapshot-directory>` after systemd has stopped and
+passed the stopped-service observable-reference gate. A non-zero exit, empty destination or
+source-state hash change enters compensation. The fixed hook implements the
+ADR-040 strict stopped-state snapshot contract. It does not make the release
+pointer transition SIGKILL-recoverable.
+
+The single allowlisted legacy application server (`server.mjs` SHA-256
+`9aa52cb59c508239316baf1fbc4eca083cbce578624bc891a2dfd4d121df1df5`)
+predates `/health/quiescent`. Upgrade may treat only that exact root-owned,
+`0444`, single-link server as requiring offline quiescence: it publishes the
+normal and durable guards, stops and proves the writer absent, then performs
+the canonical offline active-task/replay measurement. Any other missing or
+failed quiescent probe rejects before promotion. This exception is not a
+general health bypass.
+
+The observable-reference gate is deliberately narrower than a proof of all
+future write capability. On the supported local, persistent, single-mount
+`ext4` state tree it scans two stable `/proc` windows for every visible task:
+writable/deleted/O_TMPFILE descriptors and mount aliases, live state-inode
+`MAP_SHARED` mappings with `VM_MAYWRITE`, exact state or immediate-parent
+cwd/root/dirfd references, the dedicated service UID and the forbidden service
+cgroup. A leaderless process whose task view is unavailable fails closed.
+Nested, stacked, overlay, network, FUSE, tmpfs and read-only state mounts are
+rejected.
+
+This gate does not inspect queued `SCM_RIGHTS` descriptors, io_uring registered
+files, `pidfd_getfd`, capabilities derived from a higher ancestor directory, a
+remote filesystem writer or a later trusted-root reopen. Safety therefore also
+depends on the dedicated UID/cgroup, the `0700` state boundary and trusted root.
+On the Ubuntu 22.04 staging host, the fixed helper completed 20/20 idle scans
+and 20/20 scans under controlled short-process churn. Those runs also exercised
+the supported absent-cgroup result after systemd had no unit cgroup. A separate
+private mount-namespace probe opened a real ext4 `O_TMPFILE` through a bind
+alias; the descriptor appeared as a deleted alias path with a mount id absent
+from the inspector namespace, and the helper failed closed with
+`aliasInspectionComplete:false`. No probe mount or process remained. Same-
+namespace chroot, linkat publication and active-to-trimmed systemd cgroup
+evidence remain required before field acceptance.
 
 ```bash
 sudo /usr/libexec/agent-os/hub/bin/upgrade.sh \
@@ -398,8 +560,9 @@ cd "$SOURCE_ROOT"
   production-safe.
 - Rotate Windows logs and cap journald by host policy. Alert before state or log
   volumes exhaust free space.
-- Backup, restore and smoke evidence records commands, exit codes and hashes,
-  not file contents that may contain credentials.
+- Backup, restore and smoke evidence records only commands, exit codes, hashes,
+  counts and stages. Snapshot and forensic contents remain high-sensitive and
+  are never copied into logs.
 
 ## Staging gates and blockers
 
@@ -413,11 +576,16 @@ cd "$SOURCE_ROOT"
 | bounded body parsing, shutdown deadline and propagated close failure | implemented; focused local runtime gate passes |
 | reconnect backoff, jitter and bounded Runner transport/body caches | implemented; focused runtime gate passes |
 | SSE admission, replay-byte and slow-client bounds | implemented; EventLog full-history startup projection remains a staging blocker |
-| systemd units, fixed admin kit, safe app extractor, proxy sample and lifecycle scripts | non-root fault matrix and real root-owned admin bootstrap pass; service activation waits on the approved FQDN/certificate |
+| systemd units, fixed admin kit, safe app extractor, proxy sample and lifecycle scripts | non-root fault matrix, real root-owned bootstrap and exact 17→25 installed migration pass; public proxy activation waits on the approved FQDN/certificate |
 | Nginx query/log leakage and real upstream failure exercise | static policy passes; real enabled-vhost test waits on the dedicated FQDN/certificate |
-| staging backup/restore and capacity/rotation scripts | not implemented |
-| audited hard-maintenance state restore | blocked on SVR-03; deploy refuses to clear the sentinel |
+| strict staging backup, snapshot verification and capacity preflight | target Ubuntu acceptance passed on 2026-08-25: a root-only strict snapshot was published with manifest SHA-256 `71392fe3…`, its separately copied and corrupted twin failed `snapshot_data_mismatch`, and the signed original remained unchanged |
+| journaled restore, `recover-old` and raw forensic preservation | target Ubuntu signed restore passed on 2026-08-25 with state tree `bc079a58…`, service `active+enabled`, all runtime/persistent guards absent and a final observable-reference scan `ok:true`; forensic and crash matrices remain covered by the non-root fault gate |
+| `events.jsonl` retention | rotation, segmentation, `copytruncate` and pruning are prohibited; no production segment protocol exists |
+| state quota, retention and disaster recovery | peak-capacity admission exists; per-artifact quota enforcement, approved retention and encrypted off-host copies remain blocked |
+| release upgrade/rollback transaction recovery | no fsynced release journal or explicit release recovery command; SIGKILL pointer recovery remains blocked |
+| real Linux alias and mount proof | Ubuntu idle and controlled process-churn scans pass 20/20 each; an ext4 private-namespace bind-alias `O_TMPFILE` is rejected when its mount object is unavailable to the inspector; same-namespace chroot/linkat and active systemd-cgroup trim remain pending |
 | production event-store durability | blocked on RM-1.1b; outside this workflow |
+| EventLog caller-acknowledgement atomicity | marker phases fail closed before cleanup, but crash after durable marker removal and before caller observation remains ambiguous without RM-1.1b operation idempotency |
 | Windows atomic replacement on repeated persistence | requires real NTFS reproduction and fix |
 | Windows account-only ACL for state and bearer mounts | requires implementation and effective-ACL proof |
 | reparse-point/hardlink-safe credential mounting | not implemented |
