@@ -274,6 +274,7 @@ public static class Probe {
       "another Windows Worker admin upgrade journal candidate exists",
     );
     expect(upgrade).toContain("taskUsesNewRelease");
+    expect(upgrade).toContain("Set-AgentOSWorkerExecutableAcl -Path $executable");
     for (const phase of ["prepared", "task_switched", "verified", "committed"]) {
       expect(upgrade).toContain(`'${phase}'`);
     }
@@ -330,7 +331,6 @@ public static class Probe {
     expect(windowsModule).toContain(
       "Assert-AgentOSWorkerExecutableAcl -Path $executable",
     );
-    expect(upgrade).toContain("Set-AgentOSWorkerExecutableAcl -Path $executable");
     expect(windowsModule).toContain(
       "Assert-AgentOSBatchLogonRight -WorkerSid $workerSid",
     );
