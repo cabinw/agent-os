@@ -414,3 +414,17 @@ func TestEnvironmentRequiresFixedMinimalSet(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSuccessProtocolIsCanonicalAndRedacted(t *testing.T) {
+	record := artifactRecord{
+		typeName:     "hub-release",
+		sequence:     7,
+		artifactHash: strings.Repeat("a", 64),
+		bytes:        13,
+	}
+	line := successLine(record, "/var/lib/agent-os/publisher")
+	expected := "publisher_verifier result=ok artifact_type=hub-release sequence=7 artifact_sha256=" + strings.Repeat("a", 64) + " artifact_bytes=13 published_path=/var/lib/agent-os/publisher/staging/hub-release-7-" + strings.Repeat("a", 64)
+	if line != expected || strings.Contains(line, "signature") || strings.ContainsRune(line, '\n') {
+		t.Fatalf("unexpected success protocol: %q", line)
+	}
+}

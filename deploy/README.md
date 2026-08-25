@@ -430,7 +430,7 @@ sudo /root/agent-os-admin-kit/bootstrap-admin.sh
 
 sudo /usr/libexec/agent-os/hub/bin/install.sh \
   --archive /secure/staging/agent-os-<revision>.tar.gz \
-  --sha256 <trusted-sha256> \
+  --envelope /secure/staging/agent-os-<revision>.envelope \
   --revision <revision> \
   --env-file /secure/staging/hub.env
 
@@ -448,12 +448,15 @@ path outside the fixed admin kit before executing the shared entry guard or
 the immediate shell/Node execution closure. Privileged Node helpers reject
 inherited Node, TLS and OpenSSL configuration/module/engine variables before Node
 starts; system tool overrides exist only inside a validated non-root test root.
-Ownership and a supplied SHA-256 prove local integrity only; they do not
-authenticate the publisher. ADR-045 fixes the offline-root policy, canonical
-envelopes, rotation/revocation and same-descriptor publication acceptance
-contract. The fixed pre-bootstrap launcher and verifier are not implemented,
-so authenticated admin-kit and application-release admission remains a
-production blocker. Admin-kit upgrade is a separate packaging/change-control
+Application-release install and upgrade now execute the fixed, statically
+linked verifier under `env -i` before acquiring the deployment lock. The
+root-only `/etc/agent-os/publisher/verifier.sha256` record pins that executable;
+the entries accept only its canonical one-line result and consume only the
+published copy under `/var/lib/agent-os/publisher/staging`. Caller-supplied
+SHA-256-only admission is rejected. ADR-045 defines the offline-root policy,
+canonical envelopes, rotation/revocation and same-descriptor publication
+contract. Cold admin-kit admission is not wired yet and remains a production
+blocker. Admin-kit upgrade is a separate packaging/change-control
 workflow governed by
 [ADR-041](../docs/decisions/ADR-041-privileged-admin-kit-migration.md). The only
 supported migration from the allowlisted legacy staging kit is:
@@ -578,7 +581,7 @@ fail closed on the resulting state-tree change.
 ```bash
 sudo /usr/libexec/agent-os/hub/bin/upgrade.sh \
   --archive /secure/staging/agent-os-<next-revision>.tar.gz \
-  --sha256 <trusted-sha256> \
+  --envelope /secure/staging/agent-os-<next-revision>.envelope \
   --revision <next-revision>
 
 sudo /usr/libexec/agent-os/hub/bin/rollback.sh
@@ -630,7 +633,7 @@ cd "$SOURCE_ROOT"
 | Dedicated Agent OS FQDN and matching trusted certificate | field dependency; placeholder origin was rejected before publication, leaving no env/unit/current/listener; Hub activation and cross-host smoke remain blocked until supplied |
 | Ubuntu exact Node version/SHA and repository-pinned Corepack/pnpm | field gate passed: pinned Linux x64 archive SHA and signature chain verified; the gate enforces `/usr/bin/node` 24.19.0, `/usr/bin/corepack` 0.35.0 and pnpm 11.17.0, and revalidates their root-owned non-writable paths before use |
 | clean Linux production dependency closure | cold-cache field gate passes with pnpm 11.17.0, zero reused packages, final SDK/Zod imports, no links/special files and no admin tree; rerun after every frozen artifact change |
-| authenticated release/admin-kit publisher and signature verification | ADR-045 acceptance contract fixed; trusted pre-bootstrap launcher, offline policy store and same-descriptor verifier remain unimplemented |
+| authenticated release/admin-kit publisher and signature verification | application release verifier core and install/upgrade admission implemented; Ubuntu lifecycle acceptance and cold admin-kit wiring remain pending |
 | Hub health endpoints and health-check script | implemented; focused local gate passes |
 | bounded body parsing, shutdown deadline and propagated close failure | implemented; focused local runtime gate passes |
 | reconnect backoff, jitter and bounded Runner transport/body caches | implemented; focused runtime gate passes |
