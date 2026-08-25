@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   cpSync,
   linkSync,
@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 const bootstrap = "deploy/hub/bootstrap-admin.sh";
 const library = "deploy/hub/bin/lib.sh";
 const digestHelper = "deploy/hub/admin-generation-digest.mjs";
+const executionFixture = "tests/fixtures/hub-admin-generation-execution.sh";
 const oldAdmin = "444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6";
 const newAdmin = "f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8";
 const oldRuntime = "ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440";
@@ -27,8 +28,100 @@ const predecessorTransaction =
 const roots: string[] = [];
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true });
+  for (const root of roots.splice(0)) {
+    spawnSync("/bin/chmod", ["-R", "u+w", root]);
+    rmSync(root, { force: true, recursive: true });
+  }
 });
+
+function executionEnvironment(root: string, nonce: string) {
+  return {
+    AGENT_OS_DEPLOY_TEST_MODE: "1",
+    AGENT_OS_DEPLOY_TEST_NONCE: nonce,
+    AGENT_OS_DEPLOY_TEST_ROOT: root,
+    AGENT_OS_GENERATION_SOURCE_ROOT: join(process.cwd(), "deploy/hub"),
+    AGENT_OS_NODE_BIN: process.execPath,
+    PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
+  };
+}
+
+function createExecutionFixture() {
+  const root = mkdtempSync(
+    join(realpathSync(tmpdir()), "agent-os-generation-execution-"),
+  );
+  roots.push(root);
+  const nonce = "admin_generation_execution_test_0001";
+  writeFileSync(join(root, ".agent-os-deploy-test-root"), `${nonce}\n`, {
+    mode: 0o600,
+  });
+  const env = executionEnvironment(root, nonce);
+  const initialized = spawnSync("/bin/bash", ["-p", executionFixture, "init"], {
+    encoding: "utf8",
+    env,
+  });
+  expect(initialized.status, initialized.stderr).toBe(0);
+  return { env, oldDigest: initialized.stdout.trim(), root };
+}
+
+function runExecutionFixture(
+  fixture: ReturnType<typeof createExecutionFixture>,
+  ...args: string[]
+) {
+  return spawnSync("/bin/bash", ["-p", executionFixture, ...args], {
+    encoding: "utf8",
+    env: fixture.env,
+  });
+}
+
+function killExecutionAtPhase(
+  fixture: ReturnType<typeof createExecutionFixture>,
+  action: "forward" | "rollback",
+  phase: string,
+) {
+  return new Promise<{ signal: NodeJS.Signals | null; stderr: string; stdout: string }>(
+    (resolve, reject) => {
+      const child = spawn("/bin/bash", ["-p", executionFixture, "run", action], {
+        env: fixture.env,
+      });
+      let stdout = "";
+      let stderr = "";
+      let killed = false;
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => {
+        stdout += chunk;
+        if (
+          !killed &&
+          stdout.includes(`phase=admin_migration_${phase} status=recorded`)
+        ) {
+          killed = child.kill("SIGKILL");
+        }
+      });
+      child.stderr.on("data", (chunk: string) => {
+        stderr += chunk;
+      });
+      child.on("error", reject);
+      child.on("close", (_code, signal) => {
+        if (!killed) {
+          reject(new Error(`phase ${phase} was not observed; stderr=${stderr}`));
+          return;
+        }
+        resolve({ signal, stderr, stdout });
+      });
+    },
+  );
+}
+
+function statusFields(fixture: ReturnType<typeof createExecutionFixture>) {
+  const result = runExecutionFixture(fixture, "status");
+  expect(result.status, result.stderr).toBe(0);
+  return Object.fromEntries(
+    result.stdout
+      .trim()
+      .split(" ")
+      .map((field) => field.split("=", 2)),
+  );
+}
 
 function copySource(): string {
   const root = mkdtempSync(join(realpathSync(tmpdir()), "agent-os-admin-generation-"));
@@ -214,4 +307,65 @@ describe("allowlisted Hub admin generation upgrade", () => {
     }
     expect(source).not.toContain('cp -R "$ADMIN_MIGRATION_STAGE" "$ADMIN_ROOT"');
   });
+
+  it("resumes a real whole-tree generation switch after external SIGKILL", async () => {
+    const fixture = createExecutionFixture();
+    const killed = await killExecutionAtPhase(fixture, "forward", "admin_activated");
+    expect(killed.signal).toBe("SIGKILL");
+
+    const resumed = runExecutionFixture(fixture, "run", "forward");
+    expect(resumed.status, resumed.stderr).toBe(0);
+    expect(statusFields(fixture)).toMatchObject({
+      active: "yes",
+      committed: "yes",
+      enabled: "yes",
+      finalized: "yes",
+      guards: "clean",
+      rolled_back: "no",
+    });
+  }, 30_000);
+
+  it.each([
+    ["stopped", 0],
+    ["prepared", 1],
+  ])(
+    "rolls back the old whole tree after a %s phase crash",
+    async (phase, _prepared) => {
+      const fixture = createExecutionFixture();
+      const killed = await killExecutionAtPhase(fixture, "forward", phase);
+      expect(killed.signal).toBe("SIGKILL");
+
+      const rolledBack = runExecutionFixture(fixture, "run", "rollback");
+      expect(rolledBack.status, rolledBack.stderr).toBe(0);
+      expect(statusFields(fixture)).toMatchObject({
+        active: "yes",
+        current: fixture.oldDigest,
+        enabled: "yes",
+        finalized: "yes",
+        guards: "clean",
+        rolled_back: "yes",
+      });
+    },
+    30_000,
+  );
+
+  it("rejects a changed frozen payload and remains transaction-blocked", async () => {
+    const fixture = createExecutionFixture();
+    const killed = await killExecutionAtPhase(fixture, "forward", "prepared");
+    expect(killed.signal).toBe("SIGKILL");
+    expect(runExecutionFixture(fixture, "tamper-new-runtime").status).toBe(0);
+
+    const rejected = runExecutionFixture(fixture, "run", "forward");
+    expect(rejected.status).toBe(1);
+    expect(rejected.stderr).toContain(
+      "frozen admin migration runtime payload digest changed",
+    );
+    expect(statusFields(fixture)).toMatchObject({
+      active: "no",
+      committed: "no",
+      enabled: "no",
+      finalized: "no",
+      guards: "present",
+    });
+  }, 30_000);
 });
