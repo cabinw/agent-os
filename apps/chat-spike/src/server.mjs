@@ -17,6 +17,7 @@
  * rule 5), tasks, memory.
  */
 
+import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -33,7 +34,7 @@ import {
   requestOrigin,
 } from "./http-security.mjs";
 import { Hub } from "./hub.mjs";
-import { EventLog } from "./log.mjs";
+import { EVENT_LOG_WRITE_FAILURE_MESSAGE, EventLog } from "./log.mjs";
 import { mountMcp } from "./mcp-mount.mjs";
 import { HUMAN_ID } from "./mcp-tools.mjs";
 import { LocalRunner } from "./runners/local.mjs";
@@ -56,6 +57,8 @@ const HOST = process.env.HOST ?? DEFAULT_HOST;
 const WORKSPACE = process.env.AGENT_CWD ?? resolve(HERE, "../workspace");
 const LOG_PATH = process.env.LOG_PATH ?? resolve(HERE, "../data/events.jsonl");
 const SESSION_PATH = process.env.SESSION_PATH ?? join(dirname(LOG_PATH), "sessions.json");
+const CREDENTIAL_ROOT =
+  process.env.AGENT_OS_CREDENTIAL_ROOT ?? join(dirname(SESSION_PATH), "credentials");
 const REMOTE_STATE_PATH =
   process.env.AGENT_OS_REMOTE_STATE_PATH ??
   join(dirname(LOG_PATH), "remote-placement.json");
@@ -136,7 +139,23 @@ let origins = allowedOrigins({
   configured: process.env.AGENT_OS_ALLOWED_ORIGINS,
 });
 
-const log = new EventLog(LOG_PATH);
+let lifecycle = null;
+let storageFailureTriggered = false;
+const log = new EventLog(LOG_PATH, {
+  onFatal: () => {
+    if (storageFailureTriggered) return;
+    storageFailureTriggered = true;
+    console.error(EVENT_LOG_WRITE_FAILURE_MESSAGE);
+    if (lifecycle === null) {
+      process.exit(1);
+      return;
+    }
+    void lifecycle.shutdown().then(
+      () => process.exit(1),
+      () => process.exit(1),
+    );
+  },
+});
 const sseClients = createSseClientRegistry();
 
 function broadcast(type, data) {
@@ -160,6 +179,12 @@ if (RUNNER_MODE === "local") {
     mcpFor: (request, workspace) =>
       mountMcp(request.adapter, {
         dir: workspace,
+        credentialDir: join(
+          CREDENTIAL_ROOT,
+          createHash("sha256")
+            .update(`${request.user}\0${request.project}\0${request.agent}`)
+            .digest("hex"),
+        ),
         url: HUB_URL,
         token: credentials.tokenForAgent(request.agent),
       }),
@@ -256,12 +281,24 @@ async function handleRequest(req, res) {
   if (
     req.method === "GET" &&
     isLoopbackRequest(req) &&
-    (url.pathname === "/health/live" || url.pathname === "/health/ready")
+    ["/health/live", "/health/ready", "/health/quiescent"].includes(url.pathname)
   ) {
     applySecurityHeaders(res);
     res.setHeader("cache-control", "no-store");
     closeAfterResponse();
     if (url.pathname === "/health/live") return json(200, { status: "ok" });
+
+    if (url.pathname === "/health/quiescent") {
+      let quiescent = false;
+      try {
+        quiescent = await hub.quiescent();
+      } catch {
+        // The probe is deliberately boolean and fail closed.
+      }
+      return json(quiescent ? 200 : 503, {
+        status: quiescent ? "quiescent" : "not_quiescent",
+      });
+    }
 
     let ready = false;
     try {
@@ -464,7 +501,7 @@ async function handleRequest(req, res) {
   return rejectAndClose(404, { error: "not found" });
 }
 
-const lifecycle = createServerLifecycle({
+lifecycle = createServerLifecycle({
   server,
   closeRunner: () => hub.close(),
   closeClients: () => sseClients.closeAll(),

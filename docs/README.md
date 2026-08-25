@@ -71,6 +71,8 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-006](decisions/ADR-006-threads-as-a-view-in-agents.md) | Threads live in Agents and are scoped to tasks |
 | [ADR-007](decisions/ADR-007-implementation-stack.md) | TypeScript + Tauri 2 + SQLite; deployment scope superseded |
 | [ADR-008](decisions/ADR-008-server-hub-local-first-runners.md) | Server Hub; Local Runner first, Remote Runner next |
+| [ADR-040](decisions/ADR-040-staging-state-snapshot-and-recovery.md) | Staging state artifact, recovery phases and EventLog rotation boundary |
+| [ADR-041](decisions/ADR-041-privileged-admin-kit-migration.md) | Allowlisted, journaled replacement of the privileged Hub administrator kit |
 
 ## Assets
 

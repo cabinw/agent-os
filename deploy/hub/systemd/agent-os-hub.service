@@ -2,17 +2,21 @@
 Description=Agent OS staging Server Hub
 Wants=network-online.target
 After=network-online.target
+RequiresMountsFor=/opt/agent-os /var/lib/agent-os/hub /var/lib/agent-os-ops /var/backups/agent-os/hub
 StartLimitIntervalSec=120
 StartLimitBurst=5
 
 [Service]
 Type=simple
+Slice=system.slice
 User=agent-os
 Group=agent-os
 WorkingDirectory=/opt/agent-os/current/apps/chat-spike
 Environment=NODE_ENV=production
 EnvironmentFile=/etc/agent-os/hub.env
+ExecStartPre=+/usr/libexec/agent-os/hub/bin/recovery-start-gate.sh
 ExecStartPre=+/usr/libexec/agent-os/hub/bin/validate-config.sh /etc/agent-os/hub.env
+ExecStartPre=+/usr/bin/node /usr/libexec/agent-os/hub/bin/capacity-check.mjs --state /var/lib/agent-os/hub --backup /var/backups/agent-os/hub
 ExecStart=/usr/bin/node /opt/agent-os/current/apps/chat-spike/src/server.mjs
 Restart=on-failure
 RestartSec=5s
@@ -59,6 +63,8 @@ SystemCallArchitectures=native
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=agent-os-hub
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=1000
 
 [Install]
 WantedBy=multi-user.target

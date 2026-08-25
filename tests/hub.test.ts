@@ -45,6 +45,7 @@ interface TestHub {
   };
   accept: (task: string) => void;
   depthOf: (event: string) => number;
+  quiescent: () => Promise<boolean>;
   register: (
     id: string,
     profile: { id: string; role?: string; capabilities?: string[] },
@@ -82,6 +83,7 @@ class TrustedFakeRunner {
   readonly instances = new Map<string, InstanceType<FakeAdapterClass>>();
   readonly dispatches: RunnerRequest[] = [];
   readonly resets: Array<{ user: string; project: string; agent: string }> = [];
+  healthState = { ready: true, hostId: "trusted-fake", inflight: 0, queued: 0 };
 
   constructor(definitions: Record<string, { Fake: unknown }>) {
     this.definitions = definitions as Record<string, { Fake: FakeAdapterClass }>;
@@ -113,7 +115,7 @@ class TrustedFakeRunner {
   }
 
   health() {
-    return { ready: true, hostId: "trusted-fake", inflight: 0, queued: 0 };
+    return { ...this.healthState };
   }
 
   async close() {
@@ -232,6 +234,29 @@ describe("Hub Runner 边界", () => {
       },
     });
     expect(() => new Hub({ ...baseOptions(), runner: incomplete })).toThrow(missing);
+  });
+
+  it("quiescent 同时拒绝 Runner 在途与 assigned/running task", async () => {
+    const alpha = fakeAdapter("alpha", "Alpha");
+    const made = makeHub({ alpha }, [{ id: "alpha" }]);
+    await settle(made.hub);
+    expect(await made.hub.quiescent()).toBe(true);
+
+    made.runner.healthState.inflight = 1;
+    expect(await made.hub.quiescent()).toBe(false);
+    made.runner.healthState.inflight = 0;
+
+    const created = (await made.hub.tools.call("create_task", {
+      title: "must settle before snapshot",
+      requires: [],
+    })) as { task: string };
+    await made.hub.tools.call("assign_task", {
+      task: created.task,
+      executor: "alpha",
+    });
+    expect(await made.hub.quiescent()).toBe(false);
+    await settle(made.hub);
+    expect(await made.hub.quiescent()).toBe(false);
   });
 
   it("execute 和 reset 只调用 Runner，Hub 不实例化或保存 vendor adapter", async () => {

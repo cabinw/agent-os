@@ -122,6 +122,7 @@ previous_revision=
 state_before=
 maintenance_enabled=false
 operation_succeeded=false
+operation_transaction=
 
 usage() {
   printf '%s\n' 'usage: rollback.sh [--revision ID]' >&2
@@ -129,12 +130,11 @@ usage() {
 
 recover_failed_commit() {
   local recovery_ok=true state_after=
-  service_control stop "$SERVICE_NAME" >/dev/null 2>&1 || recovery_ok=false
-  service_is_inactive || recovery_ok=false
+  (stop_and_prove_writer_stopped) >/dev/null 2>&1 || recovery_ok=false
   if [[ -n "$state_before" ]]; then
     state_after="$(state_fingerprint 2>/dev/null || true)"
   fi
-  if [[ -n "$current_revision" ]]; then
+  if [[ "$recovery_ok" == true && -n "$current_revision" ]]; then
     if ! (activate_revision "$current_revision") >/dev/null; then recovery_ok=false; fi
     if ! (record_previous_revision "$previous_revision") >/dev/null; then recovery_ok=false; fi
     service_control daemon-reload >/dev/null 2>&1 || recovery_ok=false
@@ -145,7 +145,9 @@ recover_failed_commit() {
     -n "$state_after" &&
     "$state_before" == "$state_after"
   ]]; then
-    if service_control start "$SERVICE_NAME" >/dev/null 2>&1 &&
+    if [[ "$recovery_ok" == true ]] &&
+      (start_authorized_recovery_service "$DURABLE_BLOCK_TRANSACTION") \
+        >/dev/null 2>&1 &&
       (health_gate live) >/dev/null 2>&1 &&
       (service_enable) >/dev/null 2>&1 &&
       (maintenance_off) >/dev/null 2>&1; then
@@ -165,7 +167,8 @@ recover_failed_commit() {
 finish() {
   local result=$?
   trap - EXIT
-  if [[ "$operation_succeeded" != true && "$maintenance_enabled" == true ]]; then
+  if [[ "$operation_succeeded" != true && \
+    ("$DURABLE_RECOVERY_ACTIVE" == true || "$maintenance_enabled" == true) ]]; then
     recover_failed_commit || result=1
   fi
   exit "$result"
@@ -185,11 +188,12 @@ done
 
 require_privilege
 require_fixed_admin_execution
-require_commands mv ln readlink
+require_commands mv ln readlink date
 require_pinned_node
 acquire_deploy_lock
 require_clean_maintenance_state
 ensure_layout
+require_installed_runtime_contract
 AGENT_OS_NODE_BIN="$NODE_BIN" "$ADMIN_ROOT/bin/validate-config.sh" "$ENV_FILE"
 
 current_revision="$(read_revision_link "$CURRENT_LINK")" || die 'no active release is installed'
@@ -203,14 +207,45 @@ validate_revision "$target"
 [[ -d "$RELEASES_ROOT/$target" && ! -L "$RELEASES_ROOT/$target" ]] ||
   die 'rollback target is not an installed immutable release'
 
-maintenance_on
+health_gate quiescent || die 'Hub has assigned, running, queued or inflight work'
+operation_transaction="rollback-$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM}"
+durable_recovery_on state-rollback prepared "$operation_transaction"
+maintenance_on_for_recovery
 maintenance_enabled=true
-service_control stop "$SERVICE_NAME" || die 'could not stop the active writer'
-service_is_inactive || die 'active writer did not reach a quiescent systemd state'
+if ! health_gate quiescent; then
+  maintenance_off
+  maintenance_enabled=false
+  die 'Hub stopped being quiescent before the consistency point'
+fi
+stop_and_prove_writer_stopped ||
+  die 'could not stop the active writer or prove its cgroup and state descriptors clear'
 state_before="$(state_fingerprint)" || die 'could not fingerprint stopped state'
+measurement="$($NODE_BIN "$ADMIN_ROOT/bin/state-snapshot.mjs" measure "$STATE_ROOT")" ||
+  die 'state measurement failed'
+read -r required_bytes required_inodes < <(
+  "$NODE_BIN" -e \
+    'const v=JSON.parse(process.argv[1]); process.stdout.write(`${v.totalBytes} ${v.entryCount}\n`)' \
+    "$measurement"
+)
+"$NODE_BIN" "$ADMIN_ROOT/bin/capacity-check.mjs" \
+  --state "$STATE_ROOT" \
+  --backup "$BACKUP_ROOT" \
+  --required-bytes "$required_bytes" \
+  --required-inodes "$required_inodes" >/dev/null ||
+  die 'pre-rollback snapshot capacity gate failed'
+snapshot_path="$BACKUP_ROOT/pre-rollback-$(date -u +%Y%m%dT%H%M%SZ)-${target}-$$"
+[[ ! -e "$snapshot_path" && ! -L "$snapshot_path" ]] ||
+  die 'pre-rollback snapshot destination already exists'
+"$ADMIN_ROOT/pre-upgrade-snapshot" "$STATE_ROOT" "$snapshot_path" >/dev/null ||
+  die 'pre-rollback snapshot failed'
+"$NODE_BIN" "$ADMIN_ROOT/bin/state-snapshot.mjs" verify "$snapshot_path" >/dev/null ||
+  die 'pre-rollback snapshot verification failed'
+[[ "$(state_fingerprint)" == "$state_before" ]] ||
+  die 'pre-rollback snapshot changed stopped source state'
 activate_revision "$target"
 service_control daemon-reload
-service_control start "$SERVICE_NAME" || die 'rollback target failed to start'
+start_authorized_recovery_service "$DURABLE_BLOCK_TRANSACTION" ||
+  die 'rollback target failed its authorized start'
 health_gate live || die 'rollback target failed exact liveness'
 service_enable
 record_previous_revision "$current_revision"

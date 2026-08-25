@@ -140,6 +140,7 @@ export class Hub {
       adapterId: catalogEntry.id ?? id,
       queue: Promise.resolve(),
       busy: false,
+      pending: 0,
       role,
       capabilities,
       /** The message this agent is currently answering, for causal linkage. */
@@ -213,6 +214,22 @@ export class Hub {
     if (health?.ready === true) return;
     throw new ValidationError(
       "Runner 尚未就绪，未写入会唤醒 agent 的事件；请等待 Worker 连接后重试",
+    );
+  }
+
+  async quiescent() {
+    let health;
+    try {
+      health = await this.runner.health();
+    } catch {
+      return false;
+    }
+    if (health?.inflight !== 0 || health?.queued !== 0) return false;
+    if ([...this.agents.values()].some((entry) => entry.busy || entry.pending > 0)) {
+      return false;
+    }
+    return !Object.values(this.tasks()).some(({ status }) =>
+      ["assigned", "running"].includes(status),
     );
   }
 
@@ -299,10 +316,14 @@ export class Hub {
   }
 
   enqueue(entry, cause) {
+    entry.pending += 1;
     entry.queue = entry.queue
       .then(() => this.turn(entry, cause))
       .catch((err) => {
         this.broadcastTurnError(entry, err);
+      })
+      .finally(() => {
+        entry.pending -= 1;
       });
     return entry.queue;
   }
@@ -654,6 +675,7 @@ export class Hub {
    * it is working on; everything else it needs it reads from the log.
    */
   wakeForTask(entry, taskId, cause) {
+    entry.pending += 1;
     entry.queue = entry.queue
       .then(async () => {
         // Assignment is repeatable for re-routing, but only the current
@@ -669,6 +691,9 @@ export class Hub {
       })
       .catch((err) => {
         this.broadcastTurnError(entry, err);
+      })
+      .finally(() => {
+        entry.pending -= 1;
       });
     return entry.queue;
   }

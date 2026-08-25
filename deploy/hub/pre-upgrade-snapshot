@@ -1,0 +1,47 @@
+#!/bin/bash -p
+set -Eeuo pipefail
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+
+fail() {
+  printf 'Hub state snapshot failed: %s\n' "$1" >&2
+  exit 1
+}
+
+(($# == 2)) || fail 'expected source and new destination paths'
+for influence in \
+  NODE_OPTIONS \
+  NODE_PATH \
+  NODE_EXTRA_CA_CERTS \
+  NODE_TLS_REJECT_UNAUTHORIZED \
+  OPENSSL_CONF \
+  OPENSSL_CONF_INCLUDE \
+  OPENSSL_ENGINES \
+  OPENSSL_MODULES \
+  SSL_CERT_FILE \
+  SSL_CERT_DIR; do
+  [[ -z "${!influence+x}" ]] || fail "inherited runtime variable is forbidden: $influence"
+done
+
+test_root="${AGENT_OS_DEPLOY_TEST_ROOT:-}"
+if [[ -n "$test_root" ]]; then
+  [[ "${AGENT_OS_DEPLOY_TEST_MODE:-}" == 1 && $EUID -ne 0 ]] ||
+    fail 'test mode is invalid'
+  admin_root="$test_root/usr/libexec/agent-os/hub"
+  owner_uid=$EUID
+  owner_gid=$(/usr/bin/id -g)
+  exec /usr/bin/env -i \
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    AGENT_OS_DEPLOY_TEST_ROOT="$test_root" \
+    AGENT_OS_DEPLOY_TEST_MODE=1 \
+    AGENT_OS_DEPLOY_TEST_NONCE="${AGENT_OS_DEPLOY_TEST_NONCE:-}" \
+    /usr/bin/node "$admin_root/bin/state-snapshot.mjs" \
+      create "$1" "$2" --owner-uid "$owner_uid" --owner-gid "$owner_gid"
+fi
+
+owner_uid=$(/usr/bin/id -u agent-os) || fail 'service UID is unavailable'
+owner_gid=$(/usr/bin/id -g agent-os) || fail 'service GID is unavailable'
+exec /usr/bin/env -i \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+  /usr/bin/node /usr/libexec/agent-os/hub/bin/state-snapshot.mjs \
+    create "$1" "$2" --owner-uid "$owner_uid" --owner-gid "$owner_gid"

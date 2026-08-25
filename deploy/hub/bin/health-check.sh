@@ -139,7 +139,7 @@ interval=2
 
 usage() {
   printf '%s\n' \
-    'usage: health-check.sh [--config PATH] [--unit UNIT] [--candidate REVISION] [--live|--ready] [--attempts N] [--interval SECONDS]' >&2
+    'usage: health-check.sh [--config PATH] [--unit UNIT] [--candidate REVISION] [--live|--ready|--quiescent] [--attempts N] [--interval SECONDS]' >&2
 }
 
 while (($# > 0)); do
@@ -157,6 +157,7 @@ while (($# > 0)); do
       ;;
     --live) probe=live; shift ;;
     --ready) probe=ready; shift ;;
+    --quiescent) probe=quiescent; shift ;;
     *) usage; exit 2 ;;
   esac
 done
@@ -193,6 +194,7 @@ port="$($VALIDATOR "${validator_arguments[@]}")"
 url="http://127.0.0.1:${port}/health/${probe}"
 expected_body='{"status":"ready"}'
 [[ "$probe" == live ]] && expected_body='{"status":"ok"}'
+[[ "$probe" == quiescent ]] && expected_body='{"status":"quiescent"}'
 
 managed_listener() {
   local pid=$1 output line matched=false
