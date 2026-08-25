@@ -14,8 +14,19 @@
  * cannot participate (Codex), in which case its adapter translates for it.
  */
 
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import {
+  constants,
+  chmodSync,
+  closeSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TOOL_SPECS } from "./mcp-tools.mjs";
 
@@ -28,18 +39,70 @@ const BRIDGE = join(dirname(fileURLToPath(import.meta.url)), "../bin/agent-os-mc
  */
 const TOOLS = Object.keys(TOOL_SPECS);
 
-function secureWrite(path, content) {
-  writeFileSync(path, content, { mode: 0o600 });
-  chmodSync(path, 0o600);
+function secureDirectory(path) {
+  if (!isAbsolute(path) || resolve(path) !== path) {
+    throw new Error("MCP credential directory must be a canonical absolute path");
+  }
+  mkdirSync(path, { recursive: true, mode: 0o700 });
+  const metadata = lstatSync(path);
+  if (
+    !metadata.isDirectory() ||
+    metadata.isSymbolicLink() ||
+    realpathSync(path) !== path
+  ) {
+    throw new Error("MCP credential directory must be a fixed non-link directory");
+  }
+  chmodSync(path, 0o700);
 }
 
-function serverJson(url, token) {
+function readFixedFile(path) {
+  const before = lstatSync(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) {
+    throw new Error("MCP material must be a private non-link regular file");
+  }
+  const noFollow = constants.O_NOFOLLOW ?? 0;
+  const fd = openSync(path, constants.O_RDONLY | noFollow);
+  try {
+    const opened = fstatSync(fd);
+    if (
+      !opened.isFile() ||
+      opened.nlink !== 1 ||
+      opened.dev !== before.dev ||
+      opened.ino !== before.ino
+    ) {
+      throw new Error("MCP material identity changed while opening it");
+    }
+    return readFileSync(fd, "utf8");
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function secureWriteOnce(path, content) {
+  try {
+    const fd = openSync(
+      path,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+      0o600,
+    );
+    try {
+      writeFileSync(fd, content, "utf8");
+      chmodSync(path, 0o600);
+    } finally {
+      closeSync(fd);
+    }
+  } catch (error) {
+    if (error?.code !== "EEXIST" || readFixedFile(path) !== content) throw error;
+  }
+}
+
+function serverJson(url, secretPath) {
   return {
     mcpServers: {
       "agent-os": {
         command: "node",
         args: [BRIDGE],
-        env: { AGENT_OS_URL: url, AGENT_OS_TOKEN: token },
+        env: { AGENT_OS_URL: url, AGENT_OS_SECRET_FILE: secretPath },
       },
     },
   };
@@ -50,9 +113,9 @@ const MOUNTS = {
    * A file is mandatory: an inline JSON string makes the CLI read the following
    * prompt as a second config path.
    */
-  claude(dir, url, token) {
+  claude(dir, url, secretPath) {
     const path = join(dir, "mcp.json");
-    secureWrite(path, JSON.stringify(serverJson(url, token), null, 2));
+    secureWriteOnce(path, JSON.stringify(serverJson(url, secretPath), null, 2));
     return {
       args: [
         "--mcp-config",
@@ -64,8 +127,11 @@ const MOUNTS = {
     };
   },
 
-  kimi(dir, url, token) {
-    secureWrite(join(dir, ".mcp.json"), JSON.stringify(serverJson(url, token), null, 2));
+  kimi(dir, url, secretPath) {
+    secureWriteOnce(
+      join(dir, ".mcp.json"),
+      JSON.stringify(serverJson(url, secretPath), null, 2),
+    );
     return { args: [], env: {} };
   },
 
@@ -74,10 +140,10 @@ const MOUNTS = {
    * Project-scoped servers do not start in an untrusted folder; a throwaway
    * per-agent directory can never be trusted, so the gate is turned off for it.
    */
-  grok(dir, url, token) {
+  grok(dir, url, secretPath) {
     const cfg = join(dir, ".grok");
     mkdirSync(cfg, { recursive: true, mode: 0o700 });
-    secureWrite(
+    secureWriteOnce(
       join(cfg, "config.toml"),
       [
         "[mcp_servers.agent-os]",
@@ -87,7 +153,7 @@ const MOUNTS = {
         "",
         "[mcp_servers.agent-os.env]",
         `AGENT_OS_URL = ${JSON.stringify(url)}`,
-        `AGENT_OS_TOKEN = ${JSON.stringify(token)}`,
+        `AGENT_OS_SECRET_FILE = ${JSON.stringify(secretPath)}`,
         "",
       ].join("\n"),
     );
@@ -113,16 +179,19 @@ const MOUNTS = {
 
 /**
  * @param {string} providerId
- * @param {{ dir: string, url: string, token: string|null }} opts
+ * @param {{ dir: string, credentialDir: string, url: string, token: string|null }} opts
  * @returns {{ args: string[], env: Record<string,string> } | null}
  */
-export function mountMcp(providerId, { dir, url, token }) {
+export function mountMcp(providerId, { dir, credentialDir, url, token }) {
   const mount = MOUNTS[providerId];
   if (!mount) return null;
   if (!token)
     throw new Error(`missing bearer token for participating agent ${providerId}`);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  return mount(dir, url, token);
+  secureDirectory(credentialDir);
+  const secretPath = join(credentialDir, "mcp-secret.json");
+  secureWriteOnce(secretPath, JSON.stringify({ token }));
+  return mount(dir, url, secretPath);
 }
 
 /** Which vendors will actually call our tools — measured, never declared. */

@@ -15,11 +15,43 @@
  * Attach it to Claude Code with:
  *   claude --mcp-config '{"mcpServers":{"agent-os":{"command":"node","args":["<abs path>"]}}}'
  *
- * Env: AGENT_OS_URL (default http://127.0.0.1:4173), AGENT_OS_TOKEN.
+ * Env: AGENT_OS_URL (default http://127.0.0.1:4173), AGENT_OS_SECRET_FILE.
  */
 
+import {
+  constants,
+  closeSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+} from "node:fs";
+
 const BASE = process.env.AGENT_OS_URL ?? "http://127.0.0.1:4173";
-const TOKEN = process.env.AGENT_OS_TOKEN ?? null;
+function loadToken() {
+  const path = process.env.AGENT_OS_SECRET_FILE;
+  if (!path) return null;
+  const before = lstatSync(path);
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) {
+    throw new Error("AGENT_OS_SECRET_FILE is not a private regular file");
+  }
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const opened = fstatSync(fd);
+    if (opened.dev !== before.dev || opened.ino !== before.ino || opened.nlink !== 1) {
+      throw new Error("AGENT_OS_SECRET_FILE identity changed while opening it");
+    }
+    const parsed = JSON.parse(readFileSync(fd, "utf8"));
+    if (typeof parsed.token !== "string" || parsed.token.length < 32) {
+      throw new Error("AGENT_OS_SECRET_FILE has an invalid credential");
+    }
+    return parsed.token;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+const TOKEN = loadToken();
 
 const send = (msg) => process.stdout.write(`${JSON.stringify(msg)}\n`);
 const reply = (id, result) => send({ jsonrpc: "2.0", id, result });

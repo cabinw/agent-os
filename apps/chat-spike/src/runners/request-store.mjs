@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { RUNNER_ERROR_CODES, RUNNER_EVENT_KINDS } from "./contract.mjs";
+import { publishDurableFile } from "./durable-file.mjs";
 
 const FORMAT_VERSION = 1;
 const STATES = new Set([
@@ -140,9 +140,11 @@ function validRecord(value) {
  * id, a SHA-256 fingerprint, normalized observations and the terminal value.
  */
 export class RequestStore {
-  constructor(path) {
+  constructor(path, { publish = publishDurableFile, durability } = {}) {
     if (!nonEmptyString(path)) throw new TypeError("RequestStore path 必须是非空字符串");
     this.path = path;
+    this.publishFile = publish;
+    this.durability = durability;
     this.records = new Map();
 
     try {
@@ -199,7 +201,6 @@ export class RequestStore {
   }
 
   persist(records = this.records) {
-    const temp = `${this.path}.${process.pid}.${randomUUID()}.tmp`;
     const body = `${JSON.stringify(
       {
         version: FORMAT_VERSION,
@@ -209,12 +210,8 @@ export class RequestStore {
       2,
     )}\n`;
     try {
-      writeFileSync(temp, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
-      renameSync(temp, this.path);
+      this.publishFile(this.path, body, this.durability);
     } catch (error) {
-      try {
-        unlinkSync(temp);
-      } catch {}
       throw new Error(`无法写入 request store：${this.path}`, { cause: error });
     }
   }

@@ -58,12 +58,16 @@ export class LocalRunner {
     workspaceRoot,
     sessionStore,
     getAdapter,
+    adapterOptionsFor,
     hostId = "local",
     mcpFor,
     requestStore,
   }) {
     if (typeof getAdapter !== "function") {
       throw new TypeError("LocalRunner.getAdapter 必须是函数");
+    }
+    if (adapterOptionsFor !== undefined && typeof adapterOptionsFor !== "function") {
+      throw new TypeError("LocalRunner.adapterOptionsFor 必须是函数");
     }
     if (
       !sessionStore ||
@@ -88,12 +92,15 @@ export class LocalRunner {
 
     this.sessionStore = sessionStore;
     this.getAdapter = getAdapter;
+    this.adapterOptionsFor = adapterOptionsFor ?? (() => ({}));
     this.hostId = hostId;
     this.mcpFor = mcpFor ?? (() => null);
     this.requestStore =
       requestStore ??
       (typeof sessionStore.path === "string"
-        ? new RequestStore(`${sessionStore.path}.requests.json`)
+        ? new RequestStore(`${sessionStore.path}.requests.json`, {
+            durability: sessionStore.durability,
+          })
         : null);
     if (
       !this.requestStore ||
@@ -282,7 +289,16 @@ export class LocalRunner {
 
       let adapter;
       try {
+        const adapterOptions = this.adapterOptionsFor(request);
+        if (
+          adapterOptions === null ||
+          typeof adapterOptions !== "object" ||
+          Array.isArray(adapterOptions)
+        ) {
+          throw new TypeError("adapterOptionsFor 必须返回对象");
+        }
         adapter = new AdapterClass({
+          ...adapterOptions,
           cwd: workspace,
           model: request.model,
           mcp,

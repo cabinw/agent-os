@@ -23,7 +23,7 @@ export class KimiAdapter extends SubprocessAdapter {
     const args = ["-p", prompt, "--output-format", "stream-json"];
     if (resume) args.push("-r", resume);
     if (this.model) args.push("-m", this.model);
-    return { cmd: "kimi", args };
+    return { cmd: this.executable, args };
   }
 
   handleLine(o) {

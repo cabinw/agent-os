@@ -35,7 +35,7 @@ export class CodexAdapter extends Adapter {
     if (this.#client) return;
 
     const transport = new StdioClientTransport({
-      command: "codex",
+      command: this.executable,
       args: ["mcp-server"],
       env: childProcessEnv(),
       stderr: "ignore",

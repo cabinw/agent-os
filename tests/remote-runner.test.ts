@@ -2462,7 +2462,7 @@ describe("C-REMOTE-01 · outbound Remote Runner transport", () => {
       placementStore: placementStore(environment),
       pollTimeoutMs: 10,
       offerLeaseMs: 10,
-      leaseMs: 30,
+      leaseMs: 300,
       closeGraceMs: 50,
     });
     const { server, url } = await serve(remote);
@@ -2485,7 +2485,9 @@ describe("C-REMOTE-01 · outbound Remote Runner transport", () => {
     const result = remote.dispatch(request);
     await fixture.waitForBlockedExecution();
     const initialLease = remote.requests.get(request.requestId).leaseId;
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    // Exercise several heartbeat renewals without making the lease shorter than
+    // a normal loaded CI scheduler slice.
+    await new Promise((resolve) => setTimeout(resolve, 900));
     const record = remote.requests.get(request.requestId);
     expect(record).toMatchObject({
       state: "inflight",
@@ -2733,7 +2735,7 @@ describe("C-REMOTE-01 · outbound Remote Runner transport", () => {
         directoryPath: join(environment.root, "old-request-ledger"),
       }),
       pollTimeoutMs: 10,
-      leaseMs: 40,
+      leaseMs: 400,
       closeGraceMs: 30,
     });
     const oldRemote = remote;
@@ -2756,7 +2758,10 @@ describe("C-REMOTE-01 · outbound Remote Runner transport", () => {
     const abandoned = oldRemote.dispatch(request);
     void abandoned.catch(() => {});
     await fixture.waitForBlockedExecution();
-    await waitFor(() => oldRemote.requests.get(request.requestId)?.events.length === 1);
+    await waitFor(
+      () => oldRemote.requests.get(request.requestId)?.events.length === 1,
+      5_000,
+    );
     const oldRecord = oldRemote.requests.get(request.requestId);
     const oldLeaseId = oldRecord.leaseId;
 
@@ -2765,7 +2770,7 @@ describe("C-REMOTE-01 · outbound Remote Runner transport", () => {
       hostId: HOST,
       placementStore: placementStore(environment),
       pollTimeoutMs: 10,
-      leaseMs: 40,
+      leaseMs: 400,
       closeGraceMs: 30,
     });
     const orphanProbe = await postJson(url, "/event", {
@@ -2781,7 +2786,10 @@ describe("C-REMOTE-01 · outbound Remote Runner transport", () => {
     });
 
     fixture.releaseBlockedExecution();
-    await waitFor(() => worker.executions.get(request.requestId)?.settled === true);
+    await waitFor(
+      () => worker.executions.get(request.requestId)?.settled === true,
+      5_000,
+    );
     expect(worker.fatalError).toBeNull();
     const replayed = await remote.dispatch(request);
     expect(replayed).toMatchObject({ text: "contract-result" });

@@ -23,7 +23,7 @@ export class GrokAdapter extends SubprocessAdapter {
     const args = ["--single", prompt, "--output-format", "streaming-json"];
     if (resume) args.push("--resume", resume);
     if (this.model) args.push("-m", this.model);
-    return { cmd: "grok", args };
+    return { cmd: this.executable, args };
   }
 
   handleLine(o) {

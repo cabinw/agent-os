@@ -1,7 +1,7 @@
-import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { RUNNER_ERROR_CODES, RunnerDispatchError, runnerError } from "./contract.mjs";
+import { publishDurableFile } from "./durable-file.mjs";
 
 const FORMAT_VERSION = 1;
 
@@ -51,9 +51,11 @@ function validRecord(value) {
  * single Local Runner; the formal Hub store remains a later SQLite boundary.
  */
 export class SessionStore {
-  constructor(path) {
+  constructor(path, { publish = publishDurableFile, durability } = {}) {
     if (!nonEmptyString(path)) throw new TypeError("SessionStore path 必须是非空字符串");
     this.path = path;
+    this.publishFile = publish;
+    this.durability = durability;
     this.sessions = new Map();
 
     try {
@@ -108,34 +110,35 @@ export class SessionStore {
       workspace: value.workspace,
       updatedAt: new Date().toISOString(),
     });
-    this.sessions.set(key, record);
-    this.persist();
+    const candidate = new Map(this.sessions);
+    candidate.set(key, record);
+    this.persist(candidate);
+    this.sessions = candidate;
     return { ...record };
   }
 
   delete(scope) {
-    const changed = this.sessions.delete(scopeKey(scope));
-    if (changed) this.persist();
-    return changed;
+    const key = scopeKey(scope);
+    if (!this.sessions.has(key)) return false;
+    const candidate = new Map(this.sessions);
+    candidate.delete(key);
+    this.persist(candidate);
+    this.sessions = candidate;
+    return true;
   }
 
-  persist() {
-    const temp = `${this.path}.${process.pid}.${randomUUID()}.tmp`;
+  persist(sessions = this.sessions) {
     const body = `${JSON.stringify(
       {
         version: FORMAT_VERSION,
-        sessions: Object.fromEntries(this.sessions),
+        sessions: Object.fromEntries(sessions),
       },
       null,
       2,
     )}\n`;
     try {
-      writeFileSync(temp, body, { encoding: "utf8", flag: "wx", mode: 0o600 });
-      renameSync(temp, this.path);
+      this.publishFile(this.path, body, this.durability);
     } catch (error) {
-      try {
-        unlinkSync(temp);
-      } catch {}
       throw sessionFailure(`无法写入 session store：${this.path}`, error);
     }
   }

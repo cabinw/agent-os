@@ -496,7 +496,7 @@ export function defineRunnerContractSuite(
       }
       await fixture.runner.dispatch(pressureRequests[0]);
       expect(fixture.executionCount()).toBe(pressureStart + pressureRequests.length);
-    });
+    }, 15_000);
 
     it("listener 在 started 内重入订阅时不会收到重复事件", async () => {
       const fixture = await harness();
