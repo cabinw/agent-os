@@ -374,6 +374,9 @@ $action = New-ScheduledTaskAction -Execute $PowerShellPath -Argument (
   '-NoLogo -NoProfile -NonInteractive -File "{0}" -ConfigPath "{1}"' -f $hostPath, $configPath
 )
 $null = Set-AgentOSBatchLogonRight -WorkerSid $workerSid
+foreach ($executable in @($nodePath, $grokPath)) {
+  Set-AgentOSWorkerExecutableAcl -Path $executable -WorkerSid $workerSid
+}
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) `
   -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) `

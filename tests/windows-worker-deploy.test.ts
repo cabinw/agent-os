@@ -321,6 +321,13 @@ public static class Probe {
     expect(install).toContain("Set-AgentOSPrivateAcl -Path $jobGate");
     expect(windowsModule).toContain("SeBatchLogonRight");
     expect(windowsModule).toContain("LsaAddAccountRights");
+    expect(install).toContain("Set-AgentOSWorkerExecutableAcl -Path $executable");
+    expect(windowsModule).toContain(
+      "[Security.AccessControl.FileSystemRights]::Traverse",
+    );
+    expect(windowsModule).toContain(
+      "Assert-AgentOSWorkerExecutableAcl -Path $executable",
+    );
     expect(windowsModule).toContain(
       "Assert-AgentOSBatchLogonRight -WorkerSid $workerSid",
     );

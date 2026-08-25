@@ -57,6 +57,10 @@ Install pre-creates the Job assignment gate with the private admin-owned ACL.
 The non-admin host reuses that fixed file and writes `pending`, `assigned`, then
 `closed`; it never creates, deletes, takes ownership of, or re-ACLs the gate.
 The suspended child cannot observe `assigned` before Job attachment succeeds.
+Managed Node and adapter binaries grant the Worker only `ReadAndExecute`; each
+managed parent below `ProgramData` grants only `Traverse`. Lifecycle assertions
+recheck both while the existing trusted-owner and no-untrusted-write rules stay
+in force. Program Files executables retain their platform ACLs.
 
 The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
 Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.

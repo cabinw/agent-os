@@ -798,6 +798,107 @@ function Assert-AgentOSTrustedExecutable {
   return $item
 }
 
+function Get-AgentOSManagedExecutableAncestors {
+  param([Parameter(Mandatory)][string]$Path)
+  $managedRoot = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) `
+    'AgentOSAssetStage'
+  if (-not (Test-AgentOSContainedPath -Root $managedRoot -Path $Path)) {
+    return @()
+  }
+  $ancestors = [Collections.Generic.List[string]]::new()
+  $cursor = [IO.Path]::GetDirectoryName($Path)
+  while ($cursor -and $cursor -cne [IO.Path]::GetDirectoryName($managedRoot)) {
+    $ancestors.Add($cursor)
+    if ($cursor -ceq $managedRoot) { break }
+    $cursor = [IO.Path]::GetDirectoryName($cursor)
+  }
+  if ($ancestors.Count -eq 0 -or $ancestors[$ancestors.Count - 1] -cne $managedRoot) {
+    throw "Agent OS managed executable ancestry is invalid: $Path"
+  }
+  return @($ancestors)
+}
+
+function Set-AgentOSWorkerExecutableAcl {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][Security.Principal.SecurityIdentifier]$WorkerSid
+  )
+  $null = Assert-AgentOSTrustedExecutable -Path $Path -WorkerSid $WorkerSid
+  $ancestors = @(Get-AgentOSManagedExecutableAncestors -Path $Path)
+  if ($ancestors.Count -eq 0) { return }
+  foreach ($directory in $ancestors) {
+    $null = Assert-AgentOSFixedPath -Path $directory -Kind Directory
+    $acl = Get-Acl -LiteralPath $directory
+    $acl.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+      $WorkerSid,
+      [Security.AccessControl.FileSystemRights]::Traverse,
+      [Security.AccessControl.InheritanceFlags]::None,
+      [Security.AccessControl.PropagationFlags]::None,
+      [Security.AccessControl.AccessControlType]::Allow
+    ))
+    Set-Acl -LiteralPath $directory -AclObject $acl
+  }
+  $fileAcl = Get-Acl -LiteralPath $Path
+  $fileAcl.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+    $WorkerSid,
+    [Security.AccessControl.FileSystemRights]::ReadAndExecute,
+    [Security.AccessControl.InheritanceFlags]::None,
+    [Security.AccessControl.PropagationFlags]::None,
+    [Security.AccessControl.AccessControlType]::Allow
+  ))
+  Set-Acl -LiteralPath $Path -AclObject $fileAcl
+  Assert-AgentOSWorkerExecutableAcl -Path $Path -WorkerSid $WorkerSid
+}
+
+function Assert-AgentOSWorkerExecutableAcl {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][Security.Principal.SecurityIdentifier]$WorkerSid
+  )
+  $null = Assert-AgentOSTrustedExecutable -Path $Path -WorkerSid $WorkerSid
+  $ancestors = @(Get-AgentOSManagedExecutableAncestors -Path $Path)
+  if ($ancestors.Count -eq 0) { return }
+  $fileAllowsExecute = $false
+  foreach ($rule in (Get-Acl -LiteralPath $Path).GetAccessRules(
+    $true,
+    $true,
+    [Security.Principal.SecurityIdentifier]
+  )) {
+    if ($rule.IdentityReference.Value -eq $WorkerSid.Value) {
+      if ($rule.AccessControlType -ne 'Allow') {
+        throw "Agent OS managed executable denies the Worker: $Path"
+      }
+      if (($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::ReadAndExecute) -eq
+          [Security.AccessControl.FileSystemRights]::ReadAndExecute) {
+        $fileAllowsExecute = $true
+      }
+    }
+  }
+  if (-not $fileAllowsExecute) {
+    throw "Agent OS managed executable is not executable by the Worker: $Path"
+  }
+  foreach ($directory in $ancestors) {
+    $allowsTraverse = $false
+    foreach ($rule in (Get-Acl -LiteralPath $directory).GetAccessRules(
+      $true,
+      $true,
+      [Security.Principal.SecurityIdentifier]
+    )) {
+      if ($rule.IdentityReference.Value -eq $WorkerSid.Value) {
+        if ($rule.AccessControlType -ne 'Allow') {
+          throw "Agent OS managed executable ancestry denies the Worker: $Path"
+        }
+        if (($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::Traverse) -ne 0) {
+          $allowsTraverse = $true
+        }
+      }
+    }
+    if (-not $allowsTraverse) {
+      throw "Agent OS managed executable ancestry blocks Worker traversal: $Path"
+    }
+  }
+}
+
 function Get-AgentOSWorkerProcesses {
   param([Parameter(Mandatory)][string]$ConfigPath)
   $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -845,6 +946,7 @@ function Assert-AgentOSWorkerTask {
     [string]$config.environment.AGENT_OS_GROK_BIN
   )) {
     $null = Assert-AgentOSTrustedExecutable -Path $executable -WorkerSid $workerSid
+    Assert-AgentOSWorkerExecutableAcl -Path $executable -WorkerSid $workerSid
   }
   Assert-AgentOSRuntimeArchitecture `
     -DeclaredHostMachine ([string]$config.hostArchitecture) `
@@ -871,4 +973,4 @@ function Assert-AgentOSWorkerTask {
   return $task
 }
 
-Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSAdminTree, Assert-AgentOSBatchLogonRight, Assert-AgentOSConfiguredWorkerRelease, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerAccount, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSCanonicalReleaseManifest, Get-AgentOSExactTreeDigest, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSBatchLogonRight, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
+Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSAdminTree, Assert-AgentOSBatchLogonRight, Assert-AgentOSConfiguredWorkerRelease, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerAccount, Assert-AgentOSWorkerExecutableAcl, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSCanonicalReleaseManifest, Get-AgentOSExactTreeDigest, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSBatchLogonRight, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerExecutableAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
