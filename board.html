@@ -240,11 +240,11 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 378,
-  "updatedAt": "2026-08-25 13:12 CST",
+  "revision": 379,
+  "updatedAt": "2026-08-25 13:20 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-03",
-  "verification": {"testsPassed":973,"testsTotal":973,"filesPassed":51,"filesTotal":51,"gatePassed":9,"gateTotal":9,"lintErrors":0,"checkedAt":"2026-08-24 22:32 CST"},
+  "verification": {"testsPassed":973,"testsTotal":973,"filesPassed":51,"filesTotal":51,"gatePassed":9,"gateTotal":9,"lintErrors":0,"checkedAt":"2026-08-25 13:20 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":38,"eventSchemaTotal":38,"adapters":4},
   "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06"],
   "roadmapPhases": [
@@ -365,7 +365,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"PROB-MEMORY-SUPERSEDES","status":"resolved","severity":"medium","title":"supersedes事件方向与线性投影语义已统一","detail":"ADR-022确定knowledge.superseded {old,new}以old为subject；事件不改知识内容，reducer派生old.supersededBy=new与new.supersedes=old。两端必须decision，new创建更晚，单前驱/单后继禁止分叉、合并与环。","next":"实现strict reducer/snapshot和带creation-event optimistic fences的串行admission；旧项必须永久可读。","affects":["RM-2.3"],"source":"docs/decisions/ADR-022-linear-knowledge-supersession.md"},
     {"id":"PROB-MEMORY-CAUSAL-WINDOW","status":"resolved","severity":"high","title":"摘要窗口的因果完整性与来源authority已冻结","detail":"ADR-021要求完整project history从seq1严格校验；窗口由向后causedBy/reply闭包、approval request、direct task scope与artifact lineage确定，至少双事件且anchor最后。模型不接收/返回source authority，runtime附exact ordered sourceEvents。","next":"实现必须对missing/future/cross-thread引用、seq gap、孤立anchor、disallowed type和model authority字段fail closed，任何失败零admission。","affects":["RM-2.2"],"source":"docs/decisions/ADR-021-causal-knowledge-windows.md"},
     {"id":"PROB-DOC","status":"resolved","severity":"medium","title":"文档状态、计数与 Runner 拓扑已同步","detail":"README、HANDOFF、CLAUDE、canonical docs、doc/next/todo 页面已统一到 12 个 MCP 工具、无 hosted CI、Server Hub 与 Local-first Runner 路线；固定旧测试数已移除。","next":"功能改动继续在同一提交更新关联文档和看板，不再复制第二份规范。","affects":["ADR-008","GATE-01"],"source":"docs/development/roadmap.md"},
-    {"id":"PROB-SUPPLY","status":"open","severity":"medium","title":"依赖审计仍有 1 critical / 3 high 等告警","detail":"Vitest、Vite、nanoid 与生产链 fast-uri 均有已知 advisory；当前配置未发现可利用数据流，但版本需要升级或 override。","next":"固定 packageManager / Node，并在独立任务中升级后复跑 verify 与 audit。","affects":["GATE-01"],"source":"pnpm-lock.yaml"},
+    {"id":"PROB-SUPPLY","status":"resolved","severity":"medium","title":"依赖审计已归零并通过完整兼容性门禁","detail":"2026-08-25联网审计先确认旧锁文件为1 critical、3 high、6 moderate、1 low；Vitest升级至3.2.6，测试链精确约束Vite 6.4.3，并将生产传递依赖fast-uri/hono约束到3.1.5/4.12.34。实际安装后audit为0，51文件973/973、build/type/Biome/layer/native及macOS Tauri debug构建全部通过。","next":"保留pnpm 11工作区override与冻结锁文件；依赖变更后同时运行audit和完整verify，不把仅生成锁文件视为完成。","affects":["GATE-01"],"source":"pnpm-lock.yaml"},
     {"id":"PROB-RUNNER-IDEMP","status":"resolved","severity":"high","title":"Runner requestId 已具备跨重启 at-most-once 语义","detail":"0600 原子 request ledger 持久化 SHA-256 fingerprint、规范事件与终态，不保存 prompt；completed / failed 可重放，崩溃遗留 queued / running 明确恢复为 UNAVAILABLE。","next":"正式 Event Store 的写入幂等由 RM-1.1b 独立实现，不与 Runner request ledger 混用。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"apps/chat-spike/src/runners/request-store.mjs"},
     {"id":"PROB-RUNNER-LIFE","status":"resolved","severity":"high","title":"共享 Runner 生命周期与错误语义已冻结","detail":"Local / Remote 共用 dispatch、cancel、health、hasSession、resetSession、close；CANCELLED、TIMEOUT、UNAVAILABLE 与 ADAPTER_FAILURE 的 retry 分类和竞态由同一 contract suite 验证。","next":"新增 transport 只能实现这份契约，不得引入 provider-specific 分支。","affects":["RUNNER-CONTRACT-01","C-REMOTE-01"],"source":"tests/helpers/runner-contract-suite.ts"},
     {"id":"PROB-HUB-FALLBACK","status":"resolved","severity":"critical","title":"Hub 已无绕过 Runner 的执行路径","detail":"Hub 构造现在强制完整 Runner，direct-adapter、working-copy、MCP mount 与 vendor CLI fallback 已移除；无完整 Runner 时 fail closed。","next":"server 组合根只负责选择并注入 Local 或 Remote Runner。","affects":["RUNNER-CONTRACT-01"],"source":"apps/chat-spike/src/hub.mjs"},
@@ -404,6 +404,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-25 13:20","kind":"completed","entity":"PROB-SUPPLY","title":"依赖安全告警从11项归零，完整仓库门禁通过","detail":"旧锁文件联网audit确认1 critical/3 high/6 moderate/1 low；升级Vitest 3.2.6并精确约束Vite 6.4.3、fast-uri 3.1.5、hono 4.12.34后，实际安装环境audit 0。TypeScript、Biome 219文件、4条分层、native boundary、51文件973/973与macOS Tauri debug构建全部exit0；问题关闭但不重复增加已完成GATE-01或服务器路线分数，总体保持95.00%。"},
     {"at":"2026-08-25 16:48","kind":"verified","entity":"SVR-03","title":"当前服务器WIP完整workspace 420/420","detail":"固定tracked-diff指纹f077ae76与untracked-manifest指纹a2e13be2在测试前后完全一致；TypeScript build、Biome 84文件、4条分层规则及20个测试文件420项全部绿色，包含真实loopback Hub/Remote运行时。该workspace门禁与Debian deploy gate、Ubuntu实机分开记录，现有18/18自动测试分已覆盖，不重复加分，总体保持95.00%。"},
     {"at":"2026-08-25 16:28","kind":"verified","entity":"SVR-03","title":"当前固定哈希状态与耐久focused 223/223","detail":"EventLog 48、capacity 10、tree-digest 21、forensic 19、snapshot 29、Open-FD 96，共7文件223项exit0；18个改动源/测试通过Biome，全部Shell bash -n、Node --check与diff-check绿色。13个关键文件测试前后SHA-256一致；该证据更新旧216基线但已包含在现有自动测试/实现分内，不重复加分，总体保持95.00%。"},
     {"at":"2026-08-25 16:08","kind":"progress","entity":"SVR-03","title":"Open-FD固定哈希本地矩阵96/96，SVR-03即时升至72%","detail":"state-open-files实现e94f7785与测试48078037在运行前后SHA-256一致；96项覆盖mount graph、deleted/O_TMPFILE、leaderless task、PID/TID/FD ABA及双扫描重启，exit0。恢复/Open-FD实现15/20，SVR-03 71→72、总体94.98→95.00%；真实Ubuntu 20/20与namespace矩阵仍开放。"},

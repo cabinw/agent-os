@@ -2,6 +2,13 @@ packages:
   - "packages/*"
   - "apps/*"
 
+overrides:
+  "@vitest/mocker>vite": 6.4.3
+  fast-uri: 3.1.5
+  hono: 4.12.34
+  "vite-node>vite": 6.4.3
+  "vitest>vite": 6.4.3
+
 # Both need their install script to fetch a platform-native binary; neither
 # works without it. Reviewed and approved deliberately — pnpm blocks install
 # scripts by default, and that default should stay on for anything added later.
