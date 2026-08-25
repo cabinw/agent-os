@@ -102,6 +102,15 @@ wait_for_line() {
   return 1
 }
 
+wait_for_cgroup_populated() {
+  local events=$1 index
+  for index in {1..500}; do
+    if [[ -f "$events" ]] && /usr/bin/grep -qx 'populated 1' "$events"; then return 0; fi
+    /bin/sleep 0.01
+  done
+  return 1
+}
+
 run_chroot_probe() {
   "$probe_root/holder" chroot "$state_root" >"$probe_root/holder.log" 2>"$probe_root/holder.err" &
   holder_pid=$!
@@ -142,6 +151,8 @@ run_cgroup_probe() {
   /usr/bin/systemd-run --collect --unit "$probe_unit" --property "User=nobody" \
     --property "Type=simple" /bin/sleep infinity >/dev/null
   /usr/bin/systemctl is-active --quiet "$probe_unit" || fail cgroup_unit_not_active
+  wait_for_cgroup_populated "/sys/fs/cgroup/system.slice/$probe_unit/cgroup.events" ||
+    fail cgroup_unit_not_populated
   set +e
   "$node_bin" "$helper" "$state_root" --forbidden-cgroup "/system.slice/$probe_unit" \
     --service-uid "$service_uid" >"$probe_root/active.json" 2>"$probe_root/active.err"

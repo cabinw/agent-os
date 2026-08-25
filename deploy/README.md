@@ -546,9 +546,12 @@ the supported absent-cgroup result after systemd had no unit cgroup. A separate
 private mount-namespace probe opened a real ext4 `O_TMPFILE` through a bind
 alias; the descriptor appeared as a deleted alias path with a mount id absent
 from the inspector namespace, and the helper failed closed with
-`aliasInspectionComplete:false`. No probe mount or process remained. Same-
-namespace chroot, linkat publication and active-to-trimmed systemd cgroup
-evidence remain required before field acceptance.
+`aliasInspectionComplete:false`. The bounded field probes then passed the
+same-namespace chroot rejection, an `O_TMPFILE` published with `linkat` exactly
+between scans and the active-to-trimmed systemd cgroup transition. The cgroup
+probe explicitly waits for `cgroup.events` to report `populated 1`; systemd's
+active state alone is not a sufficient readiness proof. No probe mount,
+process, temporary tree or transient unit remained.
 
 The remaining evidence has a bounded, source-tree probe entry point. Run each
 mode separately from a frozen, root-owned, non-group/world-writable checkout
@@ -637,7 +640,7 @@ cd "$SOURCE_ROOT"
 | `events.jsonl` retention | rotation, segmentation, `copytruncate` and pruning are prohibited; no production segment protocol exists |
 | state quota, retention and disaster recovery | peak-capacity admission exists; per-artifact quota enforcement, approved retention and encrypted off-host copies remain blocked |
 | release upgrade/rollback transaction recovery | no fsynced release journal or explicit release recovery command; SIGKILL pointer recovery remains blocked |
-| real Linux alias and mount proof | Ubuntu idle and controlled process-churn scans pass 20/20 each; an ext4 private-namespace bind-alias `O_TMPFILE` is rejected when its mount object is unavailable to the inspector; same-namespace chroot/linkat and active systemd-cgroup trim remain pending |
+| real Linux alias and mount proof | passed on Ubuntu 22.04: idle and controlled process-churn scans pass 20/20 each; private-namespace bind-alias `O_TMPFILE` fails closed; bounded same-namespace chroot, between-scan `O_TMPFILE` linkat publication and active-to-trimmed systemd-cgroup probes all pass with zero residue |
 | production event-store durability | blocked on RM-1.1b; outside this workflow |
 | EventLog caller-acknowledgement atomicity | marker phases fail closed before cleanup, but crash after durable marker removal and before caller observation remains ambiguous without RM-1.1b operation idempotency |
 | Windows atomic replacement on repeated persistence | unified candidate/flush/ReplaceFile boundary and failure rollback pass locally; real NTFS kill/reboot/concurrent-read proof remains |

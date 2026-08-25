@@ -34,5 +34,7 @@ describe("Linux observable-reference field probes", () => {
     expect(node).toContain("onBetweenScans()");
     expect(shell).toContain("cgroupDirectoryAbsent!==true");
     expect(shell).toContain("cgroupPopulatedDetected!==true");
+    expect(shell).toContain("wait_for_cgroup_populated");
+    expect(shell).toContain("cgroup_unit_not_populated");
   });
 });
