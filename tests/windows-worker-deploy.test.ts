@@ -477,9 +477,23 @@ public static class Probe {
   );
 
   it("provides idempotent start, stop, health and uninstall entrypoints", async () => {
-    const [start, stop, health, uninstall] = await Promise.all(
-      [START, STOP, HEALTH, UNINSTALL].map((path) => readFile(path, "utf8")),
+    const lifecyclePaths = [
+      START,
+      STOP,
+      HEALTH,
+      UNINSTALL,
+      HOST,
+      INSTALL,
+      UPGRADE,
+      MODULE,
+      BOOTSTRAP,
+    ];
+    const [start, stop, health, uninstall, ...allOtherSources] = await Promise.all(
+      lifecyclePaths.map((path) => readFile(path, "utf8")),
     );
+    for (const source of [start, stop, health, uninstall, ...allOtherSources]) {
+      expect(source).not.toContain("Split-Path -LiteralPath");
+    }
     expect(start).toContain("Assert-AgentOSWorkerTask");
     expect(start).toContain("health-worker.ps1");
     expect(stop).toContain("Get-AgentOSWorkerProcesses");

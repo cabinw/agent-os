@@ -278,7 +278,7 @@ if (-not (Test-Path -LiteralPath $workerRuntimeRoot)) {
   foreach ($relative in $workerReleaseManifest) {
     $source = Join-Path $WorkerReleaseSource $relative
     $destination = Join-Path $workerRuntimeStage $relative
-    $destinationParent = Split-Path -LiteralPath $destination -Parent
+    $destinationParent = [IO.Path]::GetDirectoryName($destination)
     if (-not (Test-Path -LiteralPath $destinationParent)) {
       $null = New-Item -ItemType Directory -Path $destinationParent
       Set-AgentOSAdminAcl -Path $destinationParent

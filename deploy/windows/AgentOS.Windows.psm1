@@ -67,7 +67,7 @@ function Assert-AgentOSFixedPath {
     if (($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
       throw "Agent OS path ancestry must not contain a reparse point: $Path"
     }
-    $parent = Split-Path -LiteralPath $cursor -Parent
+    $parent = [IO.Path]::GetDirectoryName($cursor)
     if (-not $parent -or $parent -ceq $cursor) { break }
     $cursor = $parent
   }
@@ -410,7 +410,7 @@ function Assert-AgentOSAdminTree {
         throw 'Agent OS admin tree ancestry is writable by an untrusted principal'
       }
     }
-    $parent = Split-Path -LiteralPath $cursor -Parent
+    $parent = [IO.Path]::GetDirectoryName($cursor)
     if (-not $parent -or $parent -ceq $cursor) { break }
     $cursor = $parent
   }
@@ -582,8 +582,9 @@ function Assert-AgentOSTrustedExecutable {
         throw "Agent OS executable ancestry is writable by an untrusted principal: $Path"
       }
     }
-    $parent = Split-Path -LiteralPath $cursor -Parent
-    if (-not $parent -or $parent -ceq $cursor -or -not (Split-Path -LiteralPath $parent -Parent)) { break }
+    $parent = [IO.Path]::GetDirectoryName($cursor)
+    $grandparent = if ($parent) { [IO.Path]::GetDirectoryName($parent) } else { $null }
+    if (-not $parent -or $parent -ceq $cursor -or -not $grandparent) { break }
     $cursor = $parent
   }
   return $item
@@ -614,7 +615,7 @@ function Assert-AgentOSWorkerTask {
   $workerSid = Assert-AgentOSWorkerAccount -WorkerAccount $WorkerAccount
   $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
   Assert-AgentOSWorkerReadAcl `
-    -Path (Split-Path -LiteralPath $ConfigPath -Parent) `
+    -Path ([IO.Path]::GetDirectoryName($ConfigPath)) `
     -WorkerSid $workerSid
   Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
   $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json

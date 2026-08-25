@@ -17,7 +17,7 @@ $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
 $workerSid = ([Security.Principal.NTAccount]$WorkerAccount).Translate(
   [Security.Principal.SecurityIdentifier]
 )
-Assert-AgentOSWorkerReadAcl -Path (Split-Path -LiteralPath $ConfigPath -Parent) -WorkerSid $workerSid
+Assert-AgentOSWorkerReadAcl -Path ([IO.Path]::GetDirectoryName($ConfigPath)) -WorkerSid $workerSid
 Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
 $task = Assert-AgentOSWorkerTask -TaskName $TaskName -WorkerAccount $WorkerAccount `
   -PowerShellPath $PowerShellPath -HostPath $HostPath -ConfigPath $ConfigPath

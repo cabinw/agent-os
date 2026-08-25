@@ -177,7 +177,7 @@ namespace AgentOS.Windows {
 $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
 $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $workerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
-Assert-AgentOSWorkerReadAcl -Path (Split-Path -LiteralPath $ConfigPath -Parent) -WorkerSid $workerSid
+Assert-AgentOSWorkerReadAcl -Path ([IO.Path]::GetDirectoryName($ConfigPath)) -WorkerSid $workerSid
 Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
 $workerReleaseRoot = Assert-AgentOSConfiguredWorkerRelease -Config $config -WorkerSid $workerSid
 

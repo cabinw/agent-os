@@ -21,7 +21,7 @@ if ($WorkerCredential.UserName -cne $WorkerAccount) {
 }
 $null = Assert-AgentOSTrustedExecutable -Path $PowerShellPath -WorkerSid $workerSid
 $null = Assert-AgentOSFixedPath -Path $ConfigPath -Kind File
-Assert-AgentOSWorkerReadAcl -Path (Split-Path -LiteralPath $ConfigPath -Parent) -WorkerSid $workerSid
+Assert-AgentOSWorkerReadAcl -Path ([IO.Path]::GetDirectoryName($ConfigPath)) -WorkerSid $workerSid
 Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
 $runtimeConfig = try {
   Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
