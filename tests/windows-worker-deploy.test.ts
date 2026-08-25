@@ -294,9 +294,10 @@ public static class Probe {
   });
 
   it("preflights before mutation and exposes an adoptable install fault matrix", async () => {
-    const [install, windowsModule] = await Promise.all([
+    const [install, windowsModule, host] = await Promise.all([
       readFile(INSTALL, "utf8"),
       readFile(MODULE, "utf8"),
+      readFile(HOST, "utf8"),
     ]);
     const firstRootWrite = install.indexOf("New-Item -ItemType Directory -Path $root");
     expect(install.indexOf("Get-AgentOSTreeDigest -Root $PSScriptRoot")).toBeLessThan(
@@ -316,6 +317,8 @@ public static class Probe {
     expect(install).toContain("-AllowStartIfOnBatteries");
     expect(install).toContain("-DontStopIfGoingOnBatteries");
     expect(install).toContain("Set-AgentOSBatchLogonRight -WorkerSid $workerSid");
+    expect(install).toContain("'job-assigned.gate'");
+    expect(install).toContain("Set-AgentOSPrivateAcl -Path $jobGate");
     expect(windowsModule).toContain("SeBatchLogonRight");
     expect(windowsModule).toContain("LsaAddAccountRights");
     expect(windowsModule).toContain(
@@ -324,6 +327,11 @@ public static class Probe {
     expect(windowsModule).toContain("$_.ExecutablePath.Equals($powerShellPath");
     expect(windowsModule).toContain("$_.CommandLine.EndsWith($expectedHostArguments");
     expect(windowsModule).toContain("$_.ExecutablePath.Equals($nodePath");
+    expect(host).not.toContain("Remove-Item -LiteralPath $gate");
+    expect(host).toContain("Assert-AgentOSPrivateAcl -Path $gate");
+    expect(host).toContain("WriteAllText($gate, 'pending'");
+    expect(host).toContain("WriteAllText($gate, 'assigned'");
+    expect(host).toContain("WriteAllText($gate, 'closed'");
     expect(install.indexOf("if ($journalNeedsIntentRebind)")).toBeLessThan(
       install.indexOf("$journal -and $journal.phase -eq 'committed'"),
     );
@@ -524,8 +532,11 @@ public static class Probe {
     expect(host).not.toContain("$process.Start()");
     expect(host).toContain("$start.Environment.Clear()");
     expect(host).not.toContain("'PATH'");
+    expect(host.indexOf("WriteAllText($gate, 'pending'")).toBeLessThan(
+      host.indexOf("$job.StartSuspended("),
+    );
     expect(host.indexOf("$job.StartSuspended(")).toBeLessThan(
-      host.indexOf("[IO.File]::WriteAllText($gate"),
+      host.indexOf("WriteAllText($gate, 'assigned'"),
     );
     expect(host).toContain("Assert-AgentOSWorkerReadAcl -Path $ConfigPath");
     expect(host).toContain("$job.Dispose()");

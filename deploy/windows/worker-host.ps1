@@ -283,7 +283,9 @@ Assert-AgentOSRuntimeArchitecture `
   )
 
 $gate = Join-Path $runtimeRoot 'job-assigned.gate'
-if (Test-Path -LiteralPath $gate) { Remove-Item -LiteralPath $gate -Force }
+$null = Assert-AgentOSFixedPath -Path $gate -Kind File
+Assert-AgentOSPrivateAcl -Path $gate -WorkerSid $workerSid
+[IO.File]::WriteAllText($gate, 'pending', [Text.UTF8Encoding]::new($false))
 $start.Environment['AGENT_OS_JOB_ASSIGNMENT_GATE'] = $gate
 [AgentOS.Windows.Job]::AssertQuotingContract()
 $job = [AgentOS.Windows.Job]::new()
@@ -297,11 +299,12 @@ try {
     $null
   )
   [IO.File]::WriteAllText($gate, 'assigned', [Text.UTF8Encoding]::new($false))
-  Set-AgentOSPrivateAcl -Path $gate -WorkerSid $workerSid
   $exitCode = $process.WaitForExit()
   exit $exitCode
 } finally {
   if ($process) { $process.Dispose() }
   $job.Dispose()
-  if (Test-Path -LiteralPath $gate) { Remove-Item -LiteralPath $gate -Force }
+  if (Test-Path -LiteralPath $gate) {
+    [IO.File]::WriteAllText($gate, 'closed', [Text.UTF8Encoding]::new($false))
+  }
 }

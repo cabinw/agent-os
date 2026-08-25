@@ -247,6 +247,16 @@ if (-not (Test-Path -LiteralPath $releasesRoot)) {
 Set-AgentOSReleaseAcl -Path $releasesRoot -WorkerSid $workerSid
 Advance-InstallJournal -Phase layout
 
+$jobGate = Join-Path (Join-Path $root 'run') 'job-assigned.gate'
+if (-not (Test-Path -LiteralPath $jobGate)) {
+  [IO.File]::WriteAllText($jobGate, 'closed', [Text.UTF8Encoding]::new($false))
+  Set-AgentOSPrivateAcl -Path $jobGate -WorkerSid $workerSid
+} else {
+  $null = Assert-AgentOSFixedPath -Path $jobGate -Kind File
+  Assert-AgentOSPrivateAcl -Path $jobGate -WorkerSid $workerSid
+  [IO.File]::WriteAllText($jobGate, 'closed', [Text.UTF8Encoding]::new($false))
+}
+
 if (-not (Test-Path -LiteralPath $releaseRoot)) {
   if (-not (Test-Path -LiteralPath $stage)) {
     $null = New-Item -ItemType Directory -Path $stage

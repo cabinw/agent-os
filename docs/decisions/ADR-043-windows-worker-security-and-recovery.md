@@ -53,6 +53,10 @@ Lifecycle process discovery matches the fixed PowerShell executable plus
 the complete Task action argument suffix ending in `worker-host.ps1` and its
 config, or the fixed Node executable plus `workerEntry`. Merely mentioning the
 host or config path does not make a management command a Worker process.
+Install pre-creates the Job assignment gate with the private admin-owned ACL.
+The non-admin host reuses that fixed file and writes `pending`, `assigned`, then
+`closed`; it never creates, deletes, takes ownership of, or re-ACLs the gate.
+The suspended child cannot observe `assigned` before Job attachment succeeds.
 
 The supported machine contracts are deliberately narrow: `AMD64 host → AMD64
 Worker`, or `ARM64 host + Windows AMD64 user-mode emulation → AMD64 Worker`.
