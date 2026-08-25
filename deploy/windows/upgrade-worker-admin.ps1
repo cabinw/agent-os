@@ -6,7 +6,9 @@ param(
   [Parameter(Mandatory)][string]$PowerShellPath,
   [Parameter(Mandatory)][string]$CurrentHostPath,
   [Parameter(Mandatory)][string]$ConfigPath,
-  [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedAdminSha256
+  [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedAdminSha256,
+  [Parameter(Mandatory)][string[]]$WorkerReleaseFiles,
+  [Parameter(Mandatory)][ValidatePattern('^[a-f0-9]{64}$')][string]$ExpectedWorkerReleaseSha256
 )
 
 Set-StrictMode -Version Latest
@@ -28,6 +30,16 @@ $runtimeConfig = try {
 } catch {
   throw 'Worker secret configuration is invalid'
 }
+$workerReleaseManifest = @(Get-AgentOSCanonicalReleaseManifest -Files $WorkerReleaseFiles)
+$configWorkerReleaseManifest = @(Get-AgentOSCanonicalReleaseManifest `
+  -Files @($runtimeConfig.workerReleaseFiles | ForEach-Object { [string]$_ })
+)
+if ([string]$runtimeConfig.workerReleaseSha256 -cne $ExpectedWorkerReleaseSha256 -or
+    ($configWorkerReleaseManifest -join "`n") -cne ($workerReleaseManifest -join "`n")) {
+  throw 'Worker configuration runtime release does not match the upgrade contract'
+}
+$workerRuntimeRoot = Assert-AgentOSConfiguredWorkerRelease `
+  -Config $runtimeConfig -WorkerSid $workerSid
 $nodePath = [string]$runtimeConfig.nodePath
 $grokPath = [string]$runtimeConfig.environment.AGENT_OS_GROK_BIN
 $configuredPowerShellPath = [string]$runtimeConfig.environment.AGENT_OS_PWSH_BIN
@@ -46,7 +58,7 @@ $adminFiles = @(
   'AgentOS.Architecture.ps1', 'AgentOS.Windows.psm1',
   'health-worker.ps1', 'start-worker.ps1',
   'replace-file.ps1', 'stop-worker.ps1', 'uninstall-worker.ps1',
-  'upgrade-worker-admin.ps1', 'worker-host.ps1'
+  'upgrade-worker-admin.ps1', 'worker-host.ps1', 'worker-runtime.manifest'
 )
 if ((Get-AgentOSTreeDigest -Root $PSScriptRoot -Files $adminFiles) -cne $ExpectedAdminSha256) {
   throw 'Windows Worker admin source digest does not match the approved release'
@@ -76,10 +88,11 @@ function Read-UpgradeJournalRecord {
     throw 'Windows Worker admin upgrade journal is invalid'
   }
   $keys = @($record.PSObject.Properties.Name | Sort-Object)
-  if (($keys -join ',') -cne 'configPath,kind,newAdminSha256,oldHostPath,phase,taskName,version,workerSid' -or
+  if (($keys -join ',') -cne 'configPath,kind,newAdminSha256,oldHostPath,phase,taskName,version,workerReleaseSha256,workerSid' -or
       $record.version -ne 1 -or $record.kind -cne 'upgrade-worker-admin' -or
       $record.taskName -cne $TaskName -or $record.workerSid -cne $workerSid.Value -or
       $record.configPath -cne $ConfigPath -or
+      $record.workerReleaseSha256 -cne $ExpectedWorkerReleaseSha256 -or
       ([string]$record.newAdminSha256) -notmatch '^[a-f0-9]{64}$' -or
       -not [IO.Path]::IsPathFullyQualified([string]$record.oldHostPath) -or
       [IO.Path]::GetFullPath([string]$record.oldHostPath) -cne [string]$record.oldHostPath -or
@@ -175,6 +188,7 @@ function Write-UpgradeJournal {
     version = 1; kind = 'upgrade-worker-admin'; taskName = $TaskName
     workerSid = $workerSid.Value; oldHostPath = $CurrentHostPath
     configPath = $ConfigPath; newAdminSha256 = $ExpectedAdminSha256; phase = $Phase
+    workerReleaseSha256 = $ExpectedWorkerReleaseSha256
   }
   if (Test-Path -LiteralPath $journalCandidate) {
     $null = Assert-AgentOSFixedPath -Path $journalCandidate -Kind File

@@ -179,6 +179,7 @@ $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom
 $workerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
 Assert-AgentOSWorkerReadAcl -Path (Split-Path -LiteralPath $ConfigPath -Parent) -WorkerSid $workerSid
 Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
+$workerReleaseRoot = Assert-AgentOSConfiguredWorkerRelease -Config $config -WorkerSid $workerSid
 
 $agentRoot = Get-AgentOSRoot
 $expectedConfig = Join-Path $agentRoot 'config\worker.json'
@@ -190,14 +191,15 @@ $workingDirectory = [string]$config.workingDirectory
 $null = Assert-AgentOSTrustedExecutable -Path $nodePath -WorkerSid $workerSid
 $null = Assert-AgentOSTrustedExecutable -Path $workerEntry -WorkerSid $workerSid
 $null = Assert-AgentOSFixedPath -Path $runtimeRoot -Kind Directory
-if (-not (Test-AgentOSContainedPath -Root (Join-Path $agentRoot 'releases') -Path $workerEntry)) {
+if (-not (Test-AgentOSContainedPath -Root $workerReleaseRoot -Path $workerEntry)) {
   throw 'Worker entry is outside a protected Agent OS release'
 }
 if ($runtimeRoot -cne (Join-Path $agentRoot 'run')) {
   throw 'Worker runtime root is outside the fixed Agent OS root'
 }
 $null = Assert-AgentOSFixedPath -Path $workingDirectory -Kind Directory
-if (-not (Test-AgentOSContainedPath -Root (Join-Path $agentRoot 'releases') -Path $workingDirectory)) {
+if ($workingDirectory -cne $workerReleaseRoot -and
+    -not (Test-AgentOSContainedPath -Root $workerReleaseRoot -Path $workingDirectory)) {
   throw 'Worker working directory is outside a protected Agent OS release'
 }
 Assert-AgentOSPrivateAcl -Path $runtimeRoot -WorkerSid $workerSid

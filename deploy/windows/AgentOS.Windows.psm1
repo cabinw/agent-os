@@ -3,6 +3,54 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'AgentOS.Architecture.ps1')
 
+if (-not ('AgentOS.Windows.ReleaseManifest' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+
+namespace AgentOS.Windows {
+  public static class ReleaseManifest {
+    private static readonly Regex Reserved = new Regex(
+      @"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)",
+      RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
+    );
+    public static string[] Canonicalize(string[] files) {
+      if (files == null || files.Length == 0) throw new InvalidDataException("manifest_empty");
+      var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      var result = new List<string>();
+      foreach (string relative in files) {
+        if (string.IsNullOrEmpty(relative) || Path.IsPathRooted(relative) ||
+            relative.IndexOf('/') >= 0 || relative[0] == '\\') {
+          throw new InvalidDataException("manifest_path_unsafe");
+        }
+        string[] segments = relative.Split('\\');
+        foreach (string segment in segments) {
+          if (string.IsNullOrEmpty(segment) || segment == "." || segment == ".." ||
+              segment.EndsWith(".", StringComparison.Ordinal) ||
+              segment.EndsWith(" ", StringComparison.Ordinal) || Reserved.IsMatch(segment)) {
+            throw new InvalidDataException("manifest_segment_unsafe");
+          }
+          foreach (char value in segment) {
+            if (value < 0x20 || "<>:\"/\\|?*".IndexOf(value) >= 0) {
+              throw new InvalidDataException("manifest_segment_unsafe");
+            }
+          }
+        }
+        string canonical = string.Join("\\", segments);
+        if (!seen.Add(canonical)) throw new InvalidDataException("manifest_case_collision");
+        result.Add(canonical);
+      }
+      result.Sort(StringComparer.Ordinal);
+      return result.ToArray();
+    }
+  }
+}
+'@
+}
+
 function Assert-AgentOSFixedPath {
   param(
     [Parameter(Mandatory)][string]$Path,
@@ -227,6 +275,12 @@ function Assert-AgentOSAdminAcl {
   if (-not $acl.AreAccessRulesProtected) {
     throw "Agent OS admin ACL must disable inheritance: $Path"
   }
+  $ownerSid = ([Security.Principal.NTAccount]$acl.Owner).Translate(
+    [Security.Principal.SecurityIdentifier]
+  ).Value
+  if ($ownerSid -ne 'S-1-5-32-544') {
+    throw "Agent OS admin ACL owner changed: $Path"
+  }
   $allowed = @('S-1-5-18', 'S-1-5-32-544')
   $seen = @($acl.Access | ForEach-Object {
     $sid = $_.IdentityReference.Translate(
@@ -273,6 +327,118 @@ function Get-AgentOSTreeDigest {
   }
   $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($frames -join ''))
   return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+}
+
+function Get-AgentOSCanonicalReleaseManifest {
+  param([Parameter(Mandatory)][string[]]$Files)
+  try {
+    return [AgentOS.Windows.ReleaseManifest]::Canonicalize($Files)
+  } catch {
+    throw 'Agent OS release manifest is not a canonical Windows file list'
+  }
+}
+
+function Get-AgentOSExactTreeDigest {
+  param(
+    [Parameter(Mandatory)][string]$Root,
+    [Parameter(Mandatory)][string[]]$Files
+  )
+  $null = Assert-AgentOSFixedPath -Path $Root -Kind Directory
+  $normalized = @(Get-AgentOSCanonicalReleaseManifest -Files $Files)
+  foreach ($relative in $normalized) {
+    $full = [IO.Path]::GetFullPath((Join-Path $Root $relative))
+    if (-not (Test-AgentOSContainedPath -Root $Root -Path $full)) {
+      throw 'Agent OS release manifest escapes its root'
+    }
+    if ([IO.Path]::GetRelativePath($Root, $full) -cne $relative) {
+      throw 'Agent OS release manifest path is not canonical'
+    }
+  }
+  $actualFiles = @(Get-ChildItem -LiteralPath $Root -Force -Recurse -File |
+    ForEach-Object { [IO.Path]::GetRelativePath($Root, $_.FullName) } |
+    Sort-Object -CaseSensitive)
+  if (($actualFiles -join "`n") -cne ($normalized -join "`n")) {
+    throw 'Agent OS release tree differs from its exact file manifest'
+  }
+  $allowedDirectories = [Collections.Generic.HashSet[string]]::new(
+    [StringComparer]::Ordinal
+  )
+  foreach ($relative in $normalized) {
+    $parent = Split-Path -Path $relative -Parent
+    while ($parent) {
+      $null = $allowedDirectories.Add($parent)
+      $parent = Split-Path -Path $parent -Parent
+    }
+  }
+  foreach ($directory in @(Get-ChildItem -LiteralPath $Root -Force -Recurse -Directory)) {
+    $relative = [IO.Path]::GetRelativePath($Root, $directory.FullName)
+    if (-not $allowedDirectories.Contains($relative)) {
+      throw 'Agent OS release tree contains an extra directory'
+    }
+    $null = Assert-AgentOSFixedPath -Path $directory.FullName -Kind Directory
+  }
+  return Get-AgentOSTreeDigest -Root $Root -Files $normalized
+}
+
+function Assert-AgentOSAdminTree {
+  param([Parameter(Mandatory)][string]$Path)
+  $null = Assert-AgentOSFixedPath -Path $Path -Kind Directory
+  $untrusted = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545')
+  $writeMask = [Security.AccessControl.FileSystemRights]'Write, Modify, FullControl, ChangePermissions, TakeOwnership'
+  $cursor = $Path
+  while ($cursor) {
+    foreach ($rule in (Get-Acl -LiteralPath $cursor -ErrorAction Stop).Access) {
+      $sid = $rule.IdentityReference.Translate(
+        [Security.Principal.SecurityIdentifier]
+      ).Value
+      if ($rule.AccessControlType -eq 'Allow' -and $sid -in $untrusted -and
+          ($rule.FileSystemRights -band $writeMask) -ne 0) {
+        throw 'Agent OS admin tree ancestry is writable by an untrusted principal'
+      }
+    }
+    $parent = Split-Path -LiteralPath $cursor -Parent
+    if (-not $parent -or $parent -ceq $cursor) { break }
+    $cursor = $parent
+  }
+  Assert-AgentOSAdminAcl -Path $Path
+  foreach ($entry in @(Get-ChildItem -LiteralPath $Path -Force -Recurse)) {
+    Assert-AgentOSAdminAcl -Path $entry.FullName
+  }
+}
+
+function Assert-AgentOSConfiguredWorkerRelease {
+  param(
+    [Parameter(Mandatory)]$Config,
+    [Parameter(Mandatory)][Security.Principal.SecurityIdentifier]$WorkerSid
+  )
+  $digest = [string]$Config.workerReleaseSha256
+  $files = @(Get-AgentOSCanonicalReleaseManifest -Files @(
+    $Config.workerReleaseFiles | ForEach-Object { [string]$_ }
+  ))
+  if ($digest -notmatch '^[a-f0-9]{64}$' -or $files.Count -eq 0) {
+    throw 'Worker runtime release declaration is invalid'
+  }
+  $root = Join-Path (Join-Path (Get-AgentOSRoot) 'releases') "worker-runtime-$digest"
+  if ((Get-AgentOSExactTreeDigest -Root $root -Files $files) -cne $digest) {
+    throw 'Worker runtime release digest changed'
+  }
+  Assert-AgentOSReleaseTree -Path $root -WorkerSid $WorkerSid
+  $entry = [string]$Config.workerEntry
+  $working = [string]$Config.workingDirectory
+  if (-not [IO.Path]::IsPathFullyQualified($entry) -or
+      [IO.Path]::GetFullPath($entry) -cne $entry -or
+      -not (Test-AgentOSContainedPath -Root $root -Path $entry) -or
+      [IO.Path]::GetRelativePath($root, $entry) -cnotin $files) {
+    throw 'Worker entry is not bound to the declared runtime release'
+  }
+  if (-not [IO.Path]::IsPathFullyQualified($working) -or
+      [IO.Path]::GetFullPath($working) -cne $working -or
+      ($working -cne $root -and -not (Test-AgentOSContainedPath -Root $root -Path $working))) {
+    throw 'Worker working directory is not bound to the declared runtime release'
+  }
+  $null = Assert-AgentOSFixedPath -Path $entry -Kind File
+  $null = Assert-AgentOSFixedPath -Path $working -Kind Directory
+  return $root
 }
 
 function Set-AgentOSReleaseAcl {
@@ -409,6 +575,7 @@ function Assert-AgentOSWorkerTask {
     -WorkerSid $workerSid
   Assert-AgentOSWorkerReadAcl -Path $ConfigPath -WorkerSid $workerSid
   $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $null = Assert-AgentOSConfiguredWorkerRelease -Config $config -WorkerSid $workerSid
   foreach ($executable in @(
     $PowerShellPath,
     [string]$config.nodePath,
@@ -441,4 +608,4 @@ function Assert-AgentOSWorkerTask {
   return $task
 }
 
-Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
+Export-ModuleMember -Function Assert-AgentOSAdminAcl, Assert-AgentOSAdminTree, Assert-AgentOSConfiguredWorkerRelease, Assert-AgentOSFixedPath, Assert-AgentOSPrivateAcl, Assert-AgentOSReleaseTree, Assert-AgentOSRuntimeArchitecture, Assert-AgentOSTrustedExecutable, Assert-AgentOSWorkerReadAcl, Assert-AgentOSWorkerTask, Get-AgentOSCanonicalReleaseManifest, Get-AgentOSExactTreeDigest, Get-AgentOSRoot, Get-AgentOSTreeDigest, Get-AgentOSWorkerProcesses, Set-AgentOSAdminAcl, Set-AgentOSPrivateAcl, Set-AgentOSReleaseAcl, Set-AgentOSWorkerReadAcl, Test-AgentOSContainedPath
