@@ -449,8 +449,10 @@ the immediate shell/Node execution closure. Privileged Node helpers reject
 inherited Node, TLS and OpenSSL configuration/module/engine variables before Node
 starts; system tool overrides exist only inside a validated non-root test root.
 Ownership and a supplied SHA-256 prove local integrity only; they do not
-authenticate the publisher. Signed admin-kit and
-application release manifests plus an audited publisher-key policy are still a
+authenticate the publisher. ADR-045 fixes the offline-root policy, canonical
+envelopes, rotation/revocation and same-descriptor publication acceptance
+contract. The fixed pre-bootstrap launcher and verifier are not implemented,
+so authenticated admin-kit and application-release admission remains a
 production blocker. Admin-kit upgrade is a separate packaging/change-control
 workflow governed by
 [ADR-041](../docs/decisions/ADR-041-privileged-admin-kit-migration.md). The only
@@ -628,7 +630,7 @@ cd "$SOURCE_ROOT"
 | Dedicated Agent OS FQDN and matching trusted certificate | field dependency; placeholder origin was rejected before publication, leaving no env/unit/current/listener; Hub activation and cross-host smoke remain blocked until supplied |
 | Ubuntu exact Node version/SHA and repository-pinned Corepack/pnpm | field gate passed: pinned Linux x64 archive SHA and signature chain verified; the gate enforces `/usr/bin/node` 24.19.0, `/usr/bin/corepack` 0.35.0 and pnpm 11.17.0, and revalidates their root-owned non-writable paths before use |
 | clean Linux production dependency closure | cold-cache field gate passes with pnpm 11.17.0, zero reused packages, final SDK/Zod imports, no links/special files and no admin tree; rerun after every frozen artifact change |
-| authenticated release/admin-kit publisher and signature verification | not implemented; root ownership and checksums do not prove provenance |
+| authenticated release/admin-kit publisher and signature verification | ADR-045 acceptance contract fixed; trusted pre-bootstrap launcher, offline policy store and same-descriptor verifier remain unimplemented |
 | Hub health endpoints and health-check script | implemented; focused local gate passes |
 | bounded body parsing, shutdown deadline and propagated close failure | implemented; focused local runtime gate passes |
 | reconnect backoff, jitter and bounded Runner transport/body caches | implemented; focused runtime gate passes |
