@@ -530,6 +530,14 @@ The repository also contains a verification-independent offline authoring
 tool. Build and run it only on the offline signing workstation; never copy root
 or publisher private keys to a Hub host:
 
+The production `agent.zeroplus.fun` certificate uses Certbot's manual DNS
+plugin with `deploy/hub/bin/alidns-manual-hook.py`. The hook is fixed to the
+delegated `acme.agent.zeroplus.fun` zone, rejects every other certificate name,
+requires root-owned mode-0600 credentials at
+`/etc/agent-os/alidns-credentials.json`, creates one challenge TXT record and
+deletes that exact record through `CERTBOT_AUTH_OUTPUT`. Its RAM identity must
+only receive record add/delete/read/update actions on that delegated zone.
+
 ```bash
 cd deploy/publisher
 go build -trimpath -o /secure/bin/agent-os-publisher-offline ./offline
