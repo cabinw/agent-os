@@ -28,7 +28,7 @@ must name the exact entry and working directory in that release. Lifecycle and
 admin-upgrade validation remeasure the same exact tree.
 
 The admitted Worker artifact is a reproducible single-file ESM bundle. Its
-builder first proves the canonical 27-file source inventory still matches the
+builder first proves the canonical 29-file source inventory still matches the
 repository, then includes the locked third-party dependency graph. The runtime
 manifest admits only `runner-worker.bundle.mjs`; an archive of bare sources is
 rejected because Node module resolution would otherwise escape the exact-tree

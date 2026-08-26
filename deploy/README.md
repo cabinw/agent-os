@@ -187,7 +187,7 @@ out of deployed secret directories.
 Windows `worker.json` additionally declares `hostArchitecture` as `AMD64` or
 `ARM64` and `workerArchitecture` as exactly `AMD64`. These declarations are
 verified against Win32 machine evidence and cannot authorize another machine.
-The 27-file repository input inventory is
+The 29-file repository input inventory is
 `deploy/windows/worker-runtime.sources`. Release preparation verifies it against
 the complete application source tree, then esbuild bundles those sources and
 the locked third-party dependency graph into one self-contained ESM file. The

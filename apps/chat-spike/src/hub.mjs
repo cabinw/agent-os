@@ -873,14 +873,23 @@ export class Hub {
   }
 
   /** A human message enters through the same door an agent's does. */
-  say(text, to) {
+  say(text, to, task = null) {
+    if (task !== null && !Object.hasOwn(this.tasks(), task)) {
+      throw new ValidationError(`未知任务 "${task}"`);
+    }
     const stored = this.emit(
       makeEvent({
         type: "message.sent",
         project: this.projectId,
         actor: { kind: "human", id: HUMAN_ID },
         subject: { kind: "project", id: this.projectId },
-        payload: { from: HUMAN_ID, to, type: "instruction", content: text },
+        payload: {
+          from: HUMAN_ID,
+          to,
+          type: "instruction",
+          content: text,
+          ...(task === null ? {} : { task }),
+        },
       }),
     );
     this.route(stored);

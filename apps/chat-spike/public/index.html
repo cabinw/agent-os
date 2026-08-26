@@ -327,14 +327,14 @@
   <form class="auth-card" id="authform">
     <div class="auth-mark">◈</div>
     <h1 id="auth-title">连接 Agent OS</h1>
-    <p>输入启动 Hub 时显示的人类访问令牌。令牌只保留在当前页面内存中。</p>
-    <label for="token">Bearer token</label>
+    <p>输入管理员提供的连接密钥。验证后密钥会被换成当前浏览器的安全会话，不会写入地址、浏览器存储或日志。</p>
+    <label for="token">连接密钥</label>
     <div class="auth-row">
       <input id="token" name="token" type="password" autocomplete="off" spellcheck="false" required>
       <button type="submit">连接</button>
     </div>
     <div class="auth-error" id="autherror" role="alert"></div>
-    <div class="auth-note">也可以用 <code>#token=…</code> 打开；页面会在连接前立即清除地址栏片段。</div>
+    <div class="auth-note">本机开发入口会自动建立会话；生产入口也可以用一次性 <code>#token=…</code> 交接，页面会先清除地址栏再验证。</div>
   </form>
 </div>
 
@@ -447,7 +447,7 @@ const streams = new Map();
 
 const $ = (id) => document.getElementById(id);
 const protectedSurfaces = [...document.querySelectorAll("[data-protected]")];
-let bearer = null;
+let authenticated = false;
 let connectionVersion = 0;
 let eventController = null;
 
@@ -476,15 +476,15 @@ function unlockShell() {
 }
 
 function loseAuthentication(message) {
-  bearer = null;
+  authenticated = false;
   connectionVersion++;
   eventController?.abort();
   eventController = null;
   lockShell(message);
 }
 
-function authenticate(token) {
-  bearer = token;
+function useSession() {
+  authenticated = true;
   connectionVersion++;
   eventController?.abort();
   $("authgate").hidden = true;
@@ -493,21 +493,35 @@ function authenticate(token) {
 }
 
 const apiFetch = async (path, init = {}) => {
-  if (!bearer) throw new Error("human bearer token required");
-  const headers = new Headers(init.headers);
-  headers.set("authorization", `Bearer ${bearer}`);
-  const response = await fetch(path, { ...init, headers });
+  if (!authenticated) throw new Error("human session required");
+  const response = await fetch(path, { ...init, credentials: "same-origin" });
   if (response.status === 401 || response.status === 403) {
-    loseAuthentication("令牌无效或不是 human 凭据，请重新输入。");
+    loseAuthentication("会话已失效，请重新连接。");
   }
   return response;
 };
 
-$("authform").addEventListener("submit", (event) => {
+async function establishSession(path, token) {
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: token === undefined ? undefined : { "content-type": "application/json" },
+    body: token === undefined ? undefined : JSON.stringify({ token }),
+  });
+  if (!response.ok) return false;
+  useSession();
+  return true;
+}
+
+$("authform").addEventListener("submit", async (event) => {
   event.preventDefault();
   const token = $("token").value.trim();
   $("token").value = "";
-  if (token) authenticate(token);
+  if (!token) return;
+  $("autherror").textContent = "正在连接…";
+  if (!(await establishSession("/auth/session", token))) {
+    lockShell("连接密钥无效，请检查后重试。");
+  }
 });
 const clock = (at) => new Date(at).toLocaleTimeString("zh-CN", { hour12: false });
 const nameOf = (id) =>
@@ -729,7 +743,7 @@ function receive(d) {
 }
 
 async function connectEvents(version) {
-  while (bearer && version === connectionVersion) {
+  while (authenticated && version === connectionVersion) {
     try {
       const controller = new AbortController();
       eventController = controller;
@@ -737,7 +751,7 @@ async function connectEvents(version) {
         headers: { accept: "text/event-stream" },
         signal: controller.signal,
       });
-      if (!bearer || version !== connectionVersion) return;
+      if (!authenticated || version !== connectionVersion) return;
       if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
       unlockShell();
       const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -758,16 +772,21 @@ async function connectEvents(version) {
         }
       }
     } catch {
-      if (!bearer || version !== connectionVersion) return;
+      if (!authenticated || version !== connectionVersion) return;
       $("statusline").textContent = T.disconnected;
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }
 
-const initialToken = fragmentToken();
-if (initialToken) authenticate(initialToken);
-else lockShell();
+async function initializeEntry() {
+  const initialToken = fragmentToken();
+  if (initialToken && (await establishSession("/auth/session", initialToken))) return;
+  if (await establishSession("/auth/local")) return;
+  lockShell(initialToken ? "连接密钥无效，请重新输入。" : "");
+}
+
+void initializeEntry();
 
 // ------------------------------------------------------------------ composer
 
@@ -779,7 +798,11 @@ async function send() {
   const res = await apiFetch("/say", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text, to: target }),
+    body: JSON.stringify({
+      text,
+      to: target,
+      ...(scope !== "*" && scope !== "" ? { task: scope } : {}),
+    }),
   });
   if (!res.ok) $("statusline").textContent = (await res.json()).error;
 }

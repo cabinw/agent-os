@@ -34,6 +34,12 @@ import {
   requestOrigin,
 } from "./http-security.mjs";
 import { Hub } from "./hub.mjs";
+import {
+  clearHumanSessionCookie,
+  createHumanSessionStore,
+  humanSessionCookie,
+} from "./human-session.mjs";
+import { discoverLocalExecutables } from "./local-executables.mjs";
 import { EVENT_LOG_WRITE_FAILURE_MESSAGE, EventLog } from "./log.mjs";
 import { mountMcp } from "./mcp-mount.mjs";
 import { HUMAN_ID } from "./mcp-tools.mjs";
@@ -100,7 +106,7 @@ if (
 
 /** Claude Code is the default coordinator: measured to participate, and holding
  *  one vendor fixed keeps "how a coordinator behaves" from being a moving part. */
-const ROSTER = [
+const BASE_ROSTER = [
   {
     id: "claude",
     role: "coordinator",
@@ -110,6 +116,22 @@ const ROSTER = [
   { id: "kimi", role: "worker", capabilities: ["research", "writing"] },
   { id: "codex", role: "worker", capabilities: ["coding", "testing"] },
 ];
+const localExecutables =
+  RUNNER_MODE === "local"
+    ? discoverLocalExecutables(
+        process.env,
+        BASE_ROSTER.map((agent) => agent.id),
+      )
+    : new Map();
+const ROSTER =
+  RUNNER_MODE === "local"
+    ? BASE_ROSTER.filter((agent) => localExecutables.has(agent.id))
+    : BASE_ROSTER;
+if (ROSTER.length === 0) {
+  throw new Error(
+    "No supported local agent CLI found; install one or set AGENT_OS_<PROVIDER>_BIN",
+  );
+}
 
 const configuredAgentTokens = parseAgentTokens(process.env.AGENT_OS_AGENT_TOKENS);
 if (RUNNER_MODE === "remote") {
@@ -128,6 +150,16 @@ const credentials = createCredentialStore({
   agentTokens: configuredAgentTokens,
   agentIds: ROSTER.map((agent) => agent.id),
 });
+const humanSessions = createHumanSessionStore();
+const secureHumanSessionCookie = Boolean(
+  process.env.AGENT_OS_ALLOWED_ORIGINS?.split(",").every((origin) =>
+    origin.trim().startsWith("https://"),
+  ),
+);
+const localSessionBootstrapAllowed =
+  RUNNER_MODE === "local" &&
+  humanToken === undefined &&
+  process.env.NODE_ENV !== "production";
 if (runnerToken !== null && credentials.authenticate(`Bearer ${runnerToken}`) !== null) {
   throw new Error(
     "AGENT_OS_RUNNER_TOKEN must be independent from human and agent credentials",
@@ -159,7 +191,11 @@ const log = new EventLog(LOG_PATH, {
 const sseClients = createSseClientRegistry();
 
 function broadcast(type, data) {
-  const frame = `data: ${JSON.stringify({ type, ...data })}\n\n`;
+  const frame = `data: ${JSON.stringify({
+    type,
+    ...data,
+    ...(type === "event" ? { thread: project(log.replay()) } : {}),
+  })}\n\n`;
   sseClients.broadcast(frame);
 }
 
@@ -175,6 +211,9 @@ if (RUNNER_MODE === "local") {
     workspaceRoot: WORKSPACE,
     sessionStore: new SessionStore(SESSION_PATH),
     getAdapter,
+    adapterOptionsFor: (request) => ({
+      executable: localExecutables.get(request.adapter),
+    }),
     hostId: runnerHostId,
     mcpFor: (request, workspace) =>
       mountMcp(request.adapter, {
@@ -336,16 +375,67 @@ async function handleRequest(req, res) {
     return res.end(html);
   }
 
-  const principal = credentials.authenticate(req.headers.authorization);
+  if (
+    req.method === "POST" &&
+    (url.pathname === "/auth/session" || url.pathname === "/auth/local")
+  ) {
+    const cors = requestOrigin(req, origins);
+    applySecurityHeaders(res, cors.origin);
+    if (!cors.ok) return rejectAndClose(403, { error: "cross-origin request denied" });
+    if (url.pathname === "/auth/local") {
+      if (!localSessionBootstrapAllowed || !isLoopbackRequest(req)) {
+        return rejectAndClose(404, { error: "not found" });
+      }
+    } else {
+      const body = await readHubJsonBody(req);
+      const token = typeof body?.token === "string" ? body.token.trim() : "";
+      const bearerPrincipal = credentials.authenticate(`Bearer ${token}`);
+      if (bearerPrincipal?.kind !== "human") {
+        return rejectAndClose(401, { error: "human credential required" });
+      }
+    }
+    const session = humanSessions.issue();
+    res.setHeader(
+      "set-cookie",
+      humanSessionCookie({ ...session, secure: secureHumanSessionCookie }),
+    );
+    closeAfterResponse();
+    return json(200, { authenticated: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/auth/logout") {
+    const cors = requestOrigin(req, origins);
+    applySecurityHeaders(res, cors.origin);
+    if (!cors.ok) return rejectAndClose(403, { error: "cross-origin request denied" });
+    humanSessions.revoke(req.headers.cookie);
+    res.setHeader(
+      "set-cookie",
+      clearHumanSessionCookie({ secure: secureHumanSessionCookie }),
+    );
+    closeAfterResponse();
+    return json(200, { authenticated: false });
+  }
+
+  const bearerPrincipal = credentials.authenticate(req.headers.authorization);
+  const sessionPrincipal = humanSessions.authenticate(req.headers.cookie);
+  const principal = bearerPrincipal ?? sessionPrincipal;
   if (!principal) {
     applySecurityHeaders(res);
     res.setHeader("www-authenticate", 'Bearer realm="agent-os"');
-    return rejectAndClose(401, { error: "bearer token required" });
+    return rejectAndClose(401, { error: "authentication required" });
   }
 
   const cors = requestOrigin(req, origins);
   applySecurityHeaders(res, cors.origin);
   if (!cors.ok) return rejectAndClose(403, { error: "cross-origin request denied" });
+  if (
+    sessionPrincipal !== null &&
+    bearerPrincipal === null &&
+    !new Set(["GET", "HEAD", "OPTIONS"]).has(req.method ?? "") &&
+    req.headers.origin === undefined
+  ) {
+    return rejectAndClose(403, { error: "origin required for session write" });
+  }
 
   if (req.method === "OPTIONS") {
     res.setHeader("access-control-allow-headers", "authorization, content-type");
@@ -419,8 +509,12 @@ async function handleRequest(req, res) {
     const to = String(body?.to ?? "");
     if (!text) return json(400, { error: "empty" });
     if (!hub.agents.has(to)) return json(400, { error: `未知收件人 ${to}` });
-    hub.say(text, to);
-    return json(202, { ok: true });
+    try {
+      hub.say(text, to, body?.task === undefined ? null : String(body.task));
+      return json(202, { ok: true });
+    } catch (error) {
+      return json(error instanceof ValidationError ? 400 : 500, { error: error.message });
+    }
   }
 
   // The participation channel. bin/agent-os-mcp.mjs is a stdio↔HTTP bridge onto
@@ -535,6 +629,7 @@ server.listen(PORT, HOST, () => {
       configuredHumanToken: process.env.AGENT_OS_HUMAN_TOKEN,
       nodeEnv: process.env.NODE_ENV,
       isTty: process.stdout.isTTY === true,
+      suppressGeneratedHumanToken: process.env.AGENT_OS_SUPPRESS_GENERATED_TOKEN === "1",
     })
   ) {
     console.log(`human token →  ${credentials.humanToken}`);

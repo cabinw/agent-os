@@ -8,6 +8,8 @@ apps\chat-spike\src\events.mjs
 apps\chat-spike\src\html.mjs
 apps\chat-spike\src\http-security.mjs
 apps\chat-spike\src\hub.mjs
+apps\chat-spike\src\human-session.mjs
+apps\chat-spike\src\local-executables.mjs
 apps\chat-spike\src\log.mjs
 apps\chat-spike\src\mcp-bridge.mjs
 apps\chat-spike\src\mcp-mount.mjs

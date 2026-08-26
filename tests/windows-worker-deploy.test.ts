@@ -447,7 +447,7 @@ public static class Probe {
       .map((relative) => `apps\\chat-spike\\src\\${relative.replaceAll("/", "\\")}`)
       .sort();
     expect(sources).toEqual(expected);
-    expect(sources).toHaveLength(27);
+    expect(sources).toHaveLength(29);
     expect(manifest).toEqual(["runner-worker.bundle.mjs"]);
     for (const source of [install, upgrade]) {
       expect(source).toContain("'worker-runtime.manifest'");
@@ -465,7 +465,7 @@ public static class Probe {
           encoding: "utf8",
         });
         expect(result.status, result.stderr).toBe(0);
-        expect(JSON.parse(result.stdout)).toMatchObject({ files: 1, sources: 27 });
+        expect(JSON.parse(result.stdout)).toMatchObject({ files: 1, sources: 29 });
       }
       const firstBundle = await readFile(join(first, "runner-worker.bundle.mjs"));
       const secondBundle = await readFile(join(second, "runner-worker.bundle.mjs"));

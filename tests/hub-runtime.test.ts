@@ -1068,5 +1068,8 @@ describe("Hub runtime hardening", () => {
       }),
     ).toBe(false);
     expect(shouldPrintGeneratedHumanToken({ ...base, runnerMode: "remote" })).toBe(false);
+    expect(
+      shouldPrintGeneratedHumanToken({ ...base, suppressGeneratedHumanToken: true }),
+    ).toBe(false);
   });
 });

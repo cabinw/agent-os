@@ -14,12 +14,14 @@ export function shouldPrintGeneratedHumanToken({
   configuredHumanToken,
   nodeEnv,
   isTty,
+  suppressGeneratedHumanToken = false,
 }) {
   return (
     runnerMode === "local" &&
     !configuredHumanToken &&
     nodeEnv !== "production" &&
-    isTty === true
+    isTty === true &&
+    suppressGeneratedHumanToken !== true
   );
 }
 

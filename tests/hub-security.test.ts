@@ -166,6 +166,64 @@ describe("Hub bearer trust boundary", () => {
     expect(reset.status).toBe(200);
   });
 
+  it("exchanges the human bearer for a strict HttpOnly session and revokes it", async () => {
+    const deniedAgent = await fetch(`${baseUrl}/auth/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseUrl },
+      body: JSON.stringify({ token: CLAUDE_TOKEN }),
+    });
+    expect(deniedAgent.status).toBe(401);
+    expect(deniedAgent.headers.get("set-cookie")).toBeNull();
+
+    const login = await fetch(`${baseUrl}/auth/session`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: baseUrl },
+      body: JSON.stringify({ token: HUMAN_TOKEN }),
+    });
+    expect(login.status).toBe(200);
+    const setCookie = login.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("agent_os_session=");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Strict");
+    expect(setCookie).not.toContain(HUMAN_TOKEN);
+    expect(setCookie).not.toContain("Secure");
+    const cookie = setCookie.split(";", 1)[0];
+
+    const sessionRead = await fetch(`${baseUrl}/src/html.mjs`, {
+      headers: { cookie },
+    });
+    expect(sessionRead.status).toBe(200);
+    const writeWithoutOrigin = await fetch(`${baseUrl}/accept`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ task: "TASK-does-not-exist", ok: true }),
+    });
+    expect(writeWithoutOrigin.status).toBe(403);
+    const sessionWrite = await fetch(`${baseUrl}/accept`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json", origin: baseUrl },
+      body: JSON.stringify({ task: "TASK-does-not-exist", ok: true }),
+    });
+    expect(sessionWrite.status).toBe(400);
+
+    const logout = await fetch(`${baseUrl}/auth/logout`, {
+      method: "POST",
+      headers: { cookie, origin: baseUrl },
+    });
+    expect(logout.status).toBe(200);
+    expect(logout.headers.get("set-cookie")).toContain("Max-Age=0");
+    const revoked = await fetch(`${baseUrl}/src/html.mjs`, { headers: { cookie } });
+    expect(revoked.status).toBe(401);
+  });
+
+  it("keeps local bootstrap unavailable when an explicit human credential exists", async () => {
+    const response = await fetch(`${baseUrl}/auth/local`, {
+      method: "POST",
+      headers: { origin: baseUrl },
+    });
+    expect(response.status).toBe(404);
+  });
+
   it("separates human-only controls from agent-only MCP routes", async () => {
     const humanMcp = await at("/mcp/tools", HUMAN_TOKEN);
     expect(humanMcp.status).toBe(403);
