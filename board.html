@@ -240,8 +240,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 459,
-  "updatedAt": "2026-08-26 11:51 CST",
+  "revision": 461,
+  "updatedAt": "2026-08-26 12:59 CST",
   "updatedBy": "Codex",
   "currentTaskId": "SVR-05",
   "verification": {"testsPassed":1260,"testsTotal":1260,"filesPassed":64,"filesTotal":64,"gatePassed":11,"gateTotal":11,"lintErrors":0,"checkedAt":"2026-08-26 11:50 CST"},
@@ -412,6 +412,9 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-26 12:59","kind":"problem","entity":"PROB-HUB-PUBLISHER-TRUST","title":"admin迁移因活动TASK-004停在stopped并已正式回滚","detail":"sequence 3签名包已通过原生验签和冷准入，attempt 000002按事务关闭自动启动、启用maintenance/block并停止Hub；pre-upgrade snapshot在任何admin/runtime切换前精确拒绝active_tasks_present。随后从已准入sequence/digest固定路径执行同一attempt rollback，记录rollback_started→rolled_back→finalized，经transaction-bound token恢复live、关闭maintenance并重新enable；最终Hub/Nginx/10443 staging均active，admin tree仍为50363eb8，release仍svr03-current-noexec-v3。没有删除guard、手工启动或用控制面token冒充Grok；已要求Windows真实Grok executor重交TASK-004 result进入review后再重试。总体不虚增。"},
+    {"at":"2026-08-26 12:55","kind":"completed","entity":"PROB-HUB-PUBLISHER-TRUST","title":"冷准入实机遗漏与G3历史边界修复已推送0afb39a","detail":"sequence 1实机发现26文件包漏带generation digest helper，停服前fail-closed；修正为精确27文件且native verifier同步白名单。sequence 2随后暴露服务器保留的G3 rolled_back journal目标e140e212与新代际不同；冻结其完整规范摘要5080f7bc，新publisher代际只允许创建attempt 000002并在intent绑定前序事务/rolled_back/摘要，未知或变更历史继续拒绝。Go test/vet、Shell语法及publisher/package/generation专项24/24通过；0afb39a已推送origin/codex/project-control。"},
+    {"at":"2026-08-26 12:47","kind":"progress","entity":"PROB-HUB-PUBLISHER-TRUST","title":"生产publisher公钥信任已安装，私钥保持离线","detail":"本机离线生成root-v1与publisher-a，两个私钥均为0400单链接文件且从未上传；Node 24.19.0/Corepack 0.35.0一次性Linux amd64容器以非root打出Hub release，锁定依赖供应链检查258项通过。服务器只接收根公钥、根签policy、静态verifier及admin/Hub两个签名制品，11项传输SHA-256逐一一致；/etc与/var/lib publisher根为0700、verifier 0555、enforce 0400、transaction.lock 0600，三项生产服务仍active。正式cold admission和signed Hub事务尚未执行，总体不提前加分，保持99.67%。"},
     {"at":"2026-08-26 11:51","kind":"completed","entity":"SVR-02","title":"publisher代码闭环以d494fc7推送原仓库","detail":"单一提交仅包含offline signing、admin-kit精确打包、cold native admission、enforcement pre-source拒绝、ADR/部署文档、自动测试及实时看板；受保护.windows-field未纳入。d494fc7已推送origin/codex/project-control。提交步骤已包含在既有SVR-02/SVR-06交付满分，不重复加分；总体保持99.67%。"},
     {"at":"2026-08-26 11:50","kind":"verified","entity":"SVR-06","title":"publisher变更通过1260项与全部原生门禁","detail":"TypeScript build/type、Biome 241文件、layers 4/4、native boundary、64文件测试完成；唯一既有admin generation SIGKILL用例在高并发全仓中30.211秒触发30秒上限，停止重复整仓后单用例23.305秒通过，最终按全仓其余1259项+同一失败项精确复验计1260/1260。macOS Vite、Cargo check、Tauri debug build全部exit0；Linux publisher 15/15、Go vet和静态amd64构建另行通过。受保护.windows-field仅在门禁期间原样移出并由trap恢复，仍未跟踪。该验证已包含既有SVR-06满分项，不重复加分。"},
     {"at":"2026-08-26 11:46","kind":"verified","entity":"PROB-HUB-PUBLISHER-TRUST","title":"cold admin签名入口代码闭环，生产信任仍未启用","detail":"新增精确26文件admin-kit打包器；静态verifier新增admin-kit签名校验、同描述符发布、安全tar解出、sequence+digest固定路径、admission marker和固定/bin/bash -p接管。enforcement记录存在时，外部bootstrap在source lib前拒绝。Debian amd64原生15/15、Vitest打包/入口/契约13/13、Go vet与Shell语法全绿。该项已包含在SVR-02 Portable trust满分中，不重复加分，总体保持6279.2/6300（99.67%）；生产私钥、Ubuntu信任根和服务均未改动。"},
