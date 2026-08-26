@@ -1,7 +1,9 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"crypto/x509"
@@ -832,10 +834,192 @@ func successLine(record artifactRecord, stateRoot string) string {
 	)
 }
 
+var adminKitFiles = map[string]bool{
+	"bootstrap-admin.sh":                      true,
+	"bin/admin-entry-guard.sh":                true,
+	"bin/capacity-check.mjs":                  true,
+	"bin/copy-artifact.mjs":                   true,
+	"bin/extract-release.mjs":                 true,
+	"bin/health-check.sh":                     true,
+	"bin/install.sh":                          true,
+	"bin/lib.sh":                              true,
+	"bin/recovery-start-gate.sh":              true,
+	"bin/rollback.sh":                         true,
+	"bin/state-admin.sh":                      true,
+	"bin/state-forensic.mjs":                  true,
+	"bin/state-hash.mjs":                      true,
+	"bin/state-open-files.mjs":                true,
+	"bin/state-snapshot.mjs":                  true,
+	"bin/tree-digest.mjs":                     true,
+	"bin/upgrade.sh":                          true,
+	"bin/validate-config.mjs":                 true,
+	"bin/validate-config.sh":                  true,
+	"bin/verify-release.mjs":                  true,
+	"env.example":                             true,
+	"nginx/agent-os-hub-limits.conf":          true,
+	"nginx/agent-os-hub.conf":                 true,
+	"pre-upgrade-snapshot":                    true,
+	"systemd/agent-os-hub-candidate@.service": true,
+	"systemd/agent-os-hub.service":            true,
+}
+
+func canonicalArchiveName(name string) (string, bool) {
+	name = strings.TrimPrefix(name, "./")
+	if name == "" || strings.HasPrefix(name, "/") || strings.Contains(name, "\\") || strings.ContainsRune(name, '\x00') {
+		return "", false
+	}
+	for _, component := range strings.Split(strings.TrimSuffix(name, "/"), "/") {
+		if component == "" || component == "." || component == ".." {
+			return "", false
+		}
+	}
+	return name, true
+}
+
+func extractAdminKit(archivePath, destination string, cfg config) error {
+	archive, err := openTrustedFile(archivePath, cfg)
+	if err != nil {
+		return reject("admin_archive_untrusted")
+	}
+	defer archive.Close()
+	compressed, err := gzip.NewReader(archive)
+	if err != nil {
+		return reject("admin_archive_invalid")
+	}
+	defer compressed.Close()
+	reader := tar.NewReader(compressed)
+	seen := map[string]bool{}
+	for {
+		header, nextErr := reader.Next()
+		if errors.Is(nextErr, io.EOF) {
+			break
+		}
+		if nextErr != nil {
+			return reject("admin_archive_invalid")
+		}
+		if header.Typeflag == tar.TypeDir && (header.Name == "." || header.Name == "./") {
+			continue
+		}
+		name, ok := canonicalArchiveName(header.Name)
+		if !ok {
+			return reject("admin_archive_invalid")
+		}
+		if header.Typeflag == tar.TypeDir {
+			trimmed := strings.TrimSuffix(name, "/")
+			if trimmed != "bin" && trimmed != "nginx" && trimmed != "systemd" {
+				return reject("admin_archive_invalid")
+			}
+			continue
+		}
+		if header.Typeflag != tar.TypeReg || !adminKitFiles[name] || seen[name] || header.Size < 1 || header.Size > 16*1024*1024 {
+			return reject("admin_archive_invalid")
+		}
+		seen[name] = true
+		path := filepath.Join(destination, filepath.FromSlash(name))
+		if !strings.HasPrefix(path, destination+string(os.PathSeparator)) {
+			return reject("admin_archive_invalid")
+		}
+		if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			return reject("admin_archive_publication_failed")
+		}
+		file, openErr := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0400)
+		if openErr != nil {
+			return reject("admin_archive_publication_failed")
+		}
+		written, copyErr := io.CopyN(file, reader, header.Size)
+		if copyErr != nil || written != header.Size || file.Sync() != nil || file.Close() != nil {
+			_ = file.Close()
+			return reject("admin_archive_publication_failed")
+		}
+	}
+	if len(seen) != len(adminKitFiles) {
+		return reject("admin_archive_invalid")
+	}
+	for name := range adminKitFiles {
+		if !seen[name] {
+			return reject("admin_archive_invalid")
+		}
+	}
+	marker := filepath.Join(destination, ".publisher-admitted")
+	if err = os.WriteFile(marker, []byte("agent-os-publisher-admitted-v1\n"), 0400); err != nil {
+		return reject("admin_archive_publication_failed")
+	}
+	markerFile, err := os.Open(marker)
+	if err != nil || markerFile.Sync() != nil || markerFile.Close() != nil {
+		if markerFile != nil {
+			_ = markerFile.Close()
+		}
+		return reject("admin_archive_publication_failed")
+	}
+	for _, directory := range []string{filepath.Join(destination, "bin"), filepath.Join(destination, "nginx"), filepath.Join(destination, "systemd"), destination} {
+		if err = os.Chmod(directory, 0500); err != nil {
+			return reject("admin_archive_publication_failed")
+		}
+		if err = syncDir(directory, cfg); err != nil {
+			return reject("admin_archive_publication_failed")
+		}
+	}
+	return nil
+}
+
+func admitAdminKit(record artifactRecord, cfg config) (string, error) {
+	root := filepath.Join(cfg.stateRoot, "admin-kits")
+	if err := ensureStateDirectory(root, cfg); err != nil {
+		return "", err
+	}
+	name := fmt.Sprintf("admin-kit-%d-%s", record.sequence, record.artifactHash)
+	final := filepath.Join(root, name)
+	if _, err := os.Lstat(final); err == nil {
+		return "", reject("admin_archive_replay_requires_operator_review")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", reject("admin_archive_publication_failed")
+	}
+	candidate := final + ".candidate"
+	if err := os.Mkdir(candidate, 0700); err != nil {
+		return "", reject("admin_archive_publication_failed")
+	}
+	ok := false
+	defer func() {
+		if !ok {
+			_ = os.RemoveAll(candidate)
+		}
+	}()
+	published := filepath.Join(cfg.stateRoot, "staging", fmt.Sprintf("admin-kit-%d-%s", record.sequence, record.artifactHash))
+	if err := extractAdminKit(published, candidate, cfg); err != nil {
+		return "", err
+	}
+	if err := os.Rename(candidate, final); err != nil {
+		return "", reject("admin_archive_publication_failed")
+	}
+	if err := syncDir(root, cfg); err != nil {
+		return "", reject("admin_archive_publication_failed")
+	}
+	ok = true
+	return filepath.Join(final, "bootstrap-admin.sh"), nil
+}
+
 func main() {
 	if err := sanitizeEnvironment(); err != nil {
 		fmt.Fprintf(os.Stderr, "publisher_verifier result=%s\n", err.Error())
 		os.Exit(1)
+	}
+	if len(os.Args) >= 7 && os.Args[1] == "bootstrap-admin" && os.Args[2] == "--artifact" && os.Args[4] == "--envelope" && os.Args[6] == "--" {
+		cfg := config{rootKey: productionRootKey, policy: productionPolicy, policySig: productionPolicySig, stateRoot: productionState, trustBoundary: "/", expectedUID: 0, now: time.Now().Unix(), readClock: func() int64 { return time.Now().Unix() }}
+		record, err := verifyArtifact(cfg, os.Args[3], os.Args[5], os.Args[5]+".sig", "admin-kit")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "publisher_verifier result=%s\n", err.Error())
+			os.Exit(1)
+		}
+		bootstrap, err := admitAdminKit(record, cfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "publisher_verifier result=%s\n", err.Error())
+			os.Exit(1)
+		}
+		arguments := append([]string{"/bin/bash", "-p", bootstrap}, os.Args[7:]...)
+		if err = syscall.Exec("/bin/bash", arguments, os.Environ()); err != nil {
+			fmt.Fprintln(os.Stderr, "publisher_verifier result=admin_bootstrap_exec_failed")
+			os.Exit(1)
+		}
 	}
 	if len(os.Args) != 8 || os.Args[1] != "verify" || os.Args[2] != "--artifact-type" || os.Args[4] != "--artifact" || os.Args[6] != "--envelope" {
 		fmt.Fprintln(os.Stderr, "publisher_verifier result=usage")

@@ -522,8 +522,96 @@ the entries accept only its canonical one-line result and consume only the
 published copy under `/var/lib/agent-os/publisher/staging`. Caller-supplied
 SHA-256-only admission is rejected. ADR-045 defines the offline-root policy,
 canonical envelopes, rotation/revocation and same-descriptor publication
-contract. Cold admin-kit admission is not wired yet and remains a production
-blocker. Admin-kit upgrade is a separate packaging/change-control
+contract.
+
+The repository also contains a verification-independent offline authoring
+tool. Build and run it only on the offline signing workstation; never copy root
+or publisher private keys to a Hub host:
+
+```bash
+cd deploy/publisher
+go build -trimpath -o /secure/bin/agent-os-publisher-offline ./offline
+
+# One-time key material. Production execution requires the separately reviewed
+# key-custody ceremony; these commands are not a trust-bootstrap shortcut.
+/secure/bin/agent-os-publisher-offline generate \
+  --private /secure/root-v1.private.pem \
+  --public /secure/root-v1.pem
+/secure/bin/agent-os-publisher-offline generate \
+  --private /secure/publisher-a.private.pem \
+  --public /secure/publisher-a.pem
+
+/secure/bin/agent-os-publisher-offline policy \
+  --root-private /secure/root-v1.private.pem \
+  --epoch 1 \
+  --key publisher-a,active,<not-before>,<not-after>,/secure/publisher-a.pem \
+  --output /secure/out/policy-v1 \
+  --signature /secure/out/policy-v1.sig
+
+/secure/bin/agent-os-publisher-offline artifact \
+  --publisher-private /secure/publisher-a.private.pem \
+  --artifact /secure/out/agent-os-<revision>.tar.gz \
+  --artifact-type hub-release \
+  --key-id publisher-a \
+  --policy-epoch 1 \
+  --sequence <per-type-sequence> \
+  --not-before <utc-seconds> \
+  --expires-at <utc-seconds> \
+  --output /secure/out/agent-os-<revision>.envelope \
+  --signature /secure/out/agent-os-<revision>.envelope.sig
+
+deploy/hub/bin/package-admin-kit.sh \
+  --source "$PWD/deploy/hub" \
+  --output /secure/out/agent-os-admin-<generation>.tar.gz
+/secure/bin/agent-os-publisher-offline artifact \
+  --publisher-private /secure/publisher-a.private.pem \
+  --artifact /secure/out/agent-os-admin-<generation>.tar.gz \
+  --artifact-type admin-kit \
+  --key-id publisher-a \
+  --policy-epoch 1 \
+  --sequence <admin-kit-sequence> \
+  --not-before <utc-seconds> \
+  --expires-at <utc-seconds> \
+  --output /secure/out/agent-os-admin-<generation>.envelope \
+  --signature /secure/out/agent-os-admin-<generation>.envelope.sig
+```
+
+Inputs and outputs must be canonical absolute paths. Inputs must be owned by
+the invoking identity, single-link regular files and not group/world writable;
+outputs are created with `O_EXCL`, fsynced and never overwritten. The tool
+constructs the canonical policy/envelope bytes itself and emits raw 64-byte
+Ed25519 signatures. It never logs private keys, policy contents, envelopes or
+signatures. Policy key specifications are sorted by key id and duplicates fail
+closed. Validate a frozen tool build with `go test ./...` from
+`deploy/publisher` before every ceremony.
+
+After the separately reviewed provisioning ceremony has installed the public
+root, signed policy, static verifier, verifier pin, state layout and exact
+`0400` enforcement record, the only cold administrator entry is:
+
+```bash
+sudo /usr/bin/env -i \
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin \
+  LANG=C LC_ALL=C TZ=UTC \
+  /usr/libexec/agent-os/publisher/verify bootstrap-admin \
+  --artifact /secure/staging/agent-os-admin-<generation>.tar.gz \
+  --envelope /secure/staging/agent-os-admin-<generation>.envelope \
+  --
+```
+
+The native verifier admits `admin-kit`, publishes the authenticated archive,
+extracts only the exact 26-file allowlist without links or special objects into
+its root-only state tree, fsyncs it, and replaces itself with fixed
+`/bin/bash -p` reading that published bootstrap. When
+`/etc/agent-os/publisher/enforce` contains exactly
+`agent-os-publisher-enforcement-v1`, a bootstrap outside the admitted
+sequence/digest path fails before sourcing `lib.sh`. The enforcement record is
+part of host provisioning, never part of the candidate archive.
+
+Cold admin-kit admission is implemented and covered by native archive/path
+tests; target-Ubuntu lifecycle acceptance and the production key ceremony
+remain blockers.
+Admin-kit upgrade is a separate packaging/change-control
 workflow governed by
 [ADR-041](../docs/decisions/ADR-041-privileged-admin-kit-migration.md). The only
 supported migration from the allowlisted legacy staging kit is:
@@ -700,7 +788,7 @@ cd "$SOURCE_ROOT"
 | Dedicated Agent OS FQDN and matching trusted certificate | field dependency; placeholder origin was rejected before publication, leaving no env/unit/current/listener; Hub activation and cross-host smoke remain blocked until supplied |
 | Ubuntu exact Node version/SHA and repository-pinned Corepack/pnpm | field gate passed: pinned Linux x64 archive SHA and signature chain verified; the gate enforces `/usr/bin/node` 24.19.0, `/usr/bin/corepack` 0.35.0 and pnpm 11.17.0, and revalidates their root-owned non-writable paths before use |
 | clean Linux production dependency closure | cold-cache field gate passes with pnpm 11.17.0, zero reused packages, final SDK/Zod imports, no links/special files and no admin tree; rerun after every frozen artifact change |
-| authenticated release/admin-kit publisher and signature verification | application release verifier core and install/upgrade admission implemented; Ubuntu lifecycle acceptance and cold admin-kit wiring remain pending |
+| authenticated release/admin-kit publisher and signature verification | verifier, offline authoring, exact admin packaging, signed release admission and cold admin admission implemented; production key ceremony and Ubuntu lifecycle acceptance remain pending |
 | Hub health endpoints and health-check script | implemented; focused local gate passes |
 | bounded body parsing, shutdown deadline and propagated close failure | implemented; focused local runtime gate passes |
 | reconnect backoff, jitter and bounded Runner transport/body caches | implemented; focused runtime gate passes |

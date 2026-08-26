@@ -79,6 +79,22 @@ if [[ -n "$BOOTSTRAP_TEST_ROOT" ]]; then
   ((EUID != 0)) || bootstrap_fail 'test mode must never run as root'
 else
   bootstrap_trusted_file "$BOOTSTRAP_SOURCE"
+  readonly PUBLISHER_ENFORCEMENT=/etc/agent-os/publisher/enforce
+  if [[ -e "$PUBLISHER_ENFORCEMENT" || -L "$PUBLISHER_ENFORCEMENT" ]]; then
+    bootstrap_trusted_file "$PUBLISHER_ENFORCEMENT"
+    [[ "$(bootstrap_stat_value '%a' '%Lp' "$PUBLISHER_ENFORCEMENT")" == 400 && \
+      "$(bootstrap_stat_value '%h' '%l' "$PUBLISHER_ENFORCEMENT")" == 1 && \
+      "$(<"$PUBLISHER_ENFORCEMENT")" == agent-os-publisher-enforcement-v1 ]] ||
+      bootstrap_fail 'publisher enforcement record is invalid'
+    [[ "$BOOTSTRAP_SOURCE" =~ ^/var/lib/agent-os/publisher/admin-kits/admin-kit-[1-9][0-9]*-[a-f0-9]{64}/bootstrap-admin\.sh$ ]] ||
+      bootstrap_fail 'direct bootstrap is disabled by publisher enforcement'
+    admitted="${BOOTSTRAP_SOURCE%/*}/.publisher-admitted"
+    bootstrap_trusted_file "$admitted"
+    [[ "$(bootstrap_stat_value '%a' '%Lp' "$admitted")" == 400 && \
+      "$(bootstrap_stat_value '%h' '%l' "$admitted")" == 1 && \
+      "$(<"$admitted")" == agent-os-publisher-admitted-v1 ]] ||
+      bootstrap_fail 'publisher admission record is invalid'
+  fi
 fi
 readonly SCRIPT_DIR="$(CDPATH= cd -- "$(/usr/bin/dirname -- "$BOOTSTRAP_SOURCE")" && pwd -P)"
 if [[ -z "$BOOTSTRAP_TEST_ROOT" ]]; then

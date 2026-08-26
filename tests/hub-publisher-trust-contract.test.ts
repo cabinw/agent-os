@@ -6,6 +6,7 @@ const adr = readFileSync(
   "utf8",
 );
 const deploy = readFileSync("deploy/README.md", "utf8");
+const bootstrap = readFileSync("deploy/hub/bootstrap-admin.sh", "utf8");
 
 describe("offline publisher trust contract", () => {
   it("places the trust anchor and launcher outside candidate artifacts", () => {
@@ -48,12 +49,21 @@ describe("offline publisher trust contract", () => {
     expect(adr).toMatch(/Provisioning authenticates\s+its exact SHA-256/u);
   });
 
-  it("distinguishes the implemented release entry from cold admin admission", () => {
+  it("records both signed release and cold admin admission boundaries", () => {
     expect(deploy).toContain("Application-release install and upgrade now execute");
     expect(deploy).toContain("SHA-256-only admission is rejected");
-    expect(deploy).toContain("Cold admin-kit admission is not wired yet");
+    expect(deploy).toContain("Cold admin-kit admission is implemented");
+    expect(deploy).toContain("agent-os-publisher-enforcement-v1");
+    expect(deploy).toContain("exact 26-file allowlist");
     expect(deploy).toContain(
-      "application release verifier core and install/upgrade admission implemented",
+      "signed release admission and cold admin admission implemented",
+    );
+    expect(bootstrap).toContain(
+      "readonly PUBLISHER_ENFORCEMENT=/etc/agent-os/publisher/enforce",
+    );
+    expect(bootstrap).toContain("direct bootstrap is disabled by publisher enforcement");
+    expect(bootstrap.indexOf("PUBLISHER_ENFORCEMENT")).toBeLessThan(
+      bootstrap.indexOf('source "$SCRIPT_DIR/bin/lib.sh"'),
     );
   });
 });

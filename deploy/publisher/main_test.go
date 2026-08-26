@@ -3,6 +3,8 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -426,5 +428,101 @@ func TestSuccessProtocolIsCanonicalAndRedacted(t *testing.T) {
 	expected := "publisher_verifier result=ok artifact_type=hub-release sequence=7 artifact_sha256=" + strings.Repeat("a", 64) + " artifact_bytes=13 published_path=/var/lib/agent-os/publisher/staging/hub-release-7-" + strings.Repeat("a", 64)
 	if line != expected || strings.Contains(line, "signature") || strings.ContainsRune(line, '\n') {
 		t.Fatalf("unexpected success protocol: %q", line)
+	}
+}
+
+func writeAdminArchive(t *testing.T, path string, mutate func(*tar.Header)) {
+	t.Helper()
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressed := gzip.NewWriter(file)
+	archive := tar.NewWriter(compressed)
+	if err = archive.WriteHeader(&tar.Header{Name: "./", Mode: 0700, Typeflag: tar.TypeDir}); err != nil {
+		t.Fatal(err)
+	}
+	for name := range adminKitFiles {
+		header := &tar.Header{Name: name, Mode: 0600, Size: 1, Typeflag: tar.TypeReg}
+		if mutate != nil {
+			mutate(header)
+			mutate = nil
+		}
+		if err = archive.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = archive.Write([]byte("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = compressed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err = file.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdminArchiveExactExtractionAndTraversalRejection(t *testing.T) {
+	f := makeFixture(t)
+	archive := filepath.Join(filepath.Dir(f.artifact), "admin-kit.tar.gz")
+	writeAdminArchive(t, archive, nil)
+	destination := filepath.Join(filepath.Dir(f.artifact), "admitted")
+	if err := os.Mkdir(destination, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractAdminKit(archive, destination, f.cfg); err != nil {
+		t.Fatal(err)
+	}
+	marker, err := os.ReadFile(filepath.Join(destination, ".publisher-admitted"))
+	if err != nil || string(marker) != "agent-os-publisher-admitted-v1\n" {
+		t.Fatalf("admission marker=%q err=%v", marker, err)
+	}
+	for name := range adminKitFiles {
+		info, statErr := os.Stat(filepath.Join(destination, name))
+		if statErr != nil {
+			t.Fatalf("extracted %s err=%v", name, statErr)
+		}
+		if info.Mode().Perm() != 0400 {
+			t.Fatalf("extracted %s mode=%v", name, info.Mode())
+		}
+	}
+
+	malicious := filepath.Join(filepath.Dir(f.artifact), "malicious.tar.gz")
+	writeAdminArchive(t, malicious, func(header *tar.Header) { header.Name = "../escape" })
+	badDestination := filepath.Join(filepath.Dir(f.artifact), "rejected")
+	if err = os.Mkdir(badDestination, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = extractAdminKit(malicious, badDestination, f.cfg); err == nil || err.Error() != "admin_archive_invalid" {
+		t.Fatalf("traversal result=%v", err)
+	}
+	if _, err = os.Stat(filepath.Join(filepath.Dir(badDestination), "escape")); !os.IsNotExist(err) {
+		t.Fatal("traversal escaped the destination")
+	}
+}
+
+func TestAdminAdmissionPublishesOnlyDeterministicVerifiedPath(t *testing.T) {
+	f := makeFixture(t)
+	archiveHash := strings.Repeat("b", 64)
+	published := filepath.Join(f.cfg.stateRoot, "staging", "admin-kit-4-"+archiveHash)
+	writeAdminArchive(t, published, nil)
+	record := artifactRecord{typeName: "admin-kit", sequence: 4, artifactHash: archiveHash}
+	bootstrap, err := admitAdminKit(record, f.cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := filepath.Join(f.cfg.stateRoot, "admin-kits", "admin-kit-4-"+archiveHash, "bootstrap-admin.sh")
+	if bootstrap != expected {
+		t.Fatalf("bootstrap path=%s want=%s", bootstrap, expected)
+	}
+	if _, err = os.Stat(bootstrap); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = admitAdminKit(record, f.cfg); err == nil || err.Error() != "admin_archive_replay_requires_operator_review" {
+		t.Fatalf("repeat admission result=%v", err)
 	}
 }

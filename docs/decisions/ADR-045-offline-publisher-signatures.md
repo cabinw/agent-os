@@ -41,10 +41,26 @@ publisher authenticity and is rejected once publisher enforcement is enabled.
 Application install and upgrade call the same fixed launcher before archive
 copy, extraction, deployment lock or maintenance.
 
+For cold admission the native launcher verifies and publishes the signed
+administrator archive, extracts only the fixed administrator-file allowlist
+into a root-only sequence/digest directory, rejects links, special objects,
+duplicates, traversal and unknown paths, and fsyncs every file and directory.
+It then replaces itself with fixed `/bin/bash -p` reading only the published
+bootstrap. A root-only provisioning record enables enforcement; an admitted
+directory carries a root-only marker created by the launcher. The candidate
+archive cannot supply either enforcement state or its destination path.
+
 The offline root signs publisher policies, not ordinary artifacts. Root-key
 replacement requires a separately reviewed administrator generation containing
 the old-root/new-root dual-signature transition. It is never learned from an
 artifact or network response.
+
+Offline authoring is a separate native executable from the production
+verifier. It may generate Ed25519 key pairs and construct/sign canonical policy
+or artifact frames, but it is never installed on a Hub host. It accepts only
+absolute, owner-controlled, single-link regular inputs, creates outputs
+exclusively, fsyncs them and does not overwrite an existing ceremony artifact.
+The production verifier contains no signing or private-key code path.
 
 ### Policy
 
@@ -200,5 +216,8 @@ validity does not express deployment order; the per-type durable sequence does.
 Publisher trust becomes a host-provisioning dependency distinct from artifact
 delivery. Existing bootstrap/install commands remain staging-only until the
 fixed launcher, policy high-water store and same-descriptor publisher are
-implemented and tested. This ADR does not retroactively authenticate already
+implemented and tested. The offline authoring tool is implemented, but its
+presence does not create production trust: key custody, initial root/policy
+provisioning and cold administrator-kit admission still require a separately
+reviewed ceremony. This ADR does not retroactively authenticate already
 installed artifacts.
