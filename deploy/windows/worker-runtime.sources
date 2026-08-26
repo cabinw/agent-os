@@ -9,6 +9,7 @@ apps\chat-spike\src\html.mjs
 apps\chat-spike\src\http-security.mjs
 apps\chat-spike\src\hub.mjs
 apps\chat-spike\src\log.mjs
+apps\chat-spike\src\mcp-bridge.mjs
 apps\chat-spike\src\mcp-mount.mjs
 apps\chat-spike\src\mcp-tools.mjs
 apps\chat-spike\src\runner-worker.mjs

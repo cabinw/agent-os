@@ -28,7 +28,7 @@ must name the exact entry and working directory in that release. Lifecycle and
 admin-upgrade validation remeasure the same exact tree.
 
 The admitted Worker artifact is a reproducible single-file ESM bundle. Its
-builder first proves the canonical 26-file source inventory still matches the
+builder first proves the canonical 27-file source inventory still matches the
 repository, then includes the locked third-party dependency graph. The runtime
 manifest admits only `runner-worker.bundle.mjs`; an archive of bare sources is
 rejected because Node module resolution would otherwise escape the exact-tree
@@ -86,6 +86,12 @@ The host creates Node with `CREATE_SUSPENDED`, assigns it to a kill-on-close Job
 Object and only then resumes its primary thread. Vendor children inherit that
 boundary. The child receives an allowlisted environment and fixed executable
 paths; credentials mount outside the workspace.
+Every vendor MCP configuration binds the Agent OS bridge to the Worker's fixed
+absolute Node executable. It never relies on `PATH`, which is intentionally
+absent from the vendor environment allowlist.
+The Windows release embeds the MCP bridge behind a fixed argument on the same
+single-file Worker bundle. MCP configuration never points at an unpackaged or
+mutable script.
 The host resolves the dedicated Worker's `USERPROFILE`, `HOME`, `APPDATA` and
 `LOCALAPPDATA` from Windows special folders, validates their fixed containment
 and passes only those profile paths to the sanitized Worker. Vendor CLIs can

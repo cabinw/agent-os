@@ -12,6 +12,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ADAPTERS, getAdapter } from "./adapters/index.mjs";
 import { MIN_TOKEN_LENGTH, parseAgentTokens } from "./http-security.mjs";
+import { runMcpBridge } from "./mcp-bridge.mjs";
 import { mountMcp } from "./mcp-mount.mjs";
 import { createWindowsReplacer } from "./runners/durable-file.mjs";
 import { LocalRunner } from "./runners/local.mjs";
@@ -19,6 +20,8 @@ import { RemoteRunnerWorker } from "./runners/remote.mjs";
 import { SessionStore } from "./runners/session-store.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const WORKER_ENTRY = realpathSync(fileURLToPath(import.meta.url));
+export const WORKER_MCP_BRIDGE_ARG = "--agent-os-mcp-bridge";
 const BUILTIN_EXECUTABLE_ENV = Object.freeze({
   claude: "AGENT_OS_CLAUDE_BIN",
   codex: "AGENT_OS_CODEX_BIN",
@@ -330,6 +333,8 @@ export function createRunnerWorker({
             ),
             url,
             token: agentToken,
+            bridgePath: WORKER_ENTRY,
+            bridgeArgs: [WORKER_MCP_BRIDGE_ARG],
           });
     },
   });
@@ -385,4 +390,10 @@ export async function runRunnerWorker({ logger = console, ...options } = {}) {
 const isMain =
   process.argv[1] !== undefined &&
   realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url));
-if (isMain) await runRunnerWorker();
+if (isMain) {
+  if (process.argv.length === 3 && process.argv[2] === WORKER_MCP_BRIDGE_ARG) {
+    runMcpBridge();
+  } else {
+    await runRunnerWorker();
+  }
+}

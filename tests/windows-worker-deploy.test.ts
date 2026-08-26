@@ -447,7 +447,7 @@ public static class Probe {
       .map((relative) => `apps\\chat-spike\\src\\${relative.replaceAll("/", "\\")}`)
       .sort();
     expect(sources).toEqual(expected);
-    expect(sources).toHaveLength(26);
+    expect(sources).toHaveLength(27);
     expect(manifest).toEqual(["runner-worker.bundle.mjs"]);
     for (const source of [install, upgrade]) {
       expect(source).toContain("'worker-runtime.manifest'");
@@ -465,7 +465,7 @@ public static class Probe {
           encoding: "utf8",
         });
         expect(result.status, result.stderr).toBe(0);
-        expect(JSON.parse(result.stdout)).toMatchObject({ files: 1, sources: 26 });
+        expect(JSON.parse(result.stdout)).toMatchObject({ files: 1, sources: 27 });
       }
       const firstBundle = await readFile(join(first, "runner-worker.bundle.mjs"));
       const secondBundle = await readFile(join(second, "runner-worker.bundle.mjs"));
@@ -482,6 +482,22 @@ public static class Probe {
       expect(probe.status).not.toBe(0);
       expect(`${probe.stdout}${probe.stderr}`).toContain("AGENT_OS_URL is required");
       expect(`${probe.stdout}${probe.stderr}`).not.toContain("ERR_MODULE_NOT_FOUND");
+
+      const bridgeProbe = spawnSync(
+        process.execPath,
+        [join(first, "runner-worker.bundle.mjs"), "--agent-os-mcp-bridge"],
+        {
+          encoding: "utf8",
+          env: {},
+          input: '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\n',
+        },
+      );
+      expect(bridgeProbe.status, bridgeProbe.stderr).toBe(0);
+      expect(JSON.parse(bridgeProbe.stdout)).toMatchObject({
+        jsonrpc: "2.0",
+        id: 1,
+        result: { serverInfo: { name: "agent-os" } },
+      });
     } finally {
       rmSync(root, { recursive: true });
     }

@@ -289,6 +289,8 @@ describe("credential, HTML and local execution hardening", () => {
 
     const configPath = join(dir, ".grok", "config.toml");
     const config = await readFile(configPath, "utf8");
+    expect(config).toContain(`command = ${JSON.stringify(process.execPath)}`);
+    expect(config).not.toContain('command = "node"');
     expect(config).not.toContain(CLAUDE_TOKEN);
     expect(config).not.toContain("AGENT_OS_TOKEN");
     expect(config).toContain("AGENT_OS_SECRET_FILE");
@@ -297,6 +299,18 @@ describe("credential, HTML and local execution hardening", () => {
     const secretPath = join(credentialDir, "mcp-secret.json");
     expect(await readFile(secretPath, "utf8")).toContain(CLAUDE_TOKEN);
     expect((await stat(secretPath)).mode & 0o777).toBe(0o600);
+  });
+
+  it("rejects a PATH-dependent MCP bridge executable", () => {
+    expect(() =>
+      mountMcp("grok", {
+        dir: join(scratch, "grok-relative-node"),
+        credentialDir: join(scratch, "credentials", "grok-relative-node"),
+        url: baseUrl,
+        token: CLAUDE_TOKEN,
+        nodeExecutable: "node",
+      }),
+    ).toThrow(/absolute path/);
   });
 
   it("refuses credential reparse points, hard links and workspace config links", async () => {

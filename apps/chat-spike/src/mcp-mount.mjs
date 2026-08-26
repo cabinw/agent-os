@@ -96,12 +96,12 @@ function secureWriteOnce(path, content) {
   }
 }
 
-function serverJson(url, secretPath) {
+function serverJson(url, secretPath, nodeExecutable, bridgePath, bridgeArgs) {
   return {
     mcpServers: {
       "agent-os": {
-        command: "node",
-        args: [BRIDGE],
+        command: nodeExecutable,
+        args: [bridgePath, ...bridgeArgs],
         env: { AGENT_OS_URL: url, AGENT_OS_SECRET_FILE: secretPath },
       },
     },
@@ -113,9 +113,16 @@ const MOUNTS = {
    * A file is mandatory: an inline JSON string makes the CLI read the following
    * prompt as a second config path.
    */
-  claude(dir, url, secretPath) {
+  claude(dir, url, secretPath, nodeExecutable, bridgePath, bridgeArgs) {
     const path = join(dir, "mcp.json");
-    secureWriteOnce(path, JSON.stringify(serverJson(url, secretPath), null, 2));
+    secureWriteOnce(
+      path,
+      JSON.stringify(
+        serverJson(url, secretPath, nodeExecutable, bridgePath, bridgeArgs),
+        null,
+        2,
+      ),
+    );
     return {
       args: [
         "--mcp-config",
@@ -127,10 +134,14 @@ const MOUNTS = {
     };
   },
 
-  kimi(dir, url, secretPath) {
+  kimi(dir, url, secretPath, nodeExecutable, bridgePath, bridgeArgs) {
     secureWriteOnce(
       join(dir, ".mcp.json"),
-      JSON.stringify(serverJson(url, secretPath), null, 2),
+      JSON.stringify(
+        serverJson(url, secretPath, nodeExecutable, bridgePath, bridgeArgs),
+        null,
+        2,
+      ),
     );
     return { args: [], env: {} };
   },
@@ -140,15 +151,15 @@ const MOUNTS = {
    * Project-scoped servers do not start in an untrusted folder; a throwaway
    * per-agent directory can never be trusted, so the gate is turned off for it.
    */
-  grok(dir, url, secretPath) {
+  grok(dir, url, secretPath, nodeExecutable, bridgePath, bridgeArgs) {
     const cfg = join(dir, ".grok");
     mkdirSync(cfg, { recursive: true, mode: 0o700 });
     secureWriteOnce(
       join(cfg, "config.toml"),
       [
         "[mcp_servers.agent-os]",
-        'command = "node"',
-        `args = [${JSON.stringify(BRIDGE)}]`,
+        `command = ${JSON.stringify(nodeExecutable)}`,
+        `args = ${JSON.stringify([bridgePath, ...bridgeArgs])}`,
         "enabled = true",
         "",
         "[mcp_servers.agent-os.env]",
@@ -179,19 +190,44 @@ const MOUNTS = {
 
 /**
  * @param {string} providerId
- * @param {{ dir: string, credentialDir: string, url: string, token: string|null }} opts
+ * @param {{ dir: string, credentialDir: string, url: string, token: string|null,
+ *           nodeExecutable?: string, bridgePath?: string,
+ *           bridgeArgs?: string[] }} opts
  * @returns {{ args: string[], env: Record<string,string> } | null}
  */
-export function mountMcp(providerId, { dir, credentialDir, url, token }) {
+export function mountMcp(
+  providerId,
+  {
+    dir,
+    credentialDir,
+    url,
+    token,
+    nodeExecutable = process.execPath,
+    bridgePath = BRIDGE,
+    bridgeArgs = [],
+  },
+) {
   const mount = MOUNTS[providerId];
   if (!mount) return null;
   if (!token)
     throw new Error(`missing bearer token for participating agent ${providerId}`);
+  if (typeof nodeExecutable !== "string" || !isAbsolute(nodeExecutable)) {
+    throw new Error("MCP bridge Node executable must be an absolute path");
+  }
+  if (typeof bridgePath !== "string" || !isAbsolute(bridgePath)) {
+    throw new Error("MCP bridge entry must be an absolute path");
+  }
+  if (
+    !Array.isArray(bridgeArgs) ||
+    bridgeArgs.some((value) => typeof value !== "string")
+  ) {
+    throw new Error("MCP bridge arguments must be strings");
+  }
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   secureDirectory(credentialDir);
   const secretPath = join(credentialDir, "mcp-secret.json");
   secureWriteOnce(secretPath, JSON.stringify({ token }));
-  return mount(dir, url, secretPath);
+  return mount(dir, url, secretPath, nodeExecutable, bridgePath, bridgeArgs);
 }
 
 /** Which vendors will actually call our tools — measured, never declared. */
