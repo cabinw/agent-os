@@ -1,0 +1,93 @@
+.entry {
+  display: grid;
+  width: 100%;
+  min-height: 100%;
+  place-items: center;
+  padding: var(--space-8);
+  background: radial-gradient(circle at 20% 10%, var(--accent-soft), transparent 36%),
+    var(--bg);
+}
+
+.loginCard,
+.loadingCard {
+  display: grid;
+  width: min(100%, 440px);
+  gap: var(--space-3);
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--brand-gradient);
+  color: var(--surface);
+  font-size: 20px;
+  font-weight: var(--weight-semibold);
+}
+
+.eyebrow {
+  color: var(--text-muted);
+  font-size: var(--font-size-meta);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.loginCard h1,
+.loadingCard h1 {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-page);
+}
+
+.loginCard p,
+.loadingCard p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.loginCard label {
+  font-weight: var(--weight-semibold);
+}
+
+.loginCard input {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  outline: none;
+}
+
+.loginCard input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.loginCard button {
+  min-height: var(--control-height);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--brand-gradient);
+  color: var(--surface);
+  cursor: pointer;
+  font-weight: var(--weight-semibold);
+}
+
+.loginCard .languageAction {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.error {
+  min-height: 20px;
+  color: var(--risk);
+  font-size: var(--font-size-meta);
+}

@@ -19,7 +19,12 @@ import type {
   HumanPostingClient,
   HumanPostingPolicyViewModel,
 } from "./Threads.js";
-import { AgentsView, type ProjectWorkforceViewModel, TasksView } from "./Workforce.js";
+import {
+  AgentsView,
+  type HumanTaskReviewClient,
+  type ProjectWorkforceViewModel,
+  TasksView,
+} from "./Workforce.js";
 import { type Locale, t } from "./i18n.js";
 import {
   listenForMenuBarIntents,
@@ -36,6 +41,12 @@ import {
 
 type Density = "comfortable" | "compact";
 
+export interface TaskCreationClient {
+  createTask(
+    input: Readonly<{ title: string; requires: readonly string[] }>,
+  ): Promise<void>;
+}
+
 export function App({
   pulse = null,
   library = null,
@@ -48,6 +59,9 @@ export function App({
   approvalClient,
   canvas = null,
   memory = null,
+  connected = false,
+  taskCreationClient,
+  taskReviewClient,
 }: Readonly<{
   pulse?: ProjectPulseViewModel | null;
   library?: ProjectLibraryViewModel | null;
@@ -60,12 +74,19 @@ export function App({
   approvalClient?: ApprovalSurfaceClient;
   canvas?: ProjectCanvasViewModel | null;
   memory?: ProjectMemoryViewModel | null;
+  connected?: boolean;
+  taskCreationClient?: TaskCreationClient;
+  taskReviewClient?: HumanTaskReviewClient;
 }>) {
+  const activeProject = library?.projects[0] ?? null;
   const [locale, setLocale] = useState<Locale>("zh-CN");
   const [density, setDensity] = useState<Density>("comfortable");
-  const [route, setRoute] = useState<RouteId>(() => landingRoute(false));
+  const [route, setRoute] = useState<RouteId>(() => landingRoute(activeProject !== null));
   const [approvalCenterOpen, setApprovalCenterOpen] = useState(false);
   const [approvalFocus, setApprovalFocus] = useState<string | null>(null);
+  const [createTaskOpen, setCreateTaskOpen] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [createTaskFailed, setCreateTaskFailed] = useState(false);
   const menuView = useMemo(
     () => toMenuBarPresentation(approvals, pulse, approvalClient !== undefined),
     [approvals, pulse, approvalClient],
@@ -118,8 +139,14 @@ export function App({
           <span id="project-context-title" className={styles.eyebrow}>
             {t(locale, "project.context.label")}
           </span>
-          <strong>{t(locale, "project.context.empty.title")}</strong>
-          <p>{t(locale, "project.context.empty.detail")}</p>
+          <strong>
+            {activeProject?.name ?? t(locale, "project.context.empty.title")}
+          </strong>
+          <p>
+            {activeProject === null
+              ? t(locale, "project.context.empty.detail")
+              : `${activeProject.progress}% · ${t(locale, `library.state.${activeProject.state}`)}`}
+          </p>
         </section>
 
         <nav className={styles.navigation}>
@@ -138,8 +165,16 @@ export function App({
         </nav>
 
         <div className={styles.sidebarFooter}>
-          <span className={styles.connectionDot} aria-hidden="true" />
-          <span>{t(locale, "shell.livePending.title")}</span>
+          <span
+            className={styles.connectionDot}
+            data-connected={connected ? "true" : "false"}
+            aria-hidden="true"
+          />
+          <span>
+            {connected
+              ? t(locale, "shell.connection.connected")
+              : t(locale, "shell.livePending.title")}
+          </span>
         </div>
       </aside>
 
@@ -150,6 +185,18 @@ export function App({
             <h1>{labelFor(route, locale)}</h1>
           </div>
           <div className={styles.controls}>
+            {taskCreationClient ? (
+              <button
+                type="button"
+                className={styles.primaryAction}
+                onClick={() => {
+                  setCreateTaskFailed(false);
+                  setCreateTaskOpen(true);
+                }}
+              >
+                {t(locale, "task.create.action")}
+              </button>
+            ) : null}
             {approvals && approvals.pendingCount > 0 ? (
               <button
                 type="button"
@@ -194,6 +241,9 @@ export function App({
             conversation={conversation}
             postingPolicy={postingPolicy}
             {...(postingClient === undefined ? {} : { postingClient })}
+            {...(taskReviewClient === undefined
+              ? {}
+              : { reviewClient: taskReviewClient })}
             locale={locale}
           />
         ) : route === "agents" ? (
@@ -279,6 +329,68 @@ export function App({
             setApprovalFocus(null);
           }}
         />
+      ) : null}
+      {createTaskOpen && taskCreationClient ? (
+        <div className={styles.modalBackdrop} role="presentation">
+          <form
+            className={styles.taskComposer}
+            aria-labelledby="create-task-title"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              const title = String(form.get("title") ?? "").trim();
+              const requires = String(form.get("requires") ?? "")
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+              if (!title) return;
+              setCreatingTask(true);
+              setCreateTaskFailed(false);
+              try {
+                await taskCreationClient.createTask({ title, requires });
+                setCreateTaskOpen(false);
+                setRoute("tasks");
+              } catch {
+                setCreateTaskFailed(true);
+              } finally {
+                setCreatingTask(false);
+              }
+            }}
+          >
+            <span className={styles.eyebrow}>{t(locale, "task.create.eyebrow")}</span>
+            <h2 id="create-task-title">{t(locale, "task.create.title")}</h2>
+            <p>{t(locale, "task.create.detail")}</p>
+            <label htmlFor="task-title">{t(locale, "task.create.field.title")}</label>
+            <input id="task-title" name="title" required />
+            <label htmlFor="task-requires">
+              {t(locale, "task.create.field.requires")}
+            </label>
+            <input
+              id="task-requires"
+              name="requires"
+              placeholder={t(locale, "task.create.field.requiresPlaceholder")}
+            />
+            {createTaskFailed ? (
+              <span className={styles.formError} role="alert">
+                {t(locale, "task.create.error")}
+              </span>
+            ) : null}
+            <footer>
+              <button type="button" onClick={() => setCreateTaskOpen(false)}>
+                {t(locale, "task.create.cancel")}
+              </button>
+              <button
+                type="submit"
+                className={styles.primaryAction}
+                disabled={creatingTask}
+              >
+                {creatingTask
+                  ? t(locale, "task.create.creating")
+                  : t(locale, "task.create.submit")}
+              </button>
+            </footer>
+          </form>
+        </div>
       ) : null}
     </div>
   );

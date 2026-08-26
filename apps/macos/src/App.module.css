@@ -122,6 +122,10 @@
   background: var(--warn);
 }
 
+.connectionDot[data-connected="true"] {
+  background: var(--ok);
+}
+
 .main {
   min-width: 0;
   overflow: auto;
@@ -173,6 +177,83 @@
   border-color: var(--warn);
   color: var(--warn);
   font-weight: var(--weight-semibold);
+}
+
+.controls .primaryAction,
+.primaryAction {
+  border-color: transparent;
+  background: var(--brand-gradient);
+  color: var(--surface);
+  font-weight: var(--weight-semibold);
+}
+
+.modalBackdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: color-mix(in srgb, var(--text) 28%, transparent);
+}
+
+.taskComposer {
+  display: grid;
+  width: min(100%, 520px);
+  gap: var(--space-3);
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-popover);
+}
+
+.taskComposer h2,
+.taskComposer p {
+  margin: 0;
+}
+
+.taskComposer p {
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.taskComposer label {
+  margin-top: var(--space-2);
+  font-weight: var(--weight-semibold);
+}
+
+.taskComposer input {
+  min-height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  outline: none;
+}
+
+.taskComposer input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-focus);
+}
+
+.taskComposer footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.taskComposer footer button {
+  min-height: var(--control-height);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.formError {
+  color: var(--risk);
+  font-size: var(--font-size-meta);
 }
 
 .approvalTrigger span {

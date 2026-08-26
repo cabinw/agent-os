@@ -93,6 +93,10 @@ export type ProjectWorkforceViewModel = Readonly<{
   threads: Readonly<{ available: false }>;
 }>;
 
+export interface HumanTaskReviewClient {
+  reviewTask(input: Readonly<{ task: string; accepted: boolean }>): Promise<void>;
+}
+
 const TASK_FILTERS = [
   "all",
   "created",
@@ -152,6 +156,7 @@ export function TasksView({
   initialSelectedTask = null,
   postingPolicy = null,
   postingClient,
+  reviewClient,
 }: Readonly<{
   workforce: ProjectWorkforceViewModel | null;
   locale: Locale;
@@ -159,6 +164,7 @@ export function TasksView({
   initialSelectedTask?: string | null;
   postingPolicy?: HumanPostingPolicyViewModel | null;
   postingClient?: HumanPostingClient;
+  reviewClient?: HumanTaskReviewClient;
 }>) {
   const [filter, setFilter] = useState<(typeof TASK_FILTERS)[number]>("all");
   const [selectedTask, setSelectedTask] = useState<string | null>(initialSelectedTask);
@@ -223,8 +229,37 @@ export function TasksView({
               </div>
               {task.awaitingHumanReview ? (
                 <div className={styles.reviewNotice}>
-                  <strong>{t(locale, "workforce.review.title")}</strong>
-                  <span>{t(locale, "workforce.review.detail")}</span>
+                  <div>
+                    <strong>{t(locale, "workforce.review.title")}</strong>
+                    <span>{t(locale, "workforce.review.detail")}</span>
+                  </div>
+                  {reviewClient ? (
+                    <div className={styles.reviewActions}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void reviewClient.reviewTask({
+                            task: task.task,
+                            accepted: false,
+                          })
+                        }
+                      >
+                        {t(locale, "workforce.review.reject")}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.acceptReview}
+                        onClick={() =>
+                          void reviewClient.reviewTask({
+                            task: task.task,
+                            accepted: true,
+                          })
+                        }
+                      >
+                        {t(locale, "workforce.review.accept")}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {task.blocker ? (

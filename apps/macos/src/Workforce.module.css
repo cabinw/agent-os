@@ -131,6 +131,27 @@
 .reviewNotice {
   background: color-mix(in srgb, var(--warn) 13%, transparent);
   color: var(--warn);
+  justify-content: space-between;
+}
+.reviewNotice > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+.reviewActions {
+  display: flex;
+  gap: 6px;
+}
+.reviewActions button {
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.reviewActions .acceptReview {
+  background: var(--warn);
+  color: var(--surface);
 }
 .blocker {
   background: color-mix(in srgb, var(--risk) 10%, transparent);

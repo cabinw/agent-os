@@ -20,5 +20,17 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     watch: { ignored: ["**/src-tauri/**"] },
+    proxy: {
+      "/hub": {
+        target: "http://127.0.0.1:4173",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/hub/u, ""),
+        configure(proxy) {
+          proxy.on("proxyReq", (request) => {
+            request.setHeader("origin", "http://127.0.0.1:4173");
+          });
+        },
+      },
+    },
   },
 });

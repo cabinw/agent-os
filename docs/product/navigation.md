@@ -49,6 +49,17 @@ genuinely new object domain.
 Pulse is the daily answer to "what happened while I was away", so it is the
 default for anyone with work in flight.
 
+## Product entry
+
+- Local browser: `pnpm experience` → `http://localhost:5173/`
+- Local native window: `pnpm experience:native`
+- Local mode with no configured human token bootstraps a loopback-only web
+  session. Deployed Hubs show the connection-key exchange from
+  [ADR-046](../decisions/ADR-046-human-web-sessions-and-loopback-bootstrap.md).
+- A connected entry lands on Pulse and exposes **New task** in the top bar.
+- A 100% task remains in Review until the human accepts or returns it from
+  Tasks. Progress never substitutes for lifecycle state.
+
 ## Project Detail
 
 Opened from the Library, as a drawer over the grid or a full page. Tabs:
