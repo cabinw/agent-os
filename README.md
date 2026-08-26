@@ -9,22 +9,33 @@ events are reduced into task state, live views, and durable project knowledge.
 Agent OS is not an agent monitor. It is the place where an AI team collaborates,
 executes, and accumulates memory that outlives any single session.
 
+## Try the product
+
+From the repository root, run:
+
+```sh
+pnpm experience
+```
+
+Then open [http://localhost:5173/](http://localhost:5173/). The local product
+entry needs no token: it starts the Hub and interface together, discovers the
+supported agent CLIs already installed on this Mac, and stores local event and
+session state under the ignored `.agent-os/local/` directory. Create a task,
+watch its event-derived progress, and explicitly accept or return results from
+the Tasks view. Stop both processes with `Ctrl-C`.
+
+For the native macOS development window, use `pnpm experience:native`.
+Production Hub access still requires the separately delivered connection key;
+the browser exchanges it for an HttpOnly session and does not retain the bearer
+in URL or browser storage.
+
 ## Status
 
-Architecture plus an executable chat / Hub spike. The spike contains the event
-log, MCP trust boundary, Hub runtime and four vendor adapters; formal Phase 1
-implementation has begun in `packages/event-core`. Hub hardening is
-active: the runtime trust boundary is complete while the Ubuntu deployment and
-upgrade transaction are being hardened. The shared Runner contract covers durable request-id idempotency,
-events, sessions, cancellation, health, retry classification and close; Runner
-injection is mandatory and the Hub has no vendor execution fallback. The active
-Remote code path now runs through the Server Hub / outbound Worker production
-composition root with durable placement, fenced leases, restart replay and
-isolated credentials. It remains staging-only rather than production-ready
-until the deployment and durable-store gates are complete. The versioned strict
-Event Core contract (`RM-1.1a`) is complete;
-the active operational step is `SVR-02`, followed by the formal SQLite event
-store (`RM-1.1b`).
+The local product entry, event-derived desktop surfaces, Hub / Runner runtime,
+formal Event Core and remote Windows Worker are executable. The production Hub
+is deployed at `agent.zeroplus.fun`; access is intentionally authenticated.
+See the live [project board](board.html) for exact evidence, open problems and
+current completion rather than relying on a stale milestone summary here.
 
 ## Where to start
 

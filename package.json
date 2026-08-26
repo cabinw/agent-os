@@ -21,7 +21,9 @@
     "check:native-boundary": "node scripts/check-native-boundary.mjs",
     "check:macos": "sh -c 'cd apps/macos && node_modules/.bin/tsc --build && node_modules/.bin/vite build && cargo check --manifest-path src-tauri/Cargo.toml && node_modules/.bin/tauri build --debug --no-bundle'",
     "demo:core": "pnpm run build && node scripts/core-demo.mjs",
-    "verify": "tsc --build && pnpm run check:types && biome check . && node scripts/check-layers.mjs && node scripts/check-native-boundary.mjs && vitest run && pnpm run check:macos"
+    "verify": "tsc --build && pnpm run check:types && biome check . && node scripts/check-layers.mjs && node scripts/check-native-boundary.mjs && vitest run && pnpm run check:macos",
+    "experience": "node scripts/start-local-product.mjs",
+    "experience:native": "node scripts/start-local-product.mjs --native"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",

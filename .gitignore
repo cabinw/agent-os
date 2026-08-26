@@ -3,6 +3,7 @@
 
 # Local tool state
 .claude/
+.agent-os/
 
 # Node (Phase 1 onward — see docs/development/roadmap.md)
 node_modules/
