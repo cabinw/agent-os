@@ -467,6 +467,19 @@ async function handleRequest(req, res) {
     }
   }
 
+  if (req.method === "POST" && url.pathname === "/cancel") {
+    if (!requireKind("human")) return undefined;
+    const body = await readHubJsonBody(req);
+    const reason = String(body?.reason ?? "").trim() || "Cancelled by human";
+    try {
+      return json(200, await hub.cancel(String(body?.task ?? ""), reason));
+    } catch (error) {
+      return json(error instanceof ValidationError ? 400 : 500, {
+        error: error.message,
+      });
+    }
+  }
+
   if (req.method === "POST" && url.pathname === "/task") {
     if (!requireKind("human")) return undefined;
     if (!(await requireRunnerReady())) return undefined;

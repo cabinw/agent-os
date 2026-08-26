@@ -135,6 +135,7 @@ describe("Hub bearer trust boundary", () => {
       fetch(`${baseUrl}/say`, { method: "POST" }),
       fetch(`${baseUrl}/task`, { method: "POST" }),
       fetch(`${baseUrl}/accept`, { method: "POST" }),
+      fetch(`${baseUrl}/cancel`, { method: "POST" }),
       fetch(`${baseUrl}/reset`, { method: "POST" }),
       fetch(`${baseUrl}/not-a-route`),
     ];
@@ -171,6 +172,8 @@ describe("Hub bearer trust boundary", () => {
 
     const agentAccept = await at("/accept", CLAUDE_TOKEN, { method: "POST" });
     expect(agentAccept.status).toBe(403);
+    const agentCancel = await at("/cancel", CLAUDE_TOKEN, { method: "POST" });
+    expect(agentCancel.status).toBe(403);
 
     const humanAccept = await at("/accept", HUMAN_TOKEN, {
       method: "POST",
@@ -178,6 +181,13 @@ describe("Hub bearer trust boundary", () => {
       body: JSON.stringify({ task: "TASK-does-not-exist", ok: true }),
     });
     expect(humanAccept.status).toBe(400);
+
+    const humanCancel = await at("/cancel", HUMAN_TOKEN, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: "TASK-does-not-exist", reason: "test" }),
+    });
+    expect(humanCancel.status).toBe(400);
   });
 
   it("derives caller from the token and ignores a forged body caller", async () => {

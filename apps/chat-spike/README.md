@@ -177,6 +177,9 @@ than about context windows.
 - [x] **3 — the experiment.** Persistent session vs. rebuilding from `get_context`. **Result: 8/8 perfect recall, and it held under a 100× larger log. The cost is a ~2× per-turn premium for re-entering, almost independent of context volume.**
 - [x] **C — task review loop.** Tasks, capability routing and human acceptance
   now run through the Hub; a Runner result reaches `review`, never self-accepts.
+  Human cancellation writes `task.cancelled` and fences the stable
+  `task.started` Runner request when one exists; it remains available while the
+  Worker is offline.
 
 ## The participation channel
 

@@ -25,7 +25,7 @@ interface TestEvent {
   id: string;
   seq: number;
   type: string;
-  actor: { kind: string };
+  actor: { kind: string; id?: string };
   payload: Record<string, unknown>;
   causedBy?: string;
 }
@@ -44,6 +44,7 @@ interface TestHub {
     ) => Promise<unknown>;
   };
   accept: (task: string) => void;
+  cancel: (task: string, reason?: string) => Promise<unknown>;
   depthOf: (event: string) => number;
   quiescent: () => Promise<boolean>;
   register: (
@@ -84,6 +85,7 @@ class TrustedFakeRunner {
   readonly instances = new Map<string, InstanceType<FakeAdapterClass>>();
   readonly dispatches: RunnerRequest[] = [];
   readonly resets: Array<{ user: string; project: string; agent: string }> = [];
+  readonly cancellations: string[] = [];
   healthState = { ready: true, hostId: "trusted-fake", inflight: 0, queued: 0 };
 
   constructor(definitions: Record<string, { Fake: unknown }>) {
@@ -112,7 +114,8 @@ class TrustedFakeRunner {
   }
 
   async cancel(requestId: string) {
-    return { requestId, outcome: "not_found" };
+    this.cancellations.push(requestId);
+    return { requestId, outcome: "cancelled" };
   }
 
   health() {
@@ -816,6 +819,54 @@ describe("C 任务对象", () => {
       .replay()
       .find((e: { type: string }) => e.type === "task.completed");
     expect(done.actor.kind).toBe("human");
+  });
+
+  it("人类取消 running task 记录终态并 fencing 稳定 started request", async () => {
+    const alpha = fakeAdapter("alpha", "Alpha", {
+      onSend: () => new Promise<string>(() => {}),
+    });
+    const made = makeHub({ alpha }, [{ id: "alpha", capabilities: ["coding"] }]);
+    await made.hub.tools.call("create_task", {
+      title: "取消中的任务",
+      requires: ["coding"],
+    });
+    await made.hub.tools.call("assign_task", { task: "TASK-001" });
+    for (let index = 0; index < 20; index++) {
+      if (made.hub.tasks()["TASK-001"].status === "running") break;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    const started = made.log.replay().find((event) => event.type === "task.started");
+
+    await expect(made.hub.cancel("TASK-001", "operator stop")).resolves.toEqual({
+      task: "TASK-001",
+      status: "cancelled",
+      transport: { requestId: started?.id, outcome: "cancelled" },
+    });
+    expect(made.runner.cancellations).toEqual([started?.id]);
+    expect(made.hub.tasks()["TASK-001"].status).toBe("cancelled");
+    const cancelled = made.log.replay().find((event) => event.type === "task.cancelled");
+    expect(cancelled).toMatchObject({
+      actor: { kind: "human", id: "you" },
+      payload: { task: "TASK-001", by: "you", reason: "operator stop" },
+    });
+  });
+
+  it("Worker离线也能取消未开始的 durable task", async () => {
+    const alpha = fakeAdapter("alpha", "Alpha");
+    const made = makeHub({ alpha }, [{ id: "alpha", capabilities: ["coding"] }]);
+    await made.hub.tools.call("create_task", {
+      title: "尚未指派",
+      requires: ["coding"],
+    });
+    made.runner.healthState.ready = false;
+
+    await expect(made.hub.cancel("TASK-001", "no longer needed")).resolves.toEqual({
+      task: "TASK-001",
+      status: "cancelled",
+      transport: { requestId: null, outcome: "not_started" },
+    });
+    expect(made.runner.cancellations).toEqual([]);
+    expect(made.hub.tasks()["TASK-001"].status).toBe("cancelled");
   });
 
   it("不能替别人交付", async () => {

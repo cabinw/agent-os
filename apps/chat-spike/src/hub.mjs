@@ -841,6 +841,37 @@ export class Hub {
     this.broadcast("tasks", { tasks: this.tasks() });
   }
 
+  /** Human cancellation is durable even when the execution plane is offline. */
+  async cancel(taskId, reason = "Cancelled by human") {
+    const task = this.guard(taskId, "task.cancelled");
+    const started =
+      task.status === "running"
+        ? this.log
+            .replay()
+            .findLast(
+              (event) =>
+                event.type === "task.started" &&
+                event.subject?.kind === "task" &&
+                event.subject.id === taskId,
+            )
+        : null;
+    if (task.status === "running" && !started) {
+      throw new ValidationError(`${taskId} 缺少 task.started，不能安全取消`);
+    }
+
+    this.taskEvent(
+      "task.cancelled",
+      taskId,
+      { by: HUMAN_ID, reason },
+      { kind: "human", id: HUMAN_ID },
+    );
+    this.broadcast("tasks", { tasks: this.tasks() });
+    const transport = started
+      ? await this.runner.cancel(started.id)
+      : { requestId: null, outcome: "not_started" };
+    return { task: taskId, status: "cancelled", transport };
+  }
+
   /** A human message enters through the same door an agent's does. */
   say(text, to) {
     const stored = this.emit(
