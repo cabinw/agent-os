@@ -54,7 +54,7 @@ describe("offline publisher trust contract", () => {
     expect(deploy).toContain("SHA-256-only admission is rejected");
     expect(deploy).toContain("Cold admin-kit admission is implemented");
     expect(deploy).toContain("agent-os-publisher-enforcement-v1");
-    expect(deploy).toContain("exact 26-file allowlist");
+    expect(deploy).toContain("exact 27-file allowlist");
     expect(deploy).toContain(
       "signed release admission and cold admin admission implemented",
     );

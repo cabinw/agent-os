@@ -1095,6 +1095,19 @@ verify_admin_generation_history_allowlist() {
   done
 }
 
+admin_generation_fixed_history_digest() {
+  local transaction=$1 history_index
+  ADMIN_GENERATION_FIXED_HISTORY_DIGEST=
+  [[ "$ADMIN_MIGRATION_CONTRACT_KIND" == generation ]] || return 1
+  for ((history_index = 0; history_index < ${#ADMIN_MIGRATION_ALLOWED_HISTORY_TRANSACTIONS[@]}; history_index += 1)); do
+    if [[ "$transaction" == "${ADMIN_MIGRATION_ALLOWED_HISTORY_TRANSACTIONS[$history_index]}" ]]; then
+      ADMIN_GENERATION_FIXED_HISTORY_DIGEST="${ADMIN_MIGRATION_ALLOWED_HISTORY_DIGESTS[$history_index]}"
+      return 0
+    fi
+  done
+  return 1
+}
+
 verify_admin_generation_source_allowlist() {
   local summary
   local -a admin_manifest=() runtime_manifest=()
@@ -1456,7 +1469,7 @@ cleanup_admin_migration_journal_temporaries() {
 
 scan_admin_migration_attempts() {
   local expected_digest=$1 allow_latest_temporaries=${2:-false}
-  local migration name attempt format index allow_temporaries=false short
+  local migration name attempt format index allow_temporaries=false short fixed_digest
   local previous_transaction=none previous_terminal=none previous_digest=none
   local -a migrations=()
   validate_checksum "$expected_digest"
@@ -1504,6 +1517,15 @@ scan_admin_migration_attempts() {
       "$expected_digest" "$index" "${ADMIN_MIGRATION_SCAN_FORMATS[$index]}"
     [[ "$ADMIN_MIGRATION_ROOT" == "${ADMIN_MIGRATION_SCAN_ROOTS[$index]}" ]] ||
       die 'admin migration history path does not match its attempt identity'
+    if admin_generation_fixed_history_digest "$ADMIN_MIGRATION_TRANSACTION"; then
+      fixed_digest=$ADMIN_GENERATION_FIXED_HISTORY_DIGEST
+      [[ "$(canonical_root_tree_sha256_for "$ADMIN_MIGRATION_ROOT")" == "$fixed_digest" ]] ||
+        die 'fixed prior-generation attempt history changed'
+      previous_transaction=$ADMIN_MIGRATION_TRANSACTION
+      previous_terminal=rolled_back
+      previous_digest=$fixed_digest
+      continue
+    fi
     allow_temporaries=false
     if [[ "$allow_latest_temporaries" == true && \
       "$index" == "$ADMIN_MIGRATION_SCAN_MAX_ATTEMPT" ]]; then
@@ -1550,8 +1572,10 @@ scan_admin_migration_attempts() {
       "$expected_digest" "$index" "${ADMIN_MIGRATION_SCAN_FORMATS[$index]}"
     allow_temporaries=false
     [[ "$allow_latest_temporaries" == true ]] && allow_temporaries=true
-    validate_admin_migration_journal "$expected_digest" "$allow_temporaries" ||
-      die 'latest admin migration journal changed during history scan'
+    if ! admin_generation_fixed_history_digest "$ADMIN_MIGRATION_TRANSACTION"; then
+      validate_admin_migration_journal "$expected_digest" "$allow_temporaries" ||
+        die 'latest admin migration journal changed during history scan'
+    fi
   else
     ADMIN_MIGRATION_ATTEMPT=
     ADMIN_MIGRATION_ATTEMPT_TOKEN=
@@ -1617,6 +1641,19 @@ select_admin_migration_attempt() {
 
   set_admin_migration_attempt_paths \
     "$expected_digest" "$latest" "${ADMIN_MIGRATION_SCAN_FORMATS[$latest]}"
+  if admin_generation_fixed_history_digest "$ADMIN_MIGRATION_TRANSACTION"; then
+    [[ "$action" == forward ]] ||
+      die 'a fixed retired generation can only precede a forward attempt'
+    predecessor_digest=$ADMIN_GENERATION_FIXED_HISTORY_DIGEST
+    [[ "$(canonical_root_tree_sha256_for "$ADMIN_MIGRATION_ROOT")" == "$predecessor_digest" ]] ||
+      die 'fixed retired generation history changed before a new attempt'
+    ADMIN_MIGRATION_PREDECESSOR_TRANSACTION=$ADMIN_MIGRATION_TRANSACTION
+    ADMIN_MIGRATION_PREDECESSOR_TERMINAL=rolled_back
+    ADMIN_MIGRATION_PREDECESSOR_JOURNAL_SHA256=$predecessor_digest
+    next=$((latest + 1))
+    set_admin_migration_attempt_paths "$expected_digest" "$next" attempt
+    return 0
+  fi
   validate_admin_migration_journal "$expected_digest" true ||
     die 'latest admin migration journal is invalid'
   if [[ ! -e "$ADMIN_MIGRATION_ROOT/finalized" ]]; then

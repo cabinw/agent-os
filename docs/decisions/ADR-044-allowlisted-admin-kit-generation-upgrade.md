@@ -15,19 +15,21 @@ unaudited source merely because it can be hashed.
 The separately delivered bootstrap exposes one reviewed generation identifier:
 
 ```text
-bootstrap-admin.sh --upgrade-generation hub-admin-25-20260825-g4 [--rollback]
+bootstrap-admin.sh --upgrade-generation hub-admin-25-20260826-publisher [--rollback]
 ```
 
 The identifier selects compile-time identities in `bootstrap-admin.sh`. The
 operator cannot supply an old or new digest. This edge fixes:
 
 - old 25-file administrator tree `50363eb8…`;
-- new 25-file administrator tree `af8d4c3f…`;
+- new publisher-aware 25-file administrator tree `f83703d6…`;
 - old and new runtime payload `ccbc5110…` (the five runtime files are unchanged);
 - the optional ADR-041 predecessor transaction and its immutable journal
   digest `7b9ee35e…`;
 - the retained `g1` ancestor and its immutable journal digest `7a332db8…`; and
 - the retained initial migration ancestor and its immutable journal digest `8ff2613d…`.
+- the finalized rolled-back `g3` attempt and its immutable journal digest
+  `5080f7bc…`, which becomes the predecessor of attempt `000002`.
 
 An absent predecessor is permitted for a host cold-installed at `50363eb8…`.
 If predecessor history is present, every retained ancestor must match the
@@ -35,6 +37,10 @@ explicit transaction/digest allowlist. This includes the complete known chain,
 not only the direct predecessor. Every other `upgrade-admin-migration-*`
 namespace is rejected. The trusted source is fingerprinted before the first
 deployment lock and again under that lock.
+An exact allowlisted, finalized rolled-back attempt against the same old tree
+is read-only history, even when its rejected target digest differs. Its entire
+journal tree is pinned; the next attempt binds its transaction and digest in
+the new intent. It is never reinterpreted under the new target allowlist.
 The compile-time chain is bounded to 32 transaction/digest pairs.
 
 The generation path reuses one migration state machine from ADR-041. It

@@ -835,6 +835,7 @@ func successLine(record artifactRecord, stateRoot string) string {
 }
 
 var adminKitFiles = map[string]bool{
+	"admin-generation-digest.mjs":             true,
 	"bootstrap-admin.sh":                      true,
 	"bin/admin-entry-guard.sh":                true,
 	"bin/capacity-check.mjs":                  true,

@@ -106,11 +106,13 @@ fi
 # shellcheck source=bin/lib.sh
 source "$SCRIPT_DIR/bin/lib.sh"
 
-readonly ADMIN_GENERATION_ID=hub-admin-25-20260825-g4
+readonly ADMIN_GENERATION_ID=hub-admin-25-20260826-publisher
 readonly ADMIN_GENERATION_OLD_SHA256=50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36
-readonly ADMIN_GENERATION_NEW_SHA256=af8d4c3fcdf474851a7fae3e33e42d79c3c92286e2ddc781acaa640982e7afaa
+readonly ADMIN_GENERATION_NEW_SHA256=f83703d60cb84217881f9ac6bab4be5c0cc8c7d8516b6228a0d075d087c38f10
 readonly ADMIN_GENERATION_OLD_RUNTIME_SHA256=ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440
 readonly ADMIN_GENERATION_NEW_RUNTIME_SHA256=ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440
+readonly ADMIN_GENERATION_RETIRED_TRANSACTION=upgrade-admin-migration-50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36-attempt-000001
+readonly ADMIN_GENERATION_RETIRED_SHA256=5080f7bc4ee7dcf766faf2629faf8f51a0a6a7c1daafa65216a419519460b930
 readonly ADMIN_GENERATION_PREDECESSOR_TRANSACTION=upgrade-admin-migration-f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8-attempt-000001
 readonly ADMIN_GENERATION_PREDECESSOR_SHA256=7b9ee35e2f422fbf2699ad404f03f6a7b02fdf82a2ea104b8fc1e8b0f4f00b03
 readonly ADMIN_GENERATION_ANCESTOR_TRANSACTION=upgrade-admin-migration-444a95509b66052f71dfe94b725dbfbf6de82f053440cdba153f4b567422dbc6-attempt-000001
@@ -166,7 +168,7 @@ else
   printf '%s\n' \
     'usage: bootstrap-admin.sh [--replace-cold --expected-current-sha256 HEX]' \
     '       bootstrap-admin.sh --migrate-installed --expected-current-sha256 HEX [--rollback]' \
-    '       bootstrap-admin.sh --upgrade-generation hub-admin-25-20260825-g4 [--rollback]' >&2
+    '       bootstrap-admin.sh --upgrade-generation hub-admin-25-20260826-publisher [--rollback]' >&2
   exit 2
 fi
 
@@ -181,6 +183,8 @@ if [[ "$migrate_installed" == true ]]; then
       "$ADMIN_GENERATION_NEW_SHA256" \
       "$ADMIN_GENERATION_OLD_RUNTIME_SHA256" \
       "$ADMIN_GENERATION_NEW_RUNTIME_SHA256" \
+      "$ADMIN_GENERATION_RETIRED_TRANSACTION" \
+      "$ADMIN_GENERATION_RETIRED_SHA256" \
       "$ADMIN_GENERATION_PREDECESSOR_TRANSACTION" \
       "$ADMIN_GENERATION_PREDECESSOR_SHA256" \
       "$ADMIN_GENERATION_ANCESTOR_TRANSACTION" \

@@ -600,7 +600,7 @@ sudo /usr/bin/env -i \
 ```
 
 The native verifier admits `admin-kit`, publishes the authenticated archive,
-extracts only the exact 26-file allowlist without links or special objects into
+extracts only the exact 27-file allowlist without links or special objects into
 its root-only state tree, fsyncs it, and replaces itself with fixed
 `/bin/bash -p` reading that published bootstrap. When
 `/etc/agent-os/publisher/enforce` contains exactly

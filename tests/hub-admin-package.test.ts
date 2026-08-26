@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 describe("admin-kit package boundary", () => {
-  it("creates the exact 26-file cold artifact and checksum", () => {
+  it("creates the exact 27-file cold artifact and checksum", () => {
     const output = outputPath();
     const result = spawnSync(script, ["--source", source, "--output", output], {
       encoding: "utf8",
@@ -29,7 +29,7 @@ describe("admin-kit package boundary", () => {
     });
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toMatch(
-      /^admin_kit status=ok sha256=[a-f0-9]{64} files=26\n$/u,
+      /^admin_kit status=ok sha256=[a-f0-9]{64} files=27\n$/u,
     );
     expect(existsSync(output)).toBe(true);
     expect(readFileSync(`${output}.sha256`, "utf8")).toMatch(
@@ -44,7 +44,8 @@ describe("admin-kit package boundary", () => {
       .trim()
       .split("\n")
       .filter((item) => !item.endsWith("/"));
-    expect(files).toHaveLength(26);
+    expect(files).toHaveLength(27);
+    expect(files).toContain("./admin-generation-digest.mjs");
     expect(files).toContain("./bootstrap-admin.sh");
     expect(files).toContain("./bin/lib.sh");
   });

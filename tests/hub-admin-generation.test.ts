@@ -19,9 +19,12 @@ const library = "deploy/hub/bin/lib.sh";
 const digestHelper = "deploy/hub/admin-generation-digest.mjs";
 const executionFixture = "tests/fixtures/hub-admin-generation-execution.sh";
 const oldAdmin = "50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36";
-const newAdmin = "af8d4c3fcdf474851a7fae3e33e42d79c3c92286e2ddc781acaa640982e7afaa";
+const newAdmin = "f83703d60cb84217881f9ac6bab4be5c0cc8c7d8516b6228a0d075d087c38f10";
 const oldRuntime = "ccbc5110a87237401808774011390e335c2437080c48ab7fedf5e04d46944440";
 const newRuntime = oldRuntime;
+const retired = "5080f7bc4ee7dcf766faf2629faf8f51a0a6a7c1daafa65216a419519460b930";
+const retiredTransaction =
+  "upgrade-admin-migration-50363eb8ecb86e1fbaa3c03df3c0e6e2ee22a8d28bdb2c1100b10477a51ccb36-attempt-000001";
 const predecessor = "7b9ee35e2f422fbf2699ad404f03f6a7b02fdf82a2ea104b8fc1e8b0f4f00b03";
 const predecessorTransaction =
   "upgrade-admin-migration-f90634641ef071322baa637b6eb059ee8cad7a0bf3d552b4ae8e59ac37cfcde8-attempt-000001";
@@ -184,7 +187,7 @@ function runLibraryScript(script: string) {
     [
       "-p",
       "-c",
-      `source "$LIB"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$PREDECESSOR_TRANSACTION" "$PREDECESSOR" "$ANCESTOR_TRANSACTION" "$ANCESTOR" "$ROOT_ANCESTOR_TRANSACTION" "$ROOT_ANCESTOR"; ${script}`,
+      `source "$LIB"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$RETIRED_TRANSACTION" "$RETIRED" "$PREDECESSOR_TRANSACTION" "$PREDECESSOR" "$ANCESTOR_TRANSACTION" "$ANCESTOR" "$ROOT_ANCESTOR_TRANSACTION" "$ROOT_ANCESTOR"; ${script}`,
     ],
     {
       encoding: "utf8",
@@ -203,6 +206,8 @@ function runLibraryScript(script: string) {
         PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
         PREDECESSOR: predecessor,
         PREDECESSOR_TRANSACTION: predecessorTransaction,
+        RETIRED: retired,
+        RETIRED_TRANSACTION: retiredTransaction,
         ROOT_ANCESTOR: rootAncestor,
         ROOT_ANCESTOR_TRANSACTION: rootAncestorTransaction,
       },
@@ -221,11 +226,12 @@ describe("allowlisted Hub admin generation upgrade", () => {
       predecessor,
       ancestor,
       rootAncestor,
+      retired,
     ]) {
       expect(source).toContain(value);
       expect(readFileSync(library, "utf8")).not.toContain(value);
     }
-    expect(source).toContain("--upgrade-generation hub-admin-25-20260825-g4");
+    expect(source).toContain("--upgrade-generation hub-admin-25-20260826-publisher");
     expect(source).not.toContain("--expected-next-sha256");
   });
 
@@ -233,7 +239,7 @@ describe("allowlisted Hub admin generation upgrade", () => {
     const result = digest();
     expect(result.status, result.stderr).toBe(0);
     expect(result.value).toEqual({
-      admin: { entryCount: 28, fileCount: 25, totalBytes: 548107, treeSha256: newAdmin },
+      admin: { entryCount: 28, fileCount: 25, totalBytes: 549950, treeSha256: newAdmin },
       runtime: { entryCount: 5, fileCount: 5, totalBytes: 9204, treeSha256: oldRuntime },
     });
   });
@@ -351,6 +357,13 @@ describe("allowlisted Hub admin generation upgrade", () => {
     );
     expect(changed.status).toBe(1);
     expect(changed.stderr).toContain("predecessor history changed");
+  });
+
+  it("binds a new attempt to one exact retired generation journal", () => {
+    const result = runLibraryScript(
+      'mkdir -p "$RECOVERY_ROOT/$RETIRED_TRANSACTION"; retired_digest="$(canonical_root_tree_sha256_for "$RECOVERY_ROOT/$RETIRED_TRANSACTION")"; configure_admin_migration_contract generation "$OLD_ADMIN" "$NEW_ADMIN" "$OLD_RUNTIME" "$NEW_RUNTIME" "$RETIRED_TRANSACTION" "$retired_digest"; verify_admin_generation_history_allowlist; select_admin_migration_attempt "$OLD_ADMIN" forward; [[ "$ADMIN_MIGRATION_ATTEMPT" == 2 && "$ADMIN_MIGRATION_PREDECESSOR_TRANSACTION" == "$RETIRED_TRANSACTION" && "$ADMIN_MIGRATION_PREDECESSOR_TERMINAL" == rolled_back && "$ADMIN_MIGRATION_PREDECESSOR_JOURNAL_SHA256" == "$retired_digest" ]]',
+    );
+    expect(result.status, result.stderr).toBe(0);
   });
 
   it("rejects an unbounded compile-time history allowlist", () => {

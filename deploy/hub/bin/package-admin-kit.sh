@@ -70,6 +70,7 @@ source_root="$(CDPATH= cd -P -- "$source_root" 2>/dev/null && pwd -P)" ||
   fail 'source is not an Agent OS Hub deploy root'
 
 readonly files=(
+  admin-generation-digest.mjs
   bootstrap-admin.sh
   bin/admin-entry-guard.sh
   bin/capacity-check.mjs
