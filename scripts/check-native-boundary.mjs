@@ -1,13 +1,24 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "agent-os-native-boundary-"));
+const workspaceStatePath = join(ROOT, "node_modules", ".pnpm-workspace-state-v1.json");
+const workspaceState = existsSync(workspaceStatePath)
+  ? readFileSync(workspaceStatePath)
+  : undefined;
 
 function deploy(filter, destination) {
   execFileSync(
@@ -76,4 +87,9 @@ try {
   console.log("  · SQLite adapter deploy contains exact Hub-only driver closure");
 } finally {
   rmSync(scratch, { recursive: true, force: true });
+  // `pnpm deploy --prod` records its filtered production settings in the root
+  // install state. Preserve the caller's state so later verification commands
+  // do not mistake this packaging probe for a production-only install.
+  if (workspaceState) writeFileSync(workspaceStatePath, workspaceState);
+  else rmSync(workspaceStatePath, { force: true });
 }

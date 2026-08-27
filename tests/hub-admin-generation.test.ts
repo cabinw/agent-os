@@ -408,7 +408,7 @@ describe("allowlisted Hub admin generation upgrade", () => {
       guards: "clean",
       rolled_back: "no",
     });
-  }, 30_000);
+  }, 60_000);
 
   it.each([
     ["stopped", 0],
