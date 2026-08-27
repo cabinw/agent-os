@@ -22,6 +22,39 @@ human. A Thread is the derived grouping of a task's messages — see
 [product/threads.md](../product/threads.md). Host placement and vendor session
 are operational runtime records; see [agent-runtime](agent-runtime.md).
 
+## Code session gap
+
+[ADR-047](../decisions/ADR-047-code-session-first-product-entry.md) makes a
+project-bound Code Agent session the product entry. The current canonical model
+does not yet identify a user-visible Conversation or one prompt's executable
+Run: `Thread(project, task?)` groups existing events, while Vendor Session is an
+opaque Runner optimization.
+
+The existing implementation name `ConversationProjectState` refers to that
+thread projection: one project thread plus task threads. Its name does not make
+it a named, reopenable Code Agent Conversation, and ENTRY-1 must either evolve
+or clearly separate it without breaking historical replay.
+
+The entry refactor must freeze these four concepts before implementation:
+
+| Concept | Required distinction |
+| --- | --- |
+| Conversation | User-visible continuity; may contain multiple Runs |
+| Run | One cancellable, recoverable prompt execution with a durable terminal fact |
+| Vendor Session | Opaque continuation handle; never project truth |
+| Task | Optional accountable work unit with dependencies and human review |
+
+ADR-047 already fixes two isolation boundaries around that pending lifecycle:
+
+- working-copy placement is `(project, runnerHost)`, not one Hub path and not an
+  arbitrary browser-supplied absolute path;
+- Vendor Session scope is `(user, project, conversation, agent)`, with only an
+  explicit default Conversation allowed to adopt legacy three-part state.
+
+Do not add fields to Task or treat a direct message as a durable Run to avoid
+this decision. If Conversation / Run become stored domain identities, add a
+focused ADR, catalog events and replay tests before emitters.
+
 ## Definitions
 
 | Object | Key fields | Notes |

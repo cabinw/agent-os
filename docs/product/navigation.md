@@ -3,9 +3,26 @@
 **Canonical.** Resolves the two conflicting sidebars in the `ui/` mockups. See
 [ADR-003](../decisions/ADR-003-navigation-information-architecture.md).
 
-## Top level
+## Execution home
 
-Seven destinations. Nothing else earns a sidebar slot.
+The product opens on a project-bound Code Agent session per
+[ADR-047](../decisions/ADR-047-code-session-first-product-entry.md):
+
+```
+project / workspace · ready Agent · conversation · active Run · evidence
+```
+
+This is the place to start and control work. Its stable shell-root route id is
+`execution`; it sits outside the seven-item project-intelligence navigation
+array and is not an eighth project-data destination. `apps/macos` owns this
+product route in both browser development and Tauri. The 4173 Spike page remains
+a diagnostic surface.
+
+## Project intelligence
+
+Seven sourced destinations remain the project map around the execution home.
+They may live in secondary navigation; they are not required before the first
+prompt.
 
 | # | Destination | Answers |
 | --- | --- | --- |
@@ -43,11 +60,15 @@ genuinely new object domain.
 
 ## Landing
 
-- No active project → **Project Library**
-- Active project → **Project Pulse**
+- No selected project → project selection / import in the execution home
+- Selected project → its most recent Code Agent Conversation or a new composer
+- Pulse → secondary answer to "what happened while I was away"
 
-Pulse is the daily answer to "what happened while I was away", so it is the
-default for anyone with work in flight.
+The entry must show Agent readiness before it accepts a prompt. Hub connectivity
+alone is not execution readiness. Ready requires sourced facts for executable,
+vendor authentication, Runner connection/acceptance, workspace authorization
+and capacity. Every failed fact has an actionable diagnosis and observation
+time.
 
 ## Product entry
 
@@ -56,7 +77,14 @@ default for anyone with work in flight.
 - Local mode with no configured human token bootstraps a loopback-only web
   session. Deployed Hubs show the connection-key exchange from
   [ADR-046](../decisions/ADR-046-human-web-sessions-and-loopback-bootstrap.md).
-- A connected entry lands on Pulse and exposes **New task** in the top bar.
+- The current implementation still lands on Pulse and exposes **New task**. This
+  is the legacy entry being replaced; it is not the ADR-047 acceptance path.
+- The target entry selects a real project workspace, shows executable Codex /
+  Claude readiness and starts from a prompt. Task and capability fields are not
+  first-use requirements.
+- Browser mode selects a `(project, runnerHost)` placement already authorized by
+  the Runner; it cannot submit an arbitrary filesystem path. Native path picking
+  uses narrow feature-owned IPC and the same Runner containment admission.
 - A 100% task remains in Review until the human accepts or returns it from
   Tasks. Progress never substitutes for lifecycle state.
 
@@ -85,8 +113,9 @@ copy in view code.
 
 ## Shell contract
 
-The executable route ids and order are frozen by
-[ADR-025](../decisions/ADR-025-macos-shell-and-navigation.md). The sidebar is
-always visible at the supported native window sizes. Initial selection is
-Project Library without an active project and Project Pulse with one; Runtime,
-Project Info and Knowledge Graph are forbidden as top-level route ids.
+The seven project-intelligence route ids and order remain frozen by
+[ADR-025](../decisions/ADR-025-macos-shell-and-navigation.md). ADR-047 supersedes
+its initial-selection and always-primary-sidebar rules: the execution home is
+primary at stable root id `execution`, and those routes are secondary. Runtime,
+Project Info and Knowledge Graph remain forbidden as additional
+project-intelligence route ids.

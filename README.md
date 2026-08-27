@@ -1,15 +1,20 @@
 # Agent OS
 
-The operating system for AI-native teams.
+The persistent project environment for Code Agents.
 
-A human states a goal. A Supervisor Agent breaks it into tasks. Agents from any
-provider execute those tasks over MCP. Every state change becomes an event, and
-events are reduced into task state, live views, and durable project knowledge.
+A human opens a repository, prompts a real Code Agent and retains the execution
+evidence, decisions and project memory after that vendor session ends. Tasks,
+approvals and multi-agent delegation build on the same event log when the work
+needs them.
 
-Agent OS is not an agent monitor. It is the place where an AI team collaborates,
-executes, and accumulates memory that outlives any single session.
+Agent OS is not a terminal multiplexer and does not build on Herdr. Its existing
+Hub, Local / Remote Runner and vendor adapters are the execution substrate.
+ADR-047 moves the product entry to a Codex / Claude-style project session;
+multi-agent coordination remains a background execution strategy. The Hub /
+Runner stay in `apps/chat-spike`; `apps/macos` is the single product client, and
+the Spike 4173 page remains diagnostic.
 
-## Try the product
+## Run the current baseline
 
 From the repository root, run:
 
@@ -17,12 +22,14 @@ From the repository root, run:
 pnpm experience
 ```
 
-Then open [http://localhost:5173/](http://localhost:5173/). The local product
-entry needs no token: it starts the Hub and interface together, discovers the
-supported agent CLIs already installed on this Mac, and stores local event and
-session state under the ignored `.agent-os/local/` directory. Create a task,
-watch its event-derived progress, and explicitly accept or return results from
-the Tasks view. Stop both processes with `Ctrl-C`.
+Then open [http://localhost:5173/](http://localhost:5173/). The local composition
+starts the Hub and interface together, discovers supported Agent CLIs and stores
+local event / session state under ignored `.agent-os/local/`.
+
+This runnable baseline still lands on Project Pulse and starts work through
+`New task`. That is the legacy entry being refactored, not the target experience.
+Read [HANDOFF.md](HANDOFF.md) before changing it. Stop both processes with
+`Ctrl-C`.
 
 For the native macOS development window, use `pnpm experience:native`.
 Production Hub access still requires the separately delivered connection key;
@@ -31,28 +38,33 @@ in URL or browser storage.
 
 ## Status
 
-The local product entry, event-derived desktop surfaces, Hub / Runner runtime,
-formal Event Core and remote Windows Worker are executable. The production Hub
-is deployed at `agent.zeroplus.fun`; access is intentionally authenticated.
-See the live [project board](board.html) for exact evidence, open problems and
-current completion rather than relying on a stale milestone summary here.
+The event-derived desktop surfaces, Hub / Runner runtime, formal Event Core,
+memory packages and remote Windows Worker are executable. The production Hub is
+deployed at `agent.zeroplus.fun`; access is intentionally authenticated.
+
+First-use testing reopened the product entry despite completion of the former
+roadmap. See the [project board](board.html) and [handoff](HANDOFF.md) for the
+current ENTRY track rather than treating historical 100% as present product
+completion.
 
 ## Where to start
 
 | If you want to | Read |
 | --- | --- |
 | Understand the idea | [docs/vision.md](docs/vision.md) |
+| Understand the current product decision | [ADR-047](docs/decisions/ADR-047-code-session-first-product-entry.md) |
 | Understand the system | [docs/architecture/overview.md](docs/architecture/overview.md) |
 | Understand Hub / Runner deployment | [ADR-008](docs/decisions/ADR-008-server-hub-local-first-runners.md) |
 | Understand permanent event compatibility | [ADR-009](docs/decisions/ADR-009-versioned-strict-event-contract.md) |
 | Operate a staging Hub / Worker | [deploy/README.md](deploy/README.md) |
 | Integrate an agent | [docs/protocol/mcp-protocol.md](docs/protocol/mcp-protocol.md) |
-| Build the UI | [docs/product/navigation.md](docs/product/navigation.md), [docs/design/design-language.md](docs/design/design-language.md) |
+| Build the product entry | [HANDOFF](HANDOFF.md), [navigation](docs/product/navigation.md), [design language](docs/design/design-language.md) |
 | Know what to build next | [docs/development/roadmap.md](docs/development/roadmap.md) |
 | Browse everything | [docs/README.md](docs/README.md) |
 
-A full walkthrough — architecture plus a user-facing guide with high-fidelity
-interface designs — is in [doc.html](doc.html). Open it in a browser.
+The generated [doc.html](doc.html) and high-fidelity `ui/` renders predate
+ADR-047. Use them as historical visual reference, not as the current landing
+contract, until regenerated.
 
 Run the full repository gate from the repository root with
 `corepack pnpm verify`. Hub / Runner usage is documented in

@@ -133,13 +133,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 
       <section class="overall-progress" id="overview" aria-labelledby="overall-title">
         <div class="overall-meters">
-          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:100%">
-            <div class="overall-number"><strong id="overall-percent">100%</strong><small>总体实际完成度</small></div>
+          <div class="overall-ring" id="overall-ring" aria-label="总体进度" style="--overall-pct:93.45%">
+            <div class="overall-number"><strong id="overall-percent">93.45%</strong><small>总体实际完成度</small></div>
           </div>
-          <div class="live-progress" id="current-live-progress" aria-label="当前任务检查点验证率 29%">
-            <div class="live-progress-head"><span>检查点验证率</span><strong id="current-live-percent">29%</strong></div>
-            <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:29%"></span></div>
-            <small id="current-live-detail">RM-5.1 · 1/8 已完成 · 协商事件与ADR实现中</small>
+          <div class="live-progress" id="current-live-progress" aria-label="当前任务阶段证据完成度 15%">
+            <div class="live-progress-head"><span>当前任务完成度</span><strong id="current-live-percent">15%</strong></div>
+            <div class="live-progress-bar" aria-hidden="true"><span id="current-live-bar" style="--pct:15%"></span></div>
+            <small id="current-live-detail">ENTRY-1 · 现状与冲突审计完成 · 领域契约待实现</small>
           </div>
         </div>
         <div class="overall-copy">
@@ -159,9 +159,9 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
           <p class="lede">这里不把“跑通的实验原型”误写成“正式产品已完成”。进度按验证原型、当前执行路线和 canonical Roadmap 分轨计算；所有任务状态来自 ADR-002，问题保留开放与已解决历史。</p>
         </div>
         <aside class="hero-status" aria-label="当前安排">
-          <div class="status-head"><b>当前安排</b><span class="status-chip done">当前路线完成 · 100%</span></div>
-          <p>本地产品、macOS壳、远程Agent、生产发布与回滚均已签收；下一阶段可从已公开的exactly-once/outbox限制继续演进。</p>
-          <div class="next-chain"><span>Phase 1 ✓</span><i>→</i><span>RM-2.1</span><i>→</i><span>RM-2.2</span><i>→</i><span>RM-2.3/2.4/2.5</span></div>
+          <div class="status-head"><b>当前安排</b><span class="status-chip running">ENTRY 路线执行中</span></div>
+          <p>既有Hub、Runner、记忆与远程能力保留；当前只推进真实项目绑定的Codex/Claude会话入口，先冻结Conversation与Run边界。</p>
+          <div class="next-chain"><span>ENTRY-0 ✓</span><i>→</i><span>ENTRY-1</span><i>→</i><span>ENTRY-2/3</span><i>→</i><span>ENTRY-4</span></div>
         </aside>
       </header>
 
@@ -173,7 +173,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
       </section>
 
       <section id="current" aria-labelledby="current-title">
-        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">当前68项任务全部完成；EXP-05保留生产sequence 3、正式Origin、安全会话和双向回滚证据。</p></div>
+        <div class="section-head"><div><div class="section-kicker">Current task & todo list</div><h2 id="current-title">当前 Task 与执行顺序</h2></div><p class="section-desc">旧路线68项保留完成证据；新增ENTRY路线重新计入产品进度，当前先解决Conversation / Run / Vendor Session / Task边界。</p></div>
         <div class="current-layout">
           <article class="current-card" id="current-task"></article>
           <div class="todo-panel" id="route-list" aria-label="推荐任务顺序"></div>
@@ -187,14 +187,14 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
           <div class="filters" role="group" aria-label="任务范围">
             <button class="filter-btn" type="button" data-scope="all" aria-pressed="true">全部</button>
             <button class="filter-btn" type="button" data-scope="route" aria-pressed="false">当前路线</button>
-            <button class="filter-btn" type="button" data-scope="roadmap" aria-pressed="false">Roadmap 47</button>
+            <button class="filter-btn" type="button" data-scope="roadmap" aria-pressed="false">正式 Roadmap</button>
           </div>
         </div>
         <div class="kanban-wrap"><div class="kanban" id="kanban"></div></div>
       </section>
 
       <section id="roadmap" aria-labelledby="roadmap-title">
-        <div class="section-head"><div><div class="section-kicker">Canonical inventory</div><h2 id="roadmap-title">完整 Roadmap · 47 项</h2></div><p class="section-desc">Phase 0 和 Hub 属于已验证地基／Spike；正式包仍从 Phase 1 开始。展开阶段查看具体任务。</p></div>
+        <div class="section-head"><div><div class="section-kicker">Canonical inventory</div><h2 id="roadmap-title">完整 Roadmap · 53 项</h2></div><p class="section-desc">Phase 0、Hub 与 Phase 1–5 是已验证地基；ENTRY 是当前产品入口重构。展开阶段查看具体任务。</p></div>
         <div class="inventory" id="roadmap-list"></div>
       </section>
 
@@ -240,13 +240,13 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
 <script id="board-data" type="application/json">
 {
   "schemaVersion": 1,
-  "revision": 470,
-  "updatedAt": "2026-08-27 13:07 CST",
+  "revision": 472,
+  "updatedAt": "2026-08-27 15:11 CST",
   "updatedBy": "Codex",
-  "currentTaskId": "EXP-05",
-  "verification": {"testsPassed":1274,"testsTotal":1274,"filesPassed":67,"filesTotal":67,"gatePassed":11,"gateTotal":11,"lintErrors":0,"checkedAt":"2026-08-26 16:23 CST"},
+  "currentTaskId": "ENTRY-1",
+  "verification": {"testsPassed":1274,"testsTotal":1274,"filesPassed":67,"filesTotal":67,"gatePassed":11,"gateTotal":11,"lintErrors":0,"checkedAt":"2026-08-27 15:10 CST"},
   "capabilities": {"experimentsPassed":5,"experimentsTotal":5,"mcpImplemented":7,"mcpTotal":12,"eventSchemas":38,"eventSchemaTotal":38,"adapters":4},
-  "currentRoute": ["REPO-01","GATE-01","HUB-SEC-01","HUB-BOOT-01","EVIDENCE-01","C-LOCAL-01","SESSION-01","ADR-008","RUNNER-CONTRACT-01","C-REMOTE-01","RM-1.1a","SVR-01","SVR-02","SVR-03","SVR-04","SVR-05","SVR-06","EXP-01","EXP-02","EXP-03","EXP-04","EXP-05"],
+  "currentRoute": ["ENTRY-0","ENTRY-1","ENTRY-2","ENTRY-3","ENTRY-4","ENTRY-5"],
   "roadmapPhases": [
     {"id":"Phase 0","title":"工程地基","goal":"Workspace、测试、Biome 与分层守卫","order":0},
     {"id":"Hub","title":"Agent Hub 验证","goal":"两条通道、能力路由、任务与人工验收的 Spike","order":1},
@@ -254,7 +254,8 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"Phase 2","title":"记忆","goal":"可追溯知识、supersedes、context 与图 API","order":3},
     {"id":"Phase 3","title":"人的界面","goal":"Tauri、Pulse、审批、项目、任务、智能体与会话","order":4},
     {"id":"Phase 4","title":"复活与画布","goal":"Revival、快照、Canvas 与知识图","order":5},
-    {"id":"Phase 5","title":"多智能体深度","goal":"协商、规划、自主路由与性能分析","order":6}
+    {"id":"Phase 5","title":"多智能体深度","goal":"协商、规划、自主路由与性能分析","order":6},
+    {"id":"ENTRY","title":"Code Agent 入口重构","goal":"真实项目、单Agent会话、可执行可观测与跨会话记忆","order":7}
   ],
   "tasks": [
     {"id":"FND-0.1","scope":"roadmap","phase":"Phase 0","title":"pnpm workspace + 五个空包骨架","status":"completed","progress":100,"priority":"P0","owner":"—","dependsOn":[],"acceptance":"五个包可构建并产出声明；event-core 机械保持零内部 workspace 依赖。","source":"todo.html#p0","summary":"正式实现的类型和包边界地基。"},
@@ -331,9 +332,17 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"SESSION-01","scope":"route","phase":"Local","title":"持久化本地 Agent session","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["C-LOCAL-01"],"blockedBy":[],"acceptance":"session 以 (user, project, agent) 关联，重启后可继续或从日志正确重建。","source":"tests/local-runner.test.ts","summary":"SessionStore 以三元组隔离，原子落盘 opaque vendor session；同 host/adapter/workspace 的 Runner 重启可恢复。"},
     {"id":"ADR-008","scope":"route","phase":"Contract","title":"固化 Local / Remote Runner 共享契约","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["C-LOCAL-01"],"blockedBy":[],"acceptance":"Supersede ADR-007 的单机范围；明确拓扑、身份、存储、session、connect-out 与错误语义。","source":"docs/decisions/ADR-008-server-hub-local-first-runners.md","summary":"ADR-008 已 accepted；Hub / Runner 拓扑、principal、HostPlacement、session、working copy 与实现顺序已同步到全部 canonical 文档和页面。"},
     {"id":"RUNNER-CONTRACT-01","scope":"route","phase":"Contract","title":"Runner contract tests","status":"completed","progress":100,"priority":"P0","owner":"Codex team","dependsOn":["C-LOCAL-01","SESSION-01","ADR-008"],"blockedBy":[],"acceptance":"Local 与 Remote 共用 request、event stream、result、session、cancel、health 和 error contract；本地行为成为契约测试。","source":"tests/helpers/runner-contract-suite.ts","summary":"共享接口已固定；0600 原子 request ledger、真实取消、health / close、稳定错误和三维 session 均有机器约束，Hub 只能经 Runner dispatch。"},
-    {"id":"C-REMOTE-01","scope":"route","phase":"Remote","title":"启动远程 Agent 调用开发","status":"completed","progress":100,"priority":"P1","owner":"Codex team","dependsOn":["RUNNER-CONTRACT-01","HUB-SEC-01"],"blockedBy":[],"acceptance":"认证的出站 Runner 可重连、幂等交付并恢复 session；同一任务核心事件与 Local 一致。","source":"tests/remote-runner.test.ts","summary":"生产 Hub 与出站 Worker 已通过共享契约；随机 lease fencing、心跳续租、重启幂等、host placement、离线 fail-closed 和子进程凭据隔离由 38 项远程测试及 4 项生产组合测试覆盖。"}
+    {"id":"C-REMOTE-01","scope":"route","phase":"Remote","title":"启动远程 Agent 调用开发","status":"completed","progress":100,"priority":"P1","owner":"Codex team","dependsOn":["RUNNER-CONTRACT-01","HUB-SEC-01"],"blockedBy":[],"acceptance":"认证的出站 Runner 可重连、幂等交付并恢复 session；同一任务核心事件与 Local 一致。","source":"tests/remote-runner.test.ts","summary":"生产 Hub 与出站 Worker 已通过共享契约；随机 lease fencing、心跳续租、重启幂等、host placement、离线 fail-closed 和子进程凭据隔离由 38 项远程测试及 4 项生产组合测试覆盖。"},
+
+    {"id":"ENTRY-0","scope":"roadmap","phase":"ENTRY","title":"冻结产品定位与冷交接","status":"completed","progress":100,"priority":"P0","owner":"Codex","dependsOn":[],"blockedBy":[],"acceptance":"ADR-047、HANDOFF、canonical 产品/架构文档与看板对产品入口、底座和边界表述一致。","source":"HANDOFF.md","summary":"现有Hub、Runner、adapter、事件与记忆能力继续作为执行底座；Herdr仅作交互参考；首要入口冻结为真实项目内的常规Code Agent持续会话。","progressBasis":[{"label":"仓库与运行入口审计","earned":20,"total":20},{"label":"产品定位与领域边界","earned":30,"total":30},{"label":"ADR与canonical文档同步","earned":30,"total":30},{"label":"冷交接与看板路线","earned":20,"total":20}]},
+    {"id":"ENTRY-1","scope":"roadmap","phase":"ENTRY","title":"Conversation / Run 领域契约","status":"running","progress":15,"priority":"P0","owner":"下一位Agent","dependsOn":["ENTRY-0"],"blockedBy":[],"acceptance":"Conversation、Run、Vendor Session、Task身份分离；Run可由事件完整重放，具有明确的非终态、阻塞事实和成功/失败/取消终态；具体状态名由ENTRY-1 ADR冻结；Vendor Session按(user,project,conversation,agent)隔离；Task验收与风险审批不混入Run终态。","source":"docs/decisions/ADR-047-code-session-first-product-entry.md","summary":"现状与文档冲突审计已经完成；当前/say没有持久Run生命周期，项目线程也无法可靠表达多个独立会话，旧session key还会让同项目同Agent的Conversation串上下文。下一步先补ADR、事件目录、状态机、投影和隔离测试，不先重画UI。","progressBasis":[{"label":"现状与canonical冲突审计","earned":15,"total":15},{"label":"ADR与状态契约","earned":0,"total":20},{"label":"事件、reducer与持久重放","earned":0,"total":30},{"label":"取消、失败与身份专项测试","earned":0,"total":25},{"label":"文档、门禁与逻辑提交","earned":0,"total":10}],"checkpoints":[{"label":"现有Thread、Task、session与/say审计","status":"done"},{"label":"Conversation与Run状态ADR","status":"pending"},{"label":"事件目录与schema","status":"pending"},{"label":"projection、replay与A/B session隔离","status":"pending"},{"label":"cancel/failure边界","status":"pending"},{"label":"全仓验证与交付","status":"pending"}]},
+    {"id":"ENTRY-2","scope":"roadmap","phase":"ENTRY","title":"项目Placement与Agent就绪模型","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["ENTRY-1"],"blockedBy":[],"acceptance":"稳定Project id通过可信Runner端口注册(project,runnerHost)→canonical working copy；浏览器不能提交任意绝对路径；readiness覆盖executable/auth/Runner/workspace/capacity并给出可操作诊断。","source":"HANDOFF.md#first-implementation-milestone","summary":"移除单proj_hub、单LOG_PATH和workspace=agent的原型假设；本地浏览器只选择已授权placement，Tauri picker只经窄IPC进入同一Runner containment。"},
+    {"id":"ENTRY-3","scope":"roadmap","phase":"ENTRY","title":"唯一产品入口与本地持续会话","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["ENTRY-2"],"blockedBy":[],"acceptance":"apps/macos的execution根路由在真实仓库中支持连续提示、流式Run、取消与重启恢复；Codex或Claude至少一个真实适配器以workspace-scoped写权限完成代码修改与证据回传，不启用全局自动批准；4173仅诊断。","source":"HANDOFF.md#first-implementation-milestone","summary":"复用Local Runner与HubProduct认证/SSE，产品状态消费formal reducer；不把Spike HTML或src/thread.mjs升级为第二产品或canonical模型。"},
+    {"id":"ENTRY-4","scope":"roadmap","phase":"ENTRY","title":"执行证据、记忆与人工控制接入","status":"created","progress":0,"priority":"P0","owner":"—","dependsOn":["ENTRY-3"],"blockedBy":[],"acceptance":"每个Run可查看命令、文件差异、测试和结果来源；跨Conversation召回带来源的项目记忆；不可逆操作仍需独立审批。","source":"HANDOFF.md#first-implementation-milestone","summary":"把已有事件、正式Memory包和审批能力接到真实会话，而不是只保留在独立演示或后台路由。"},
+    {"id":"ENTRY-5","scope":"roadmap","phase":"ENTRY","title":"远程与多Agent能力降级为可选策略","status":"created","progress":0,"priority":"P1","owner":"—","dependsOn":["ENTRY-4"],"blockedBy":[],"acceptance":"默认入口无需理解拓扑；用户按需启用远程Runner、委派或多Agent规划，仍沿用同一Conversation/Run证据模型。","source":"HANDOFF.md#scope-guardrails","summary":"远程和多Agent能力继续复用现有底座，但不再挡住第一位用户完成一次本地Code Agent会话。"}
   ],
   "problems": [
+    {"id":"PROB-PRODUCT-ENTRY","status":"open","severity":"critical","title":"旧Pulse / Task入口不能启动隔离、可写的Code Agent会话","detail":"当前页面先展示Pulse并要求新建Task；/say没有持久Run；Hub仍是单proj_hub/单log且workspace=agent；旧(user,project,agent) session key会让未来多Conversation串上下文；4173与5173产品所有权此前不清；Codex仍固定read-only/never。","next":"ENTRY-1先冻结Run与Conversation-scoped session；ENTRY-2建立可信(project,runnerHost) placement和完整readiness；ENTRY-3只在apps/macos execution入口接formal reducer、安全写入与真实本地会话。","affects":["ENTRY-1","ENTRY-2","ENTRY-3","ENTRY-4"],"source":"docs/decisions/ADR-047-code-session-first-product-entry.md"},
     {"id":"PROB-BOOTSTRAP","status":"resolved","severity":"high","title":"认证后的浏览器启动流程已恢复","detail":"GET / 仅返回无数据 inert shell；human token 从 password input 或 URL fragment 进入内存，fragment 在首个 fetch 前清除。query、cookie、localStorage 均未使用。","next":"Tauri 阶段由原生 credential storage 注入，不改变 API/SSE 的 Bearer principal。","affects":["HUB-BOOT-01","C-LOCAL-01"],"source":"tests/hub-security.test.ts"},
     {"id":"PROB-REPO-PUSH","status":"resolved","severity":"medium","title":"新 SSH 仓库方案已取消","detail":"用户决定继续使用原 GitHub 仓库；新 SSH origin 已移除，原 GitHub 远端恢复为 origin，因此不再需要向新仓库上传历史。","next":"后续仅向原 GitHub 仓库推送按任务隔离的 codex 分支。","affects":["REPO-01"],"source":{"label":"本地命令 · git remote -v"}},
     {"id":"PROB-VERIFY","status":"resolved","severity":"high","title":"完整验证门禁已恢复为绿","detail":"tests/hub.test.ts 的 19 个 Biome 错误已清零；TypeScript、Biome、分层检查和 Vitest 一次通过，当前为 7 files、82/82 tests。","next":"每个任务提交前跑目标测试，路线节点完成时复跑全量 verify。","affects":["GATE-01"],"source":"package.json"},
@@ -396,7 +405,7 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"PROB-HUB-OPENSSL-EMPTY","status":"resolved","severity":"low","title":"空值 runtime / OpenSSL / Corepack set-state 已全部拒绝","detail":"服务器WIP的lib、pre-upgrade snapshot与package builder均改为按`${!name+x}`拒绝变量存在状态，不再只判断非空。主任务独立验证10个runtime变量分别经过lib/snapshot、26个package变量经过builder，共46/46精确失败诊断且零artifact；四个Shell语法通过。","next":"保留verify.sh的全denylist空值矩阵，并在最终冻结Debian gate中复验；任何新增Node/OpenSSL/Corepack影响变量必须同时进入三个入口。","affects":["SVR-02","SVR-06"],"source":{"label":"server WIP · empty set-state matrix 46/46"}},
     {"id":"PROB-HUB-GNU-STAT","status":"resolved","severity":"high","title":"GNU/BSD stat 安全字段解析已在 Ubuntu 验证","detail":"stat helper 已先探测 GNU `-c` 再回退 BSD `-f`，权限判断集中到 mode helper；冻结 tree 在真实 Ubuntu 完成冷 gate、root bootstrap 与幂等 admin kit 安装。","next":"保留 Linux/BSD 静态断言、0555 正例和 0575/0557 反例，禁止恢复 `stat -f || stat -c`。","affects":["SVR-02","SVR-06"],"source":{"label":"server branch（待集成）· deploy/hub/bin/lib.sh"}},
     {"id":"PROB-HUB-ACTIVATION","status":"resolved","severity":"high","title":"正式FQDN、自动续期、signed产品Hub与安全会话已闭合","detail":"agent.zeroplus.fun独立Let’s Encrypt证书、最小权限DNS-01续期与生产Nginx均已签收。5829999-product-v1以hub-release sequence 3验签激活；实测发现AGENT_OS_ALLOWED_ORIGINS仍为旧内部域名后，通过校验候选、原子配置和失败自动恢复将其修正为正式origin。公网入口200、健康路由404、未授权Runner 401；HttpOnly+Secure+SameSite=Strict会话登录/读取/注销/失效为200/200/200/401。回滚旧版及回切新版均通过，最终Hub/Nginx active、Hub enabled、零maintenance/recovery guard。","next":"保留sequence防重放、正式Origin会话smoke、DNS-01 dry-run与双向rollback作为每次生产发布门禁。","affects":["SVR-06","EXP-05"],"source":{"label":"agent.zeroplus.fun · sequence 3 product activation · 2026-08-27 13:07 CST"}},
-    {"id":"PROB-HUB-PRODUCTION","status":"open","severity":"high","title":"Remote Hub 当前只能作为 staging，不能声明公网生产就绪","detail":"EventLog 单写者 durable-append 可作为 staging slice 冻结，但正式语义仍有 P0：commit→调用方观察窗口没有 operation token；mutating API 重试会生成新事件；事件 append 与 route/wake 无持久 outbox；`/task` 的 create/assign 是两个独立 append。Hub 重启不会重投已提交但未执行的工作，不能宣称 exactly-once。","next":"冻结标签明确为 staging-single-writer / ambiguous-ack / no-recovery-outbox；RM-1.1b 用唯一 client token 与事务返回原事件，后续 Task Engine 定义持久 outbox/重投和多事件命令原子边界，再做 commit→response kill、同 token 并发/冲突与 append→dispatch kill。","affects":["SVR-02","SVR-03","SVR-05","RM-1.1b","RM-1.2a"],"source":"apps/chat-spike/src/server.mjs"},
+    {"id":"PROB-HUB-PRODUCTION","status":"open","severity":"high","title":"Remote Hub 当前只能作为 staging，不能声明公网生产就绪","detail":"EventLog 单写者 durable-append 可作为 staging slice 冻结，但正式语义仍有 P0：commit→调用方观察窗口没有 operation token；mutating API 重试会生成新事件；事件 append 与 route/wake 无持久 outbox；`/task` 的 create/assign 是两个独立 append。Hub 重启不会重投已提交但未执行的工作，不能宣称 exactly-once。正式SQLite Event Store与Task Engine本身已完成，缺口位于live Hub组合接线。","next":"保持staging-single-writer / ambiguous-ack / no-recovery-outbox标签；新增独立integration/migration里程碑，把正式store的operation token契约接入live Hub，并补持久outbox/重投及多事件命令原子边界，再做commit→response kill、同token并发/冲突与append→dispatch kill。","affects":["SVR-02","SVR-03","SVR-05"],"source":"apps/chat-spike/src/server.mjs"},
     {"id":"PROB-HUB-RECOVERY","status":"resolved","severity":"critical","title":"失败补偿保留token后的显式收敛路径已验证","detail":"确定性来源为upgrade补偿在非法maintenance sentinel下发布、但未被ExecStartPre消费的原事务token。派生冻结72c0df68验证安全流程：修复sentinel后先确认token值等于block transaction，经正常systemctl start/ExecStartPre原子消费，再stop+disable，最后signed restore采用原upgrade block；完整gate最终PASS。","next":"把该流程等价同步到正式verify与runbook；永久禁止直接删除token或放宽chain，保留错误token拒绝、block匹配和最终clean断言。","affects":["SVR-03","SVR-06"],"source":{"label":"主任务 · derived 72c0df68 full gate PASS"}},
     {"id":"PROB-HUB-LEGACY-MIGRATION","status":"resolved","severity":"critical","title":"legacy migration与token恢复完整矩阵已签收","detail":"正式冻结d49f0eba在非root Debian先由focused证明错误transaction零变更拒绝、原token消费、health、stop/disable和parent restore，再由full gate覆盖全部migration、rollback、restore、forensic、SIGKILL与Open-FD集成矩阵；两者均exit0显式PASS，且完整运行后无测试根残留。","next":"保留focused/full回归与runbook；转入真实Ubuntu exact-tree演练，未经实机证据不宣称SVR-03完成。","affects":["SVR-03","SVR-06"],"source":{"label":"主任务 · formal d49f0eba focused + full PASS"}},
     {"id":"PROB-HUB-RECOVERY-DOCS","status":"resolved","severity":"high","title":"恢复与特权管理工具迁移文档契约已冻结","detail":"主线ADR-010/011已被projection snapshot与Task Graph占用，因此服务器文档改用ADR-040 state recovery与ADR-041 privileged admin-kit migration；前者明确ACK歧义、observable-reference与单一local ext4边界，后者独立冻结17→25 exact-tree、allowlisted digest、attempt journal与fail-closed恢复。deploy runbook同步唯一入口与token处理，Spike把SQLite/idempotency归RM-1.1b、projection snapshots归RM-1.1d。","next":"集成时保留ADR-040/041编号和交叉引用；Ubuntu现场事实只在原始脱敏证据确认后更新，不以README自证。","affects":["SVR-03","SVR-06","RM-1.1b","RM-1.1d"],"source":{"label":"主任务 · WIP docs static validation"}},
@@ -418,6 +427,10 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"id":"FIX-LAYERS-DIR","status":"resolved","severity":"low","title":"Packages 依赖图方向曾写反","detail":"写 tsconfig references 时暴露并修正为 event-core 最底层、零内部 workspace 依赖。","next":"继续由 workspace 和 layering tests 守住。","affects":["FND-0.1","FND-0.3"],"source":"todo.html#p0"}
   ],
   "activity": [
+    {"at":"2026-08-27 15:10","kind":"verified","entity":"ENTRY-0","title":"冷交接候选完成全仓门禁","detail":"corepack pnpm verify一次通过：67/67测试文件、1274/1274测试，TypeScript、类型契约、Biome、4条分层规则、原生依赖边界、Vite、Cargo与Tauri全部绿色。验证脚本固定最多4个Vitest worker，并在filtered deploy后原样恢复pnpm工作区状态，避免资源争用和伪安装漂移。"},
+    {"at":"2026-08-27 14:37","kind":"progress","entity":"ENTRY-1","title":"Conversation / Run领域缺口登记，当前任务15%","detail":"完成Chat Spike、Hub、Local/Remote Runner、Thread、Task、Vendor Session和正式Memory的交叉审计；确认/say无持久Run生命周期、项目线程无法可靠表达多个Conversation。实现、测试与UI尚未开始，因此只计审计15分。"},
+    {"at":"2026-08-27 14:37","kind":"completed","entity":"ENTRY-0","title":"产品定位、ADR-047与冷交接完成","detail":"将现有执行能力确认为底座，Herdr仅作产品交互参考；首要入口改为真实项目内的单Agent持续会话。HANDOFF、产品、架构、设计、测试、路线图、根级Agent指南与看板已同步。"},
+    {"at":"2026-08-27 14:37","kind":"decision","entity":"ENTRY-0","title":"产品入口切换为Code Agent会话优先","detail":"默认旅程为选择真实项目→选择可用Agent→创建Conversation→执行Run→查看变更与测试→继续对话；Task、Supervisor、多Agent与远程Runner保留为可选高级能力。"},
     {"at":"2026-08-27 13:07","kind":"completed","entity":"EXP-05","title":"产品入口sequence 3生产激活并完成回滚回切，总体100%","detail":"精确5829999源码经Git archive传至Ubuntu，固定Node 24.19.0/Corepack 0.35.0/pnpm 11.17.0完成258项供应链与生产闭包门禁，产物5defdabc…由本机0400单链接publisher-a私钥离线签署hub-release sequence 3；私钥未进入CloudShell或Hub。固定verifier/upgrade完成candidate、quiescent、snapshot、activate、live和零guard。会话smoke发现旧AGENT_OS_ALLOWED_ORIGINS后立即用校验候选+自动恢复原子修正为https://agent.zeroplus.fun；登录/受保护读取/注销/失效200/200/200/401，Cookie具备HttpOnly+Secure+SameSite=Strict。随后真实回滚至afba0fd-cancel-v1并回切5829999-product-v1，两次均live/ready、active+enabled、零guard；公网入口200、health 404、未授权Runner 401，浏览器显示生产连接密钥入口。EXP-05 90→100，总体6790→6800/6800（100%）。"},
     {"at":"2026-08-26 16:24","kind":"progress","entity":"EXP-05","title":"本地产品体验、原生启动与GitHub交付完成，总体99.85%","detail":"三笔逻辑提交79df043/4e3250b/a0e5251已推送原GitHub分支。pnpm experience一键启动Hub+产品页，持久状态不入Git且控制台不输出连接密钥；experience:native完成Rust编译并启动原生窗口。浏览器签收空项目、Hub连接、新建任务表单、真实Grok E2E和人工验收；1274项测试覆盖完成，重型超时项单独复跑通过，TypeScript/Biome/layers/native filtered-deploy/Vite/Cargo/Tauri全绿。EXP-01至04完成，EXP-05 90%；仅生产签名发布与回滚复核未计分，总体6790/6800（99.85%）。"},
     {"at":"2026-08-26 16:04","kind":"progress","entity":"EXP-04","title":"真实Grok交付与人工验收闭环，总体进度升至98.24%","detail":"浏览器实测Hub重启后自动恢复会话。首轮Claude暴露本地Runner未传CLI绝对路径，已实现安全PATH发现、realpath与仅注册可执行Agent；第二轮Claude超时被人类取消，系统按能力切换已授权Grok。TASK-003真实完成created→assigned→running→message→review，任务页显示100%仍待人工审查及验收/退回按钮；经人类API验收后SSE即时变为completed。EXP-01/02/03/04均升至95，剩余为提交与可安装体验包，总体6680/6800（98.24%）。"},
@@ -953,14 +966,15 @@ body.compact .task-card{padding:8px}body.compact .todo-row{padding:8px 0}body.co
     {"at":"2026-07-31","kind":"completed","entity":"HUB-C","title":"Agent Hub Spike 闭环完成","detail":"本地多 Agent、能力路由、任务、review 和人工 completed 已经真机验证。"}
   ],
   "sources": [
+    {"label":"ADR-047 · Code Agent入口","href":"docs/decisions/ADR-047-code-session-first-product-entry.md"},
     {"label":"ADR-002 · Task 状态","href":"docs/decisions/ADR-002-task-lifecycle.md"},
     {"label":"Roadmap · 正式阶段","href":"docs/development/roadmap.md"},
-    {"label":"Event Catalog · 29 类型","href":"docs/protocol/event-catalog.md"},
+    {"label":"Event Catalog · 38 类型","href":"docs/protocol/event-catalog.md"},
     {"label":"MCP Protocol · 12 工具","href":"docs/protocol/mcp-protocol.md"},
     {"label":"HANDOFF · 当前事实","href":"HANDOFF.md"},
     {"label":"FINDINGS · 真机证据","href":"apps/chat-spike/FINDINGS.md"},
     {"label":"todo.html · 47 项库存","href":"todo.html"},
-    {"label":"next.html · 当前排序","href":"next.html"}
+    {"label":"next.html · 路线迁移入口","href":"next.html"}
   ]
 }
 </script>
@@ -1011,7 +1025,7 @@ function renderOverall(){
   const checkpointDone=checkpoints.filter((item)=>item.status==="done").length;
   const checkpointRunning=checkpoints.filter((item)=>item.status==="running").length;
   const checkpointPending=checkpoints.filter((item)=>item.status==="pending").length;
-  const checkpointPct=checkpoints.length?Math.round(checkpointDone/checkpoints.length*100):0;
+  const currentProgress=currentTask?Math.max(0,Math.min(100,Number(currentTask.progress)||0)):0;
   const ring=document.querySelector("#overall-ring");
   ring.style.setProperty("--overall-pct",`${pct}%`);
   ring.setAttribute("aria-label",`项目总体实际进度 ${pctLabel}%，${done} / ${total} 项完成，按任务阶段证据加权`);
@@ -1019,9 +1033,9 @@ function renderOverall(){
   document.querySelector("#overall-bar").style.setProperty("--pct",`${pct}%`);
   document.querySelector("#overall-fraction").textContent=`${done}/${total} 已完成 · ${earned}/${possible} progress points`;
   const liveProgress=document.querySelector("#current-live-progress");
-  liveProgress.setAttribute("aria-label",`当前任务 ${currentTask?.id??"—"} 检查点验证率 ${checkpointPct}%，${checkpointDone} / ${checkpoints.length} 个检查点已验证`);
-  document.querySelector("#current-live-percent").textContent=`${checkpointPct}%`;
-  document.querySelector("#current-live-bar").style.setProperty("--pct",`${checkpointPct}%`);
+  liveProgress.setAttribute("aria-label",`当前任务 ${currentTask?.id??"—"} 阶段证据完成度 ${currentProgress}%，${checkpointDone} / ${checkpoints.length} 个检查点已验证`);
+  document.querySelector("#current-live-percent").textContent=`${currentProgress}%`;
+  document.querySelector("#current-live-bar").style.setProperty("--pct",`${currentProgress}%`);
   document.querySelector("#current-live-detail").textContent=currentTask?`${currentTask.id} · ${checkpointDone}/${checkpoints.length} 已验证 · ${checkpointRunning} 处理中 · ${checkpointPending} 待验收`:"当前没有执行中任务";
   document.querySelector("#overall-breakdown").innerHTML=[
     `<div class="overall-stat ok"><small>已完成</small><b>${done}</b></div>`,
@@ -1036,7 +1050,7 @@ function renderKpis(){
   const phaseOneDone=phaseOne.filter((task)=>task.status==="completed").length;
   const metrics=[
     {label:"验证实验",value:`${DATA.capabilities.experimentsPassed}/${DATA.capabilities.experimentsTotal}`,sub:"5 个 Spike 阶段已证实",color:"var(--ok)"},
-    {label:"正式 Phase 1 子项",value:`${phaseOneDone}/${phaseOne.length}`,sub:"RM-1.1a 已交付",color:"var(--info)"},
+    {label:"正式 Phase 1 子项",value:`${phaseOneDone}/${phaseOne.length}`,sub:phaseOneDone===phaseOne.length?"正式核心循环已完成":"继续完成正式核心循环",color:"var(--info)"},
     {label:"完整门禁",value:`${DATA.verification.gatePassed}/${DATA.verification.gateTotal}`,sub:`Biome ${DATA.verification.lintErrors} errors`,color:"var(--risk)"},
     {label:"行为测试",value:`${DATA.verification.testsPassed}/${DATA.verification.testsTotal}`,sub:`${DATA.verification.filesPassed}/${DATA.verification.filesTotal} files pass`,color:"var(--ok)"},
     {label:"MCP 工具",value:`${DATA.capabilities.mcpImplemented}/${DATA.capabilities.mcpTotal}`,sub:"Spike / canonical",color:"var(--warn)"},
@@ -1058,8 +1072,8 @@ function renderProgress(){
   const p1Progress=p1.reduce((sum,task)=>sum+(Number(task.progress)||0),0);
   document.querySelector("#progress-grid").innerHTML=[
     progressCard("原型／验证","Phase 0 与 Agent Hub 已跑出真实证据",completedPrototype.length,prototypeTasks.length,"var(--ok)","Spike 完成"),
-    progressCard("当前执行路线","已完成基础路线，正在并行推进 Server 与 Event Core",routeProgress,routeTasks.length*100,"var(--accent)",`${routeDone}/${routeTasks.length} 项完成`,`${Math.round(routeProgress/(routeTasks.length*100)*100)}%`),
-    progressCard("正式 Phase 1","正式 packages 已进入 Event Core 契约实现",p1Progress,p1.length*100,"var(--info)",`${p1Done}/${p1.length} 项完成`,`${Math.round(p1Progress/(p1.length*100)*100)}%`)
+    progressCard("当前执行路线","Code Agent入口重构：先契约，再绑定真实项目和本地持续会话",routeProgress,routeTasks.length*100,"var(--accent)",`${routeDone}/${routeTasks.length} 项完成`,`${Math.round(routeProgress/(routeTasks.length*100)*100)}%`),
+    progressCard("正式 Phase 1","正式核心循环已完成，作为ENTRY路线的事件与任务底座",p1Progress,p1.length*100,"var(--info)",`${p1Done}/${p1.length} 项完成`,`${Math.round(p1Progress/(p1.length*100)*100)}%`)
   ].join("");
 }
 

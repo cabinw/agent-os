@@ -14,11 +14,15 @@ is exactly the coupling ADR-001 exists to prevent.
 
 ## Decision
 
-No provider list exists in core code or in normative documentation.
+No canonical supported-provider list exists in core domain code or routing
+documentation. Product surfaces may display configured Agents, and a tested
+entry milestone may name concrete adapters without making them routing policy.
 
 - Task routing reads effective `capabilities` for `(agent, host)` only. Agent
   skill plus host tools / hardware determines the value.
-- `provider` is recorded for display and billing, and is never branched on.
+- `provider` is recorded for display and billing, and is never branched on by
+  domain logic or autonomous Task routing. Direct human selection addresses a
+  configured Agent identity; invocation remains inside its adapter.
 - The capability vocabulary is a controlled list in
   [protocol/agent-schema.md](../protocol/agent-schema.md); extending it is a
   deliberate protocol change.
@@ -67,7 +71,8 @@ second axis. See [protocol/agent-schema.md](../protocol/agent-schema.md).
 - Swapping a vendor is a registration change, not a code change.
 - A capability that no connected `(agent, host)` placement has causes tasks to
   sit unassigned; the Supervisor must surface that rather than let them sit.
-- Documentation naming specific agents is illustrative only. Any example naming
-  Codex or Claude means "an agent with that capability".
+- Documentation naming specific agents is illustrative unless it explicitly
+  identifies an adapter under product/field acceptance. Such acceptance never
+  changes capability-based Task routing.
 - Surfaces must degrade on declared integration capability rather than assume the
   richest vendor's behaviour.

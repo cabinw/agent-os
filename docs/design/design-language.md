@@ -64,10 +64,12 @@ being dragged.
 
 8px base grid. Card padding 16–20px. Gaps 12–16px. Content max-width 1440px.
 
-The recurring pattern is a KPI row, a hero, then a card grid — three columns at
-desktop width, collapsing to two then one. Sidebar is fixed at 220px and does
-not collapse; the seven destinations are the product's map and hiding it costs
-more than the space it saves.
+The recurring project-intelligence pattern is a KPI row, a hero, then a card
+grid — three columns at desktop width, collapsing to two then one. The original
+220px seven-destination sidebar remains the reference for those secondary
+surfaces. ADR-047 permits the Code Agent execution home to use a conversation-
+first shell; it must preserve access to the project map rather than force that
+sidebar into the primary working area.
 
 ## Motion
 

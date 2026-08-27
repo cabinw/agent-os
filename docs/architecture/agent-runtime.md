@@ -23,6 +23,40 @@ Local and Remote Runners use the same dispatch and event-stream contract. Build
 and test the Local Runner first. Remote work changes transport only after a real
 local CLI task passes the contract suite.
 
+### Project workspace entry
+
+ADR-047 makes a user-selected project workspace part of first-use acceptance.
+The current local launcher creates Agent-specific directories under
+`.agent-os/local/workspaces`; that is safe test containment, not a product-level
+"open this repository" contract.
+
+The entry implementation gives Project a stable Hub id, then registers a
+Runner-owned placement `(project, runnerHost) → canonical working-copy path`.
+Different hosts may have different paths per ADR-008. A browser may choose only
+an already authorized placement; it never submits an arbitrary absolute path to
+the Hub. A native picker may create a placement only through narrow trusted IPC
+and Runner-side admission. Both paths reject traversal, symlink escape and
+cross-project session reuse. Worktrees may provide isolation, but remain
+Runner-owned placements derived from an explicitly authorized project root.
+
+### Product readiness
+
+The execution home may label an Agent **Ready** only when one sourced read model
+confirms all of these at an observation time:
+
+| Fact | Authority |
+| --- | --- |
+| executable | Runner resolves a canonical registered binary |
+| authenticated | adapter performs a non-mutating vendor preflight |
+| connected / accepting | authenticated live placement snapshot |
+| workspace authorized | exact `(project, host)` placement and fingerprint |
+| permission usable | adapter policy can perform the requested work class |
+| capacity | logical and placement concurrency admit another Run |
+
+A durable registration alone proves none of the live facts. A failed fact keeps
+its reason and next action; the system does not discover missing authentication
+by sacrificing the user's first real Run.
+
 ## Agent lifecycle
 
 ```
@@ -80,18 +114,26 @@ concurrency. The placement owns reachability, effective capability and load.
 
 ## Sessions
 
-A logical vendor session is keyed by `(user, project, agent)`. The Hub persists
-its owning host; that Runner persists the opaque vendor session id, adapter and
-canonical workspace. Resume requires the same host, adapter and workspace. The
-mapping is operational state, not project truth: if any of those change or
-resume fails, the Runner starts fresh and rebuilds from `get_context`.
+The implemented legacy key is `(user, project, agent)`. ADR-047 requires the
+Code-session entry to scope it as `(user, project, conversation, agent)` so two
+visible Conversations cannot share hidden vendor context. An explicit migrated
+default Conversation may adopt one legacy placement; arbitrary matching may not.
+
+The Hub persists the owning host; that Runner persists the opaque vendor session
+id, adapter and canonical workspace. Resume requires the same Conversation,
+host, adapter and workspace fingerprint. If any change or resume fails, the
+Runner starts fresh and rebuilds from sourced project context. The mapping is
+operational state, not project truth.
 
 That fallback is proven. It changes latency and cost, not correctness.
 
 ## Capability, not provider
 
-See [ADR-004](../decisions/ADR-004-capability-first-agent-catalog.md). Nothing in
-the runtime branches on `provider`. Task routing reads the effective capability
+See [ADR-004](../decisions/ADR-004-capability-first-agent-catalog.md). Domain
+logic and autonomous Task routing never branch on `provider`. A human-facing
+client may display and directly select a configured Agent such as Codex or
+Claude; vendor invocation still exists only in adapter / integration code. Task
+routing reads the effective capability
 of `(agent, host)`: an agent may have `testing` on a host with the required
 toolchain and lack it elsewhere. Swapping vendors or hosts changes registration,
 not tasks or core code.
@@ -109,8 +151,9 @@ See [ADR-012](../decisions/ADR-012-event-catalog-live-routing.md).
 ## Adapters
 
 An adapter is the thin translation between a vendor's interface and the shared
-Runner contract. It runs on the Runner and is the only place a provider name may
-appear.
+Runner contract. It runs on the Runner and is the only place invocation behavior
+branches by vendor. Provider names may also appear as configuration and display
+labels; they do not control domain semantics.
 
 ```
        Runner contract  (dispatch, event stream, cancel, health)
@@ -120,7 +163,9 @@ Claude   Codex    Gemini    Perplexity   …          ← adapters
 ```
 
 Adapters are configuration, not architecture: the shipped set grows without
-touching `agent-runtime`. An agent that participates through MCP needs no
+changing domain or routing semantics. Presentation may display the configured
+Agent/vendor label but must branch behavior on declared integration capabilities.
+An agent that participates through MCP needs no
 translation for its calls, but wake, connection mounting and vendor invocation
 remain Runner responsibilities.
 

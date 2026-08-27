@@ -32,6 +32,14 @@ Thread identity is derived: `thread(project, task?)`. There is no stored thread
 object and no way to move a message between threads — `task` is fixed at send
 time and events are immutable.
 
+This contract predates the Code-session-first entry in ADR-047. The code calls
+the containing projection `ConversationProjectState`, but one project thread
+cannot honestly represent multiple named user Conversations or the durable
+lifecycle of separate prompt Runs. The entry milestone must either explicitly
+support only one project conversation or introduce Conversation / Run identity
+through a separate decision and event contract. A UI-only grouping key is not
+durable truth.
+
 ## Interleaving is the point
 
 A thread that shows only messages reads as disembodied chat. A thread that folds

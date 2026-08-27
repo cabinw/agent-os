@@ -2,17 +2,23 @@
 
 ## Project Vision
 
-Agent OS is an AI-native operating system for managing autonomous AI teams.
+Agent OS is a persistent project environment for Code Agents.
 
-It lets humans define goals, coordinate agents, observe execution, and preserve
-project knowledge.
+It lets humans open a real project, continue a Codex- or Claude-style Agent
+conversation, observe every run, and preserve useful project knowledge across
+sessions. The first-use path is one human working with one Agent; multi-Agent
+coordination remains an advanced execution strategy on the existing runtime.
+
+Herdr is a product and interaction reference only. It is not Agent OS's runtime
+base or a dependency.
 
 ## Core Principles
 
 These are constraints on every design, not slogans.
 
-1. **MCP first.** External agents communicate through one collaboration layer.
-   No provider-specific integration path exists.
+1. **MCP first.** External agent participation crosses one collaboration layer.
+   Vendor-specific wake/invocation stays behind a Runner adapter; no domain or
+   autonomous-routing path branches on provider.
 2. **Event driven.** State changes are represented as immutable events. Nothing
    writes derived state directly.
 3. **Memory first.** Decisions and knowledge must persist, with the reasoning
@@ -21,13 +27,15 @@ These are constraints on every design, not slogans.
 
 ## Core Components
 
-- Supervisor Agent — plans and assigns
+- Conversation / Run — the primary human execution surface
+- macOS client — the single browser/Tauri product frontend
+- Supervisor Agent — optional planning and assignment strategy
 - Agent Runtime — agent lifecycle and adapters
 - MCP Server — the only ingress for external agents
 - Event Core — the kernel
-- Task Engine — the unit of work
+- Task Engine — optional accountable work and human acceptance
 - Project Memory — durable knowledge
-- Canvas / Project Pulse / Project Library — the human surfaces
+- Canvas / Project Pulse / Project Library — secondary project intelligence
 
 ## Repository Layout
 
@@ -59,3 +67,4 @@ When documents disagree, these win:
 | MCP tools | [docs/protocol/mcp-protocol.md](docs/protocol/mcp-protocol.md) |
 | Navigation | [docs/product/navigation.md](docs/product/navigation.md) |
 | Visual style | [docs/design/design-language.md](docs/design/design-language.md) |
+| Product entry | [docs/decisions/ADR-047-code-session-first-product-entry.md](docs/decisions/ADR-047-code-session-first-product-entry.md) |

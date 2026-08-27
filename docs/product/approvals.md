@@ -55,6 +55,16 @@ request event's envelope id. Task-scoped admission is one atomic command:
 5. **Everything is logged.** Who approved what, when, and with what stated
    justification — it becomes part of Memory.
 
+Three human facts remain separate in the Code Agent execution home:
+
+- a Run reached a terminal result;
+- a human accepted or returned a Task result;
+- a human granted or rejected a risky action.
+
+No one of these implies either of the others. In particular, completing a normal
+prompt is not a standing write permission, and accepting a Task result does not
+retroactively approve an irreversible action.
+
 `approval.requested` always includes `detail`; omission is not a lower-risk
 request, it is invalid. `approval.expired.after` is the planned RFC3339 deadline,
 while envelope `at` is when the expiration was recorded.

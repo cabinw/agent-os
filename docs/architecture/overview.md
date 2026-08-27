@@ -1,42 +1,53 @@
 # Agent OS Architecture Overview
 
-## The runtime loop
+## Target runtime loop
 
 This cycle is the whole system. Deployment separates its control and execution
 planes per [ADR-008](../decisions/ADR-008-server-hub-local-first-runners.md).
+ADR-047 makes the direct project session the product entry; Supervisor planning
+is an optional coordination path once work needs a durable graph. Conversation /
+Run identity and events in this diagram are the ENTRY-1 target, not an existing
+canonical reducer. Today direct `/say` crosses Hub / Runner but does not create a
+complete durable Run lifecycle.
 
 ```
-Human states a Goal
-        │
-        ▼
-Supervisor ──▶ Task Engine ──▶ Server Hub
-                                  │ dispatch only
-                         established outbound connection
-                                  │
-                                  ▼
-                           Local / Remote Runner
-                                  │
-                           adapter ──▶ vendor CLI
-                                  │ MCP requests + result stream
-                                  ▼
-                              Server Hub
-                                  │ validate + emit
-                                  ▼
-                              Event Core
-                                  │
-              ┌───────────────────┼──────────────────┐
-              ▼                   ▼                  ▼
-          Task State        Project Memory      Human Surfaces
+Human opens project ──▶ Conversation / Run ───────────────┐
+        │                                                 │
+        └── optional Goal ──▶ Supervisor ──▶ Task Engine ─┤
+                                                          ▼
+                                                     Server Hub
+                                                          │ dispatch only
+                                                 established outbound connection
+                                                          │
+                                                          ▼
+                                                   Local / Remote Runner
+                                                          │
+                                                   adapter ──▶ vendor CLI
+                                                          │ MCP requests + result stream
+                                                          ▼
+                                                      Server Hub
+                                                          │ validate + emit
+                                                          ▼
+                                                      Event Core
+                                                          │
+                              ┌───────────────────────────┼──────────────────────┐
+                              ▼                           ▼                      ▼
+                         Run / Task State           Project Memory         Human Surfaces
 ```
 
 The loop closes: what the human sees in Project Pulse is a reduction of the same
 events the Task Engine used to advance state. There is no second source of truth.
+For ENTRY, canonical Conversation / Run commands write the formal Event Store and
+a Hub-side application / read-model adapter applies formal reducers. The product
+client receives typed, sourced projections; it does not import domain code or
+reduce raw events. The pre-v1 Spike JSONL log stays diagnostic and read-only, not
+a dual-write target or implicit migration source.
 
 ## Layers
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│  apps/macos            Pulse, Canvas, Library       │  presentation
+│  apps/macos            Execution, Pulse, Library    │  presentation
 │  apps/hub              server composition root     │  control plane
 │  apps/runner           local / remote execution    │  execution plane
 ├──────────────────────────────────────────────────────┤
@@ -47,6 +58,10 @@ events the Task Engine used to advance state. There is no second source of truth
 │  event-core            bus, store, reducers         │  kernel
 └──────────────────────────────────────────────────────┘
 ```
+
+This is the formal target layering. The executable Hub and Runner currently
+remain co-composed under `apps/chat-spike`; ENTRY reuses that backend while
+`apps/macos` stays the one product client.
 
 Rule: a layer may depend downward only, so `event-core` sits at the **bottom**
 and has zero internal workspace dependencies. Pure schema and storage runtime
@@ -60,7 +75,8 @@ register reducers into it, never the reverse. See
 
 | Component | Responsibility | Never does |
 | --- | --- | --- |
-| **Supervisor Agent** | Decompose goals, assign work, detect drift | Execute the work itself |
+| **Conversation / Run (ENTRY-1 target)** | Give a project session durable execution identity and terminal facts | Treat a vendor session or live stream as project truth |
+| **Supervisor Agent** | Optionally decompose goals, assign work, detect drift | Block the first direct Code Agent prompt or execute work itself |
 | **Server Hub** | Authenticate, route, dispatch; own events and project metadata | Start a vendor CLI or open a working copy |
 | **Agent Runtime** | Track `(agent, host)` lifecycle and match capability to task | Know vendor-specific APIs outside an adapter |
 | **Runner** | Own adapters, vendor sessions and project working copies | Write the Hub event store directly |

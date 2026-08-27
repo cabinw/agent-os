@@ -34,6 +34,7 @@ most likely to be corrupted by a well-meaning fix.
 | MCP Server | Authentication, principal authorization, unknown-field rejection; body caller cannot impersonate |
 | Runner contract | Local and Remote transports produce the same normalized result and event sequence |
 | Local Runner | Real subprocess, stable failure, workspace containment, restart-session and user isolation |
+| Write policy | Writes stay inside the selected workspace; no blanket approval; denied actions fail closed |
 | Hub → Local Runner | Runtime-owned correlation, streaming, task review, normalized failure and queue recovery |
 | Adapters | Two providers execute the same task type identically behind the Runner contract |
 | Event propagation | A tool call reaches its reducer and its subscribers |
@@ -41,7 +42,7 @@ most likely to be corrupted by a well-meaning fix.
 
 ### End to end
 
-One scenario, run through the repository gate:
+The formal deterministic scenario remains:
 
 ```
 goal → supervisor plans → task routed by capability → agent executes
@@ -51,6 +52,32 @@ goal → supervisor plans → task routed by capability → agent executes
 
 Asserted on the resulting event log, not on screenshots.
 
+ADR-047 adds a separate real-product acceptance path:
+
+```
+select fixture repository → ready fixture Agent → prompt → durable Run
+  → real file change → test evidence → follow-up / cancel / terminal result
+  → refresh or Hub restart → same conversation and terminal state
+```
+
+The repository gate uses the existing Local Runner and a deterministic,
+write-capable subprocess fixture. It asserts event / projection evidence,
+workspace contents, every readiness failure and browser discoverability. A
+screenshot alone cannot satisfy it.
+
+A separate credential-dependent field smoke runs at least one real Codex or
+Claude CLI and records vendor version, authenticated identity class, selected
+workspace, permission mode and resulting evidence. `pnpm verify` must never
+depend on a vendor account or network response.
+
+Conversation, Run, Vendor Session and optional Task must be tested as distinct
+identities. Run completion cannot imply Task acceptance or risk approval. The
+real-file-change case must prove that a scoped write policy permits the intended
+edit without exposing paths outside the selected project. Two Conversations for
+the same project and Agent plant different facts, switch back and prove separate
+Vendor Session state across restart; Remote cases also bind host and workspace
+fingerprints.
+
 The Local Runner is the reference implementation. The Remote Runner reruns the
 same task and contract cases unchanged, then adds transport-only cases for
 authentication, reconnect, duplicate delivery, timeout and cancellation.
@@ -59,15 +86,21 @@ authentication, reconnect, duplicate delivery, timeout and cancellation.
 
 There is no hosted CI. `corepack pnpm verify` is the manual release and commit
 gate: build, compile-time type-contract probes, Biome, architectural layer
-checks and the full Vitest suite. Do not copy a test count into this strategy;
-the command output is authoritative.
+checks and the full Vitest suite. The repository test script caps Vitest at four
+workers because several deployment cases compile or launch real subprocesses;
+raising that limit can turn host contention into false timeout failures. Do not
+copy a test count into this strategy; the command output is authoritative.
 
 ### macOS shell
 
 RM-3.1 adds four proportional gates: strict navigation/token contract tests,
 frontend typecheck, Vite production build, and Rust/Tauri debug no-bundle build.
-Browser screenshots at 1440×900 and the 1024×720 minimum verify overflow and
-fixed-sidebar behavior; screenshots never replace semantic and native gates.
+Browser screenshots at 1440×900 and the 1024×720 minimum verify overflow and the
+current shell contract; screenshots never replace semantic and native gates.
+ADR-047 supersedes fixed-primary-sidebar acceptance for the execution home. Its
+tests instead assert visible project path, Agent readiness, primary composer,
+Run controls, stable `execution` shell root and access to all seven secondary
+project-intelligence destinations.
 
 ## Replay as a test
 

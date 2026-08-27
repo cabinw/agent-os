@@ -85,12 +85,14 @@ identity in a request body is never trusted. Human, agent and Runner principals
 have separate route permissions. Vendor credentials stay on the Runner and are
 never sent to the Hub.
 
-Logical vendor-session ownership is `(user, project, agent)`. The Hub persists
-which host owns that logical session. That Runner persists the opaque vendor
-session id, adapter and canonical workspace under the same key. Resume is
-allowed only when host, adapter and workspace still match. Moving work to a
-different host starts fresh and rebuilds context from the event log; that
-changes cost, not correctness.
+Logical vendor-session ownership for the implemented task/Spike path is
+`(user, project, agent)`. ADR-047 extends the Code-session product path to
+`(user, project, conversation, agent)` so independent visible Conversations do
+not share hidden context. The Hub persists which host owns that logical session.
+That Runner persists the opaque vendor session id, adapter and canonical
+workspace under the same key. Resume is allowed only when Conversation, host,
+adapter and workspace still match. Moving work to a different host starts fresh
+and rebuilds context from the event log; that changes cost, not correctness.
 
 Routing capability belongs to `(agent, host)`, not the agent alone. A host
 registration reports its OS, hardware and installed tools / MCP servers. The

@@ -2,58 +2,70 @@
 
 ## Definition
 
-Agent OS is the operating system for AI-native teams.
+Agent OS is the persistent project environment for Code Agents.
 
-The goal is not to monitor agents. It is to let an AI team collaborate, execute,
-and accumulate knowledge that survives the end of any conversation.
+The goal is not to replace a Code Agent or monitor its terminal. It is to let a
+person start real work in a repository, understand and control that execution,
+and retain project knowledge after any Agent session ends.
 
 ## The problem
 
-Today an AI agent session is a sealed room. Work happens, context accrues, and
-when the window closes it is gone. Ask an agent three months later why the
-project uses PostgreSQL and it has no idea — the reasoning was never anywhere
-but in a transcript nobody kept.
+Today a Code Agent session is a sealed room. Work happens, context accrues, and
+when the window closes the next session must reconstruct what changed, why it
+changed and what remains. A terminal transcript alone does not answer which
+result was accepted, which test proved it or which decision still constrains the
+repository.
 
-Multiply that by five agents from five vendors and there is no shared state at
-all: no common task list, no way for one agent to hand work to another, no
-record of who decided what.
+Switching vendors or machines makes the loss visible, but multi-agent
+coordination is not the first product problem. The first problem is continuity
+and control for one real Code Agent run. Multi-agent work reuses the same memory,
+event and approval foundation later.
 
 ## The shape of the answer
 
 ```
-Goal ─── stated once by a human
-  │
-Tasks ── planned by the Supervisor, executed by whichever agent has the capability
-  │
-Events ─ every action, immutable, replayable
-  │
-Memory ─ summarized into knowledge that answers "why", not just "what"
+Project ── the repository and its durable identity
+   │
+Conversation ── the human-visible continuity across Agent runs
+   │
+Run / Task ── executable work, controlled and reviewable
+   │
+Events ── durable facts and sourced evidence
+   │
+Memory ── knowledge that answers "why", not just "what"
 ```
 
-Four properties fall out of this and define the product:
+Five properties fall out of this and define the product:
 
-- **Any agent can do any task it is capable of.** Capability, not vendor.
+- **Start with a normal Code Agent interaction.** Project, Agent, prompt.
 - **Nothing happens invisibly.** If it is not an event, it did not happen.
 - **State is derived.** Every view is a projection of the log, so history is
   always reconstructable.
+- **Sessions are optimizations, not memory.** Correctness survives a cold Agent.
 - **The system stops for humans.** Deployment, deletion, spending, publishing —
   the agent asks first.
 
 ## Core experience
 
-A user opens Agent OS and immediately knows:
+A user opens Agent OS and can immediately:
 
-- what the AI team is doing right now
-- why it is doing that
-- how the agents are coordinating
-- what knowledge was produced
-- where a human decision is required
+- open a real project and address a ready Codex or Claude Agent
+- watch what it is doing and where the evidence came from
+- guide, stop or resolve a blocked run
+- inspect changed files and tests before accepting a result
+- reopen the project later with its decisions and accepted knowledge intact
+
+Project Pulse, Tasks, Agents, Memory and Canvas explain and manage the same
+execution history. They surround the Code Agent session; they are not a
+prerequisite for starting it. See
+[ADR-047](decisions/ADR-047-code-session-first-product-entry.md).
 
 ## Evolution
 
 ```
-Agent Monitor → Agent Canvas → Agent Collaboration Platform → Agent OS
+Code Agent → Observable Project Session → Persistent Project Memory → Agent OS
 ```
 
-The current target is the third step, built so the fourth is reachable without
-re-founding the architecture.
+The current target is the second step using the already implemented Hub / Runner
+substrate. Durable memory then differentiates the product; multi-agent depth is a
+later execution strategy, not a new foundation.

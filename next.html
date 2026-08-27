@@ -1,493 +1,65 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Agent OS 下一步决策导航：可选路线、推荐起点、完成判据与一周执行建议。">
-<title>Agent OS — 接下来做什么</title>
-<style>
-:root{
-  color-scheme:light;
-  --bg:#F7F8FA;--surface:#FFFFFF;--surface-soft:#FAFAFC;--border:#E8EAED;
-  --text:#111827;--muted:#6B7280;--faint:#9CA3AF;--accent:#6366F1;--accent-2:#8B5CF6;
-  --accent-soft:#F1F0FF;--ok:#10B981;--ok-soft:#ECFDF5;--warn:#F59E0B;--warn-soft:#FFFBEB;
-  --risk:#EF4444;--risk-soft:#FEF2F2;--info:#3B82F6;--info-soft:#EFF6FF;
-  --shadow:0 1px 2px rgba(15,23,42,.04);--panel-shadow:0 16px 48px rgba(15,23,42,.08);
-  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-}
-:root[data-theme="dark"]{
-  color-scheme:dark;--bg:#0E1014;--surface:#161A21;--surface-soft:#12161C;--border:#282E38;
-  --text:#E8EAEE;--muted:#A0A7B3;--faint:#747D8A;--accent-soft:#252342;
-  --ok-soft:#102A22;--warn-soft:#302613;--risk-soft:#321919;--info-soft:#16263C;
-  --shadow:0 1px 2px rgba(0,0,0,.18);--panel-shadow:0 18px 54px rgba(0,0,0,.28);
-}
-*{box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:24px}
-body{margin:0;background:var(--bg);color:var(--text);font:13px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
-button,a{font:inherit}
-a{color:inherit}
-button{color:inherit}
-.app{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
-.sidebar{position:sticky;top:0;height:100vh;padding:24px 16px;border-right:1px solid var(--border);background:color-mix(in srgb,var(--surface) 92%,transparent);overflow:auto}
-.brand{display:flex;align-items:center;gap:10px;padding:0 8px 20px;font-size:15px;font-weight:680;letter-spacing:-.02em}
-.brand-mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:grid;place-items:center;color:#fff;box-shadow:0 6px 18px rgba(99,102,241,.22)}
-.brand-mark svg{width:17px;height:17px}
-.nav-label{padding:14px 10px 6px;color:var(--faint);font-size:10.5px;font-weight:680;letter-spacing:.08em;text-transform:uppercase}
-.nav-link{display:flex;align-items:center;gap:9px;padding:7px 10px;margin:2px 0;border-radius:8px;color:var(--muted);text-decoration:none;transition:background .12s ease,color .12s ease}
-.nav-link:hover,.nav-link.active{background:var(--accent-soft);color:var(--accent)}
-.nav-dot{width:7px;height:7px;border:1.5px solid currentColor;border-radius:50%;flex:none}
-.side-status{margin-top:24px;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow)}
-.side-status strong{display:block;font-size:12px}
-.side-status p{margin:4px 0 0;color:var(--muted);font-size:11.5px;line-height:1.5}
-.side-status .status-line{display:flex;align-items:center;gap:7px;margin-bottom:7px;color:var(--risk)}
-.status-pulse{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 0 4px color-mix(in srgb,currentColor 13%,transparent)}
-.side-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px}
-.tiny-btn{border:1px solid var(--border);background:var(--surface-soft);padding:6px 8px;border-radius:7px;cursor:pointer;color:var(--muted);font-size:11px}
-.tiny-btn:hover{color:var(--text)}
-.main{min-width:0;padding:0 36px 100px}
-.content{max-width:1180px;margin:0 auto}
-.topbar{height:58px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
-.crumb{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
-.crumb b{color:var(--text);font-weight:600}
-.date-pill{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 10px;color:var(--muted);font-variant-numeric:tabular-nums}
-.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:20px;padding:46px 0 24px}
-.eyebrow{color:var(--accent);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
-h1{font-size:36px;line-height:1.16;letter-spacing:-.035em;margin:0;font-weight:720;max-width:720px}
-.lede{font-size:15.5px;line-height:1.75;color:var(--muted);max-width:720px;margin:15px 0 22px}
-.hero-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.btn{border:1px solid var(--border);background:var(--surface);padding:9px 14px;border-radius:8px;text-decoration:none;font-weight:600;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease}
-.btn:hover{border-color:color-mix(in srgb,var(--accent) 38%,var(--border));box-shadow:0 4px 14px rgba(99,102,241,.1)}
-.btn.primary{color:#fff;border:0;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 8px 20px rgba(99,102,241,.2)}
-.btn.primary:hover{transform:translateY(-1px)}
-.route-card{border:1px solid color-mix(in srgb,var(--accent) 26%,var(--border));background:linear-gradient(145deg,var(--surface),color-mix(in srgb,var(--accent-soft) 64%,var(--surface)));border-radius:14px;padding:18px;box-shadow:var(--panel-shadow)}
-.route-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
-.route-head strong{font-size:14px}
-.recommended{font-size:10.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:20px;padding:3px 8px}
-.mini-route{display:grid;gap:9px}
-.mini-step{display:grid;grid-template-columns:25px minmax(0,1fr) auto;align-items:center;gap:9px}
-.mini-n{width:25px;height:25px;display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--accent) 32%,var(--border));border-radius:8px;color:var(--accent);font:650 11px var(--mono);background:var(--surface)}
-.mini-step b{display:block;font-size:12px;line-height:1.35}
-.mini-step small{display:block;color:var(--muted);font-size:10.5px;line-height:1.35}
-.mini-time{color:var(--faint);font:11px var(--mono);white-space:nowrap}
-.alert{display:flex;gap:12px;align-items:flex-start;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--border));background:var(--warn-soft);padding:13px 15px;border-radius:12px;margin-bottom:18px}
-.alert svg{width:18px;height:18px;flex:none;color:var(--warn);margin-top:1px}
-.alert strong{font-size:12.5px}
-.alert p{margin:2px 0 0;color:var(--muted);font-size:12px}
-.alert a{color:var(--accent);text-underline-offset:2px}
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0 42px}
-.kpi{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:15px 16px;box-shadow:var(--shadow)}
-.kpi-top{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:11px}
-.kpi-icon{width:27px;height:27px;display:grid;place-items:center;border-radius:8px;background:var(--surface-soft);color:var(--muted)}
-.kpi-value{font-size:28px;line-height:1.15;font-weight:680;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin-top:12px}
-.kpi-meta{font-size:11px;color:var(--muted);margin-top:4px}
-.tone-risk{color:var(--risk)}.tone-ok{color:var(--ok)}.tone-info{color:var(--info)}.tone-warn{color:var(--warn)}
-section{padding:22px 0 28px;scroll-margin-top:16px}
-.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:15px}
-.section-kicker{color:var(--accent);font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
-h2{font-size:22px;line-height:1.3;letter-spacing:-.025em;margin:4px 0 0;font-weight:690}
-.section-desc{max-width:560px;color:var(--muted);font-size:12.5px;margin:0;text-align:right}
-.mode-switch{display:flex;gap:6px;padding:5px;border:1px solid var(--border);border-radius:10px;background:var(--surface);width:max-content;margin-bottom:14px}
-.mode-btn{border:0;background:transparent;padding:7px 11px;border-radius:7px;cursor:pointer;color:var(--muted);font-weight:580}
-.mode-btn[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
-.decision-panel{display:grid;grid-template-columns:minmax(240px,.7fr) minmax(0,1.3fr);border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
-.decision-copy{padding:22px;background:linear-gradient(150deg,var(--accent-soft),var(--surface))}
-.decision-copy .badge{display:inline-flex;margin-bottom:13px}
-.decision-copy h3{font-size:18px;line-height:1.35;margin:0 0 8px;letter-spacing:-.02em}
-.decision-copy p{color:var(--muted);margin:0;font-size:12.5px}
-.decision-list{padding:9px 18px}
-.call-evolution{display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1fr);align-items:stretch;gap:10px;margin:0 0 14px}
-.call-stage{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:14px 15px;box-shadow:var(--shadow)}
-.call-stage.local{border-color:color-mix(in srgb,var(--accent) 28%,var(--border));background:linear-gradient(145deg,var(--accent-soft),var(--surface))}
-.call-stage.remote{border-color:color-mix(in srgb,var(--info) 25%,var(--border))}
-.call-label{font:700 10px var(--mono);letter-spacing:.08em;color:var(--accent);text-transform:uppercase}
-.call-stage.remote .call-label{color:var(--info)}
-.call-stage h3{font-size:13px;margin:5px 0 7px}.call-stage p{margin:0;color:var(--muted);font-size:11.5px}
-.call-chain{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:10px;color:var(--text);font:600 10.5px var(--mono)}
-.call-chain i{font-style:normal;color:var(--faint)}
-.call-arrow{display:grid;place-items:center;color:var(--accent)}
-.call-arrow svg{width:25px;height:25px}
-.route-row{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 4px;border-bottom:1px solid var(--border)}
-.route-row:last-child{border-bottom:0}
-.route-num{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font:650 11px var(--mono)}
-.route-row b{font-size:13px}.route-row p{margin:2px 0 0;color:var(--muted);font-size:11.5px}
-.route-effort{font:11px var(--mono);color:var(--faint);white-space:nowrap}
-.work-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.work-card{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.work-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--card-tone,var(--accent))}
-.work-card[data-tone="risk"]{--card-tone:var(--risk)}
-.work-card[data-tone="warn"]{--card-tone:var(--warn)}
-.work-card[data-tone="info"]{--card-tone:var(--info)}
-.work-card[data-tone="ok"]{--card-tone:var(--ok)}
-.work-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
-.work-id{font:650 10.5px var(--mono);color:var(--faint);letter-spacing:.04em}
-.work-card h3{font-size:14px;margin:4px 0 5px;line-height:1.4}
-.work-card>p{color:var(--muted);font-size:12px;margin:0 0 12px}
-.tags{display:flex;gap:6px;flex-wrap:wrap}
-.tag,.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:6px;background:var(--surface-soft);border:1px solid var(--border);font-size:10.5px;color:var(--muted);white-space:nowrap}
-.tag.risk{color:var(--risk);background:var(--risk-soft);border-color:color-mix(in srgb,var(--risk) 20%,var(--border))}
-.tag.warn{color:#B45309;background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 22%,var(--border))}
-.tag.ok{color:#047857;background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 20%,var(--border))}
-.tag.info{color:#2563EB;background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 20%,var(--border))}
-.done-when{border-top:1px dashed var(--border);margin-top:13px;padding-top:11px;color:var(--muted);font-size:11.5px}
-.done-when b{color:var(--text)}
-.source-link{color:var(--accent);text-decoration:none;font-size:11px;white-space:nowrap}.source-link:hover{text-decoration:underline}
-.week{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:10px;overflow:auto;padding-bottom:4px}
-.day{min-width:150px;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:14px}
-.day-no{color:var(--accent);font:650 10px var(--mono);text-transform:uppercase;letter-spacing:.08em}
-.day h3{font-size:13px;margin:6px 0 6px}.day p{margin:0;color:var(--muted);font-size:11.5px}
-.day-out{margin-top:11px;padding-top:9px;border-top:1px solid var(--border);font-size:10.5px;color:var(--faint)}
-.day-out b{color:var(--text)}
-.check-panel{border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:8px 18px;box-shadow:var(--shadow)}
-.check-row{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:11px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
-.check-row:last-child{border-bottom:0}
-.check{appearance:none;width:18px;height:18px;border:1.5px solid var(--faint);border-radius:5px;background:var(--surface);cursor:pointer;position:relative}
-.check:checked{background:var(--accent);border-color:var(--accent)}
-.check:checked::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:750}
-.check-row:has(.check:checked) .check-title{text-decoration:line-through;color:var(--faint)}
-.check-title{font-size:12.5px;font-weight:580}.check-sub{font-size:11px;color:var(--muted);margin-top:1px}
-.check-kind{font-size:10.5px;color:var(--faint);white-space:nowrap}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.plain-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:var(--surface)}
-.plain-card h3{font-size:13.5px;margin:0 0 10px}.plain-card ul{list-style:none;padding:0;margin:0}
-.plain-card li{display:flex;gap:9px;color:var(--muted);font-size:11.8px;padding:6px 0}
-.plain-card li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--faint);flex:none;margin-top:6px}
-.plain-card.do-not li::before{background:var(--warn)}
-.plain-card.decisions li::before{background:var(--info)}
-.sources{display:flex;gap:8px;flex-wrap:wrap}
-.source-chip{padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);text-decoration:none;color:var(--muted);font-size:11px}
-.source-chip:hover{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 30%,var(--border))}
-.foot{display:flex;justify-content:space-between;gap:16px;color:var(--faint);font-size:10.5px;padding:28px 0 0;margin-top:16px;border-top:1px solid var(--border)}
-code{font-family:var(--mono);font-size:.9em;background:var(--surface-soft);border:1px solid var(--border);border-radius:4px;padding:.08em .35em}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-body.compact .work-card{padding:13px}body.compact .route-row{padding:9px 4px}body.compact .check-row{padding:9px 0}
-@media(max-width:1020px){.hero{grid-template-columns:1fr}.route-card{max-width:650px}.kpis{grid-template-columns:repeat(2,1fr)}.week{grid-template-columns:repeat(5,190px)}}
-@media(max-width:760px){.app{display:block}.sidebar{position:static;height:auto;padding:12px 14px;border-right:0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;overflow:auto}.brand{padding:0 10px 0 0;white-space:nowrap}.brand-mark{width:27px;height:27px}.nav-label,.side-status{display:none}.nav-link{white-space:nowrap;margin:0}.nav-dot{display:none}.main{padding:0 16px 70px}.topbar{height:50px}.hero{padding-top:30px}h1{font-size:30px}.kpis,.work-grid,.two-col{grid-template-columns:1fr}.decision-panel{grid-template-columns:1fr}.call-evolution{grid-template-columns:1fr}.call-arrow{transform:rotate(90deg);height:24px}.section-head{display:block}.section-desc{text-align:left;margin-top:7px}.date-pill{display:none}.foot{display:block}.foot span{display:block;margin-top:5px}}
-@media print{.sidebar,.topbar,.hero-actions,.mode-switch,.side-actions{display:none!important}.app{display:block}.main{padding:0}.content{max-width:none}.work-card,.kpi,.plain-card,.day{break-inside:avoid}.hero{padding-top:10px}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Agent OS 路线入口：实时执行状态已迁移到项目看板。">
+  <title>Agent OS — 路线已迁移</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      background: #f6f7fb;
+      color: #151820;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(99, 102, 241, .13), transparent 34rem),
+        #f6f7fb;
+    }
+    main {
+      width: min(680px, 100%);
+      padding: 36px;
+      border: 1px solid #e2e5ed;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, .92);
+      box-shadow: 0 24px 70px rgba(30, 35, 55, .1);
+    }
+    .eyebrow { color: #6366f1; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 10px 0 14px; font-size: clamp(28px, 5vw, 42px); letter-spacing: -.04em; }
+    p { margin: 0; color: #626978; line-height: 1.75; }
+    .route { margin: 26px 0; padding: 18px; border-radius: 12px; background: #f4f3ff; color: #34365b; line-height: 1.8; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    a { padding: 10px 14px; border: 1px solid #d9dce6; border-radius: 9px; color: #343741; text-decoration: none; font-weight: 650; }
+    a.primary { border-color: #6366f1; background: #6366f1; color: white; }
+    small { display: block; margin-top: 24px; color: #8a90a0; line-height: 1.6; }
+    @media (prefers-color-scheme: dark) {
+      :root, body { background: #0f1117; color: #eef0f5; }
+      main { border-color: #292d38; background: rgba(24, 27, 35, .94); }
+      p, small { color: #a3a9b6; }
+      .route { background: #26253e; color: #dcddf6; }
+      a { border-color: #3a3f4c; color: #eef0f5; }
+    }
+  </style>
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar" aria-label="页面导航">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 21 19H3L12 3Z" stroke="currentColor" stroke-width="2"/><path d="m9 15 3-6 3 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      </span>
-      Agent OS
+  <main>
+    <div class="eyebrow">Route moved</div>
+    <h1>下一步路线已迁移到实时看板</h1>
+    <p>旧页面记录的是已经完成的 Local → Remote → Server 路线。为避免交接时读取到过期计划，当前执行顺序只在看板与 HANDOFF 中维护。</p>
+    <div class="route">ENTRY-1 会话与 Run 契约 → ENTRY-2 Project / Runner Placement 与就绪 → ENTRY-3 apps/macos 唯一本地会话入口 → ENTRY-4 证据与记忆 → ENTRY-5 可选远程 / 多 Agent</div>
+    <div class="actions">
+      <a class="primary" href="board.html#current">打开实时看板</a>
+      <a href="HANDOFF.md">阅读 HANDOFF</a>
+      <a href="docs/decisions/ADR-047-code-session-first-product-entry.md">查看 ADR-047</a>
     </div>
-    <div class="nav-label">决策导航</div>
-    <a class="nav-link" href="board.html"><span class="nav-dot"></span>项目看板</a>
-    <a class="nav-link active" href="#overview"><span class="nav-dot"></span>当前判断</a>
-    <a class="nav-link" href="#start"><span class="nav-dot"></span>推荐起点</a>
-    <a class="nav-link" href="#options"><span class="nav-dot"></span>可做事项</a>
-    <a class="nav-link" href="#week"><span class="nav-dot"></span>一周切片</a>
-    <a class="nav-link" href="#checklist"><span class="nav-dot"></span>完成清单</a>
-    <a class="nav-link" href="#boundaries"><span class="nav-dot"></span>边界与决策</a>
-    <div class="nav-label">已有材料</div>
-    <a class="nav-link" href="todo.html"><span class="nav-dot"></span>完整 TODO</a>
-    <a class="nav-link" href="doc.html"><span class="nav-dot"></span>项目说明</a>
-    <div class="side-status">
-      <div class="status-line"><span class="status-pulse"></span><strong>验证门禁当前为绿</strong></div>
-      <p>完整 <code>pnpm verify</code> 已通过；测试数量以当前命令输出为准。</p>
-      <div class="side-actions">
-        <button class="tiny-btn" id="theme" type="button">切换主题</button>
-        <button class="tiny-btn" id="density" type="button">紧凑模式</button>
-      </div>
-    </div>
-  </aside>
-
-  <main class="main">
-    <div class="content">
-      <div class="topbar">
-        <div class="crumb"><span>项目库</span><span>/</span><b>Agent OS</b><span>/</span><span>下一步</span></div>
-        <div class="date-pill">状态更新 · 2026-08-23</div>
-      </div>
-
-      <header class="hero" id="overview">
-        <div>
-          <div class="eyebrow">Next move · decision brief</div>
-          <h1>Event Contract 已完成，现在验收 Server Hub</h1>
-          <p class="lede">Local Runner、共享契约、production-mode Remote Runner 和 RM-1.1a Event Contract 均已验证。当前关键路径是先完成 Server Hub 的受信部署、备份恢复与 Windows Worker 联调，再回到 RM-1.1b SQLite 事件存储；Spike 继续作为证据，不直接演变成正式内核。</p>
-          <div class="hero-actions">
-            <a class="btn primary" href="#start">从推荐起点开始</a>
-            <a class="btn" href="#options">查看全部选择</a>
-          </div>
-        </div>
-        <aside class="route-card" aria-label="默认推荐路线">
-          <div class="route-head"><strong>默认推荐路线</strong><span class="recommended">Local ✓ → Remote ✓ → Event ✓ → Server → SQLite</span></div>
-          <div class="mini-route">
-            <div class="mini-step"><span class="mini-n">01</span><span><b>Local / Remote Runner</b><small>共享契约 · transport · 重启恢复</small></span><span class="mini-time">✓</span></div>
-            <div class="mini-step"><span class="mini-n">02</span><span><b>RM-1.1a Event Contract</b><small>ULID · version-first · 29 类 schema</small></span><span class="mini-time">✓</span></div>
-            <div class="mini-step"><span class="mini-n">03</span><span><b>SVR-02 Hub 部署单元</b><small>受信工具 · 事务安装 · candidate 隔离</small></span><span class="mini-time">当前</span></div>
-            <div class="mini-step"><span class="mini-n">04</span><span><b>SVR-03～06 联调验收</b><small>备份恢复 · Windows Worker · 故障演练</small></span><span class="mini-time">后续</span></div>
-            <div class="mini-step"><span class="mini-n">05</span><span><b>RM-1.1b SQLite store</b><small>事务 seq · WAL · 幂等 token</small></span><span class="mini-time">Server 后</span></div>
-          </div>
-        </aside>
-      </header>
-
-      <div class="alert">
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v5m0 3.5v.5M10.3 4.3 2.8 17.2A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.8L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <div><strong>Runner 与 Event Contract 已完成，当前验收 Server Hub 部署</strong><p><a href="docs/decisions/ADR-009-versioned-strict-event-contract.md">ADR-009</a> 的 RM-1.1a 已通过 323 / 323 全仓测试；SVR-02 正在收口受信 admin kit、可重试安装和 candidate 流量门控，完成服务器路线后接 RM-1.1b SQLite store。</p></div>
-      </div>
-
-      <div class="kpis" aria-label="当前状态">
-        <article class="kpi"><div class="kpi-top"><span>当前执行阶段</span><span class="kpi-icon tone-info">S2</span></div><div class="kpi-value">SVR-02</div><div class="kpi-meta">Event Contract 已完成</div></article>
-        <article class="kpi"><div class="kpi-top"><span>行为测试</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">全绿</div><div class="kpi-meta">以 pnpm verify 输出为准</div></article>
-        <article class="kpi"><div class="kpi-top"><span>完整验证门禁</span><span class="kpi-icon tone-ok">✓</span></div><div class="kpi-value tone-ok">PASS</div><div class="kpi-meta">build · types · Biome · layers · tests</div></article>
-        <article class="kpi"><div class="kpi-top"><span>可运行实现</span><span class="kpi-icon tone-warn">S</span></div><div class="kpi-value">Spike</div><div class="kpi-meta">实验依据，不是最终产品</div></article>
-      </div>
-
-      <section id="start">
-        <div class="section-head">
-          <div><div class="section-kicker">Choose your route</div><h2>你想优化什么？</h2></div>
-          <p class="section-desc">默认按“证据可信 + 尽快得到真实产品反馈”排序。切换目标，会得到另一条合理路线；没有一条路线会绕过认证或文档正式化。</p>
-        </div>
-        <div class="call-evolution" aria-label="本地调用到远程调用的演进路线">
-          <article class="call-stage local">
-            <div class="call-label">Phase L · Local complete</div>
-            <h3>先确定完整调用语义</h3>
-            <p>本机就是第一个 Runner。调用、事件、会话、错误与验收全部跑通，网络尚不是变量。</p>
-            <div class="call-chain"><span>Hub</span><i>→</i><span>Local Runner</span><i>→</i><span>Adapter</span><i>→</i><span>CLI</span><i>→</i><span>Events</span></div>
-          </article>
-          <div class="call-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-          <article class="call-stage remote">
-            <div class="call-label">Phase R · Remote complete</div>
-            <h3>再验证 transport 与恢复</h3>
-            <p>保留同一 Runner 契约，把进程内调用换成认证的出站连接，只新增网络失败模式。</p>
-            <div class="call-chain"><span>Hub</span><i>⇄</i><span>Transport</span><i>⇄</i><span>Remote Runner</span><i>→</i><span>同一 Adapter</span></div>
-          </article>
-        </div>
-        <div class="mode-switch" role="group" aria-label="路线目标">
-          <button class="mode-btn" type="button" data-mode="balanced" aria-pressed="true">稳妥推进</button>
-          <button class="mode-btn" type="button" data-mode="daily" aria-pressed="false">最快改善日常使用</button>
-          <button class="mode-btn" type="button" data-mode="core" aria-pressed="false">最快进入正式内核</button>
-        </div>
-        <div class="decision-panel" aria-live="polite">
-          <div class="decision-copy">
-            <span class="badge" id="mode-badge">推荐</span>
-            <h3 id="mode-title">先签收 Server Hub 部署边界</h3>
-            <p id="mode-desc">保持 Event Contract 全绿，先完成受信部署、备份恢复和 Windows 联调，再按依赖顺序落地 SQLite Event Store。</p>
-          </div>
-          <div class="decision-list" id="route-list"></div>
-        </div>
-      </section>
-
-      <section id="options">
-        <div class="section-head">
-          <div><div class="section-kicker">Work menu</div><h2>接下来可以做的事情</h2></div>
-          <p class="section-desc">这些不是一份新的 canonical roadmap，而是把现有计划、最新方向和审计结果压成可选择的工作包。</p>
-        </div>
-        <div class="work-grid">
-          <article class="work-card" data-tone="risk">
-            <div class="work-top"><div><div class="work-id">GATE-01</div><h3>恢复 <code>pnpm verify</code></h3></div><a class="source-link" href="tests/hub.test.ts">测试源文件 →</a></div>
-            <p>Biome 与分层检查已经恢复，完整门禁重新成为可信准绳。</p>
-            <div class="tags"><span class="tag ok">已完成</span><span class="tag">持续执行</span><span class="tag">零架构风险</span></div>
-            <div class="done-when"><b>完成判据：</b><code>corepack pnpm verify</code> 一次完整通过。</div>
-          </article>
-
-          <article class="work-card" data-tone="risk">
-            <div class="work-top"><div><div class="work-id">B+</div><h3>封住 Hub 的访问与身份边界</h3></div><a class="source-link" href="apps/chat-spike/src/server.mjs">server.mjs →</a></div>
-            <p>显式绑定地址、所有路由要求 token，并让 caller 由 transport/session 推导；验收入口也必须验证 human 身份。</p>
-            <div class="tags"><span class="tag ok">已完成</span><span class="tag">持续回归</span><span class="tag">依赖 GATE-01</span></div>
-            <div class="done-when"><b>完成判据：</b>匿名请求全部 401；伪造 caller、直接调用 accept 的测试失败。</div>
-          </article>
-
-          <article class="work-card" data-tone="warn">
-            <div class="work-top"><div><div class="work-id">EVIDENCE-01</div><h3>让实验与真实 Hub 走同一路径</h3></div><a class="source-link" href="apps/chat-spike/experiments/context-rebuild.mjs">实验 →</a></div>
-            <p>去掉真实 Hub 的 200 条默认截断，或让实验直接调用 Hub runtime；同时覆盖伪造 <code>replyTo</code> 和重启后重复注册。</p>
-            <div class="tags"><span class="tag ok">已完成</span><span class="tag">持续回归</span><span class="tag">测试先行</span></div>
-            <div class="done-when"><b>完成判据：</b>1200 条用真实路径仍召回；伪造因果与重启注册回归用例稳定通过。</div>
-          </article>
-
-          <article class="work-card" data-tone="info">
-            <div class="work-top"><div><div class="work-id">C-LOCAL-01</div><h3>先实现本地 Agent 调用闭环</h3></div><a class="source-link" href="apps/chat-spike/src/adapters/base.mjs">适配器契约 →</a></div>
-            <p>把本机作为第一个 Runner：Hub 通过明确的 Runner 接口调用本地 adapter 和真实 vendor CLI；工具参与、事件写入、session、错误与人工验收全部走完整链路。</p>
-            <div class="tags"><span class="tag ok">已完成</span><span class="tag">共享契约已冻结</span><span class="tag">依赖 B+ / EVIDENCE-01</span></div>
-            <div class="done-when"><b>完成判据：</b>浏览器发起一项本地任务，真实 CLI 执行并通过 MCP/adapter 回报，事件可重放，失败与重启行为有测试。</div>
-          </article>
-
-          <article class="work-card" data-tone="info">
-            <div class="work-top"><div><div class="work-id">ADR-008</div><h3>落实 Local / Remote Runner 共享契约</h3></div><a class="source-link" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">正式决策 →</a></div>
-            <p>拓扑、身份、host capability、session placement 与共享请求／事件／结果契约已经定案；Runner 已成为服务组合根的唯一执行面。</p>
-            <div class="tags"><span class="tag ok">决策已完成</span><span class="tag ok">契约已完成</span><span class="tag">先于 Remote</span></div>
-            <div class="done-when"><b>完成判据：</b>仓库中只有一个 Runner contract；本地与远程调用的差异被限制在 transport 和网络失败恢复。</div>
-          </article>
-
-          <article class="work-card" data-tone="info">
-            <div class="work-top"><div><div class="work-id">C-REMOTE-01</div><h3>Production-mode Remote Runner 路径</h3></div><a class="source-link" href="apps/chat-spike/src/adapters/base.mjs">共享契约 →</a></div>
-            <p>保留本地阶段已经跑通的请求、流式事件、结果和 session 语义，把 Local Runner 调用换成经过认证的出站连接。Hub 只 dispatch，不启动 vendor CLI。</p>
-            <div class="tags"><span class="tag ok">已完成</span><span class="tag">38 + 4 项测试</span><span class="tag">生产组合根</span></div>
-            <div class="done-when"><b>已验证：</b>同一个真实任务走 Local 与 Remote；核心事件一致，断线、旧 lease、Hub 重启、离线与凭据隔离均有回归。</div>
-          </article>
-
-          <article class="work-card" data-tone="risk">
-            <div class="work-top"><div><div class="work-id">SVR-02 → 06</div><h3>部署并联调 Server Hub / Windows Worker</h3></div><a class="source-link" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">部署决策 →</a></div>
-            <p>先把 Hub runtime 收进受信的 Ubuntu 部署事务，再交付一致备份、Windows Worker 安全边界、真实跨机链路和故障演练；主任务负责独立验收。</p>
-            <div class="tags"><span class="tag ok">SVR-01 已完成</span><span class="tag">SVR-02 当前 64%</span><span class="tag">不可提前签收</span></div>
-            <div class="done-when"><b>完成判据：</b>受信 admin kit 与应用 artifact 分域，安装可重试、candidate 不接生产流量，Ubuntu / Windows 真机测试和恢复演练全部留证。</div>
-          </article>
-
-          <article class="work-card" data-tone="ok">
-            <div class="work-top"><div><div class="work-id">RM-1.1a</div><h3>实现正式 Event Core 信封</h3></div><a class="source-link" href="docs/architecture/event-core.md">规范 →</a></div>
-            <p>在 <code>packages/event-core</code> 落地 ULID、严格事件 schema 和 29 个 payload discriminated union，复用 spike 已证明的边界。</p>
-            <div class="tags"><span class="tag ok">已完成</span><span class="tag ok">323 / 323</span><span class="tag">正式内核</span></div>
-            <div class="done-when"><b>已验证：</b>未知 version/type、任意层额外字段、非法 subject、自引用和解析后修改全部 fail closed。</div>
-          </article>
-        </div>
-      </section>
-
-      <section id="week">
-        <div class="section-head">
-          <div><div class="section-kicker">Suggested week</div><h2>建议的一周切片</h2></div>
-          <p class="section-desc">Local / Remote 与 Event Contract 切片已经完成。服务器路线先完成部署和跨机验收，随后从 Day 3 的 SQLite 事件存储继续。</p>
-        </div>
-        <div class="week">
-          <article class="day"><div class="day-no">Day 1</div><h3>消除规范冲突</h3><p>统一事件信封、draft/stored、subject 与 29 类 payload；把约束写回权威文档和 ADR。</p><div class="day-out"><b>产出：</b>唯一可实现的事件契约</div></article>
-          <article class="day"><div class="day-no">Day 2</div><h3>实现 strict schema</h3><p>完成 ULID、信封 parser、discriminated union 与额外字段拒绝测试。</p><div class="day-out"><b>产出：</b>RM-1.1a 完成</div></article>
-          <article class="day"><div class="day-no">Day 3</div><h3>建立 SQLite 事件存储</h3><p>实现 append-only、事务 seq、WAL 与 idempotency token。</p><div class="day-out"><b>产出：</b>RM-1.1b 核心性质</div></article>
-          <article class="day"><div class="day-no">Day 4</div><h3>验证并发与恢复</h3><p>覆盖多写者、重复提交、损坏恢复与进程重启。</p><div class="day-out"><b>产出：</b>可靠事件真相源</div></article>
-          <article class="day"><div class="day-no">Day 5</div><h3>接入重放与 reducer</h3><p>实现事件总线、注册机制，并证明增量投影与从首条事件重放一致。</p><div class="day-out"><b>产出：</b>RM-1.1c 纵向切片</div></article>
-        </div>
-      </section>
-
-      <section id="checklist">
-        <div class="section-head">
-          <div><div class="section-kicker">Local checklist</div><h2>开始前后的完成清单</h2></div>
-          <p class="section-desc">勾选状态只保存在这个浏览器的 localStorage，不会写回项目，也不代表 canonical 计划已经改变。</p>
-        </div>
-        <div class="check-panel" id="checks">
-          <label class="check-row"><input class="check" type="checkbox" data-key="verify"><span><span class="check-title">完整 verify 恢复绿色</span><span class="check-sub">build · type contract · Biome · layers · 完整 Vitest 套件</span></span><span class="check-kind">门禁</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="auth"><span><span class="check-title">每条 Hub 路由都有认证</span><span class="check-sub">包括 SSE、MCP、任务、验收与 reset</span></span><span class="check-kind">安全</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="identity"><span><span class="check-title">caller 不再来自调用 payload</span><span class="check-sub">身份由连接／token/session 推导</span></span><span class="check-kind">信任边界</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="evidence"><span><span class="check-title">context 实验走真实 Hub 路径</span><span class="check-sub">1200 条 haystack 的结论可迁移到日常 Hub</span></span><span class="check-kind">证据</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="regressions"><span><span class="check-title">四个运行时回归缺口已覆盖</span><span class="check-sub">伪造 replyTo · 重启注册 · 快速重指派 · 空 caller</span></span><span class="check-kind">测试</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="local-slice"><span><span class="check-title">本地 Agent 调用形成完整事件链</span><span class="check-sub">Hub → Local Runner → Adapter → CLI → MCP / Events → Review</span></span><span class="check-kind">本地闭环</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="adr"><span><span class="check-title">Hub v2 已有 superseding ADR</span><span class="check-sub">拓扑、存储位置、runner、session 都有唯一答案</span></span><span class="check-kind">决策</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="slice"><span><span class="check-title">同一调用契约已迁移到远程 Agent</span><span class="check-sub">Remote 只替换 transport，核心事件序列与本地一致</span></span><span class="check-kind">远程调用</span></label>
-          <label class="check-row"><input class="check" type="checkbox" data-key="measurement"><span><span class="check-title">跨机器延迟、恢复和失败模式已记录</span><span class="check-sub">用测量决定下一步，不凭直觉扩设计</span></span><span class="check-kind">测量</span></label>
-        </div>
-      </section>
-
-      <section id="boundaries">
-        <div class="section-head">
-          <div><div class="section-kicker">Scope control</div><h2>现在不要做什么，以及必须拍板什么</h2></div>
-          <p class="section-desc">Runner 拓扑已经正式化；当前最容易浪费时间的方式，是绕过 Event Core 依赖顺序或再造一份事件规范。</p>
-        </div>
-        <div class="two-col">
-          <article class="plain-card do-not">
-            <h3>暂时不要做</h3>
-            <ul>
-              <li>不要修 spike 的 JSONL 持久化；Phase 1.1b 会用 SQLite + WAL 替换。</li>
-              <li>不要提前做完整 memory/retrieval；先保留不可事后恢复的 provenance 事件。</li>
-              <li>不要重新引入容器、独立 Unix 用户或 credential broker；可信协作者模型已由 owner 选定。</li>
-              <li>不要扩完整桌面 UI；本地与远程调用切片都只需要最小可观察面。</li>
-              <li>不要把“没有 CI”当作当前阻断项；唯一手工门禁已经恢复，并须在每个任务提交前保持全绿。</li>
-            </ul>
-          </article>
-          <article class="plain-card decisions">
-            <h3>已拍板的 Event Core 边界</h3>
-            <ul>
-              <li>Event Core 校验版本化记录形状；领域状态转移和授权仍归上层。</li>
-              <li><code>EventDraft.seq = null</code>；持久事件从正整数 1 开始。</li>
-              <li><code>schemaVersion: 1</code> 和 <code>subject</code> 必填；Spike 日志只可显式迁移。</li>
-              <li>29 类 payload 的必填字段以 event catalog 为唯一权威并完全 strict。</li>
-              <li>未知 version/type fail closed；reducer 只可忽略已知但无关的事件。</li>
-              <li>正式 Event Store 采用 SQLite + WAL；事件不可有损 compact。</li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
-      <section aria-labelledby="sources-title">
-        <div class="section-head">
-          <div><div class="section-kicker">Source of truth</div><h2 id="sources-title">继续阅读</h2></div>
-          <p class="section-desc">本页只帮助选择，不取代这些文档。</p>
-        </div>
-        <div class="sources">
-          <a class="source-chip" href="HANDOFF.md">HANDOFF · 最新执行意图</a>
-          <a class="source-chip" href="todo.html">todo.html · 完整工作清单</a>
-          <a class="source-chip" href="docs/development/roadmap.md">roadmap · 正式阶段顺序</a>
-          <a class="source-chip" href="apps/chat-spike/FINDINGS.md">FINDINGS · 实验依据</a>
-          <a class="source-chip" href="docs/decisions/ADR-008-server-hub-local-first-runners.md">ADR-008 · 当前 Runner 拓扑</a>
-          <a class="source-chip" href="docs/decisions/ADR-009-versioned-strict-event-contract.md">ADR-009 · 版本化事件契约</a>
-          <a class="source-chip" href="docs/design/design-language.md">design-language · 视觉规范</a>
-        </div>
-      </section>
-
-      <footer class="foot">
-        <span>Agent OS · 下一步决策导航</span>
-        <span>这是决策辅助视图，不是新的 canonical roadmap · 更新于 2026-08-23</span>
-      </footer>
-    </div>
+    <small>当前原则：复用既有 Hub / Runner / adapter 执行底座；Herdr 只作产品交互参考；先交付常规 Code Agent 入口。</small>
   </main>
-</div>
-
-<script>
-const routes={
-  balanced:{badge:"推荐",title:"先签收 Server Hub 部署边界",desc:"保持 Event Contract 全绿，先完成受信部署、备份恢复和 Windows 联调，再按依赖顺序落地 SQLite Event Store。",steps:[
-    ["RM-1.1a · 事件契约","version-first、ULID、29 类 strict union","✓"],
-    ["SVR-02 · Ubuntu Hub","受信 admin kit、事务安装、candidate 隔离","当前"],
-    ["SVR-03～06 · 跨机验收","备份恢复、Windows Worker、故障演练","后续"],
-    ["RM-1.1b · SQLite store","实现事务 seq、WAL 与幂等 token","Server 后"],
-    ["RM-1.1c · Replay + reducers","证明从首条事件重放与增量投影一致","随后"]]},
-  daily:{badge:"最快见效",title:"优先完成可部署的远程协作环境",desc:"把已经通过的 Hub / Runner runtime 放进受控 Ubuntu 部署和真实 Windows Worker，再继续正式存储。",steps:[
-    ["RM-1.1a · Strict envelope","正式输入边界、ULID 与 29 类 schema","✓"],
-    ["SVR-02 · Ubuntu Hub","非 root runtime 与 HTTPS 部署事务","当前"],
-    ["SVR-04 · Windows Worker","ACL、进程树、最小环境和真实 CLI","后续"],
-    ["SVR-05/06 · 联调与故障演练","重启恢复、过期 lease、资源边界","后续"],
-    ["RM-1.1b · SQLite store","替换 throwaway JSONL","Server 后"]]},
-  core:{badge:"正式内核",title:"从已完成 schema 继续 Phase 1",desc:"服务器路线完成后，把 store、bus、task lifecycle 和 MCP 逐层做成机器守住的性质。",steps:[
-    ["RM-1.1a schema + ULID","未知版本、类型和额外字段全部拒绝","✓"],
-    ["RM-1.1b SQLite store","并发 append 与幂等重试","下一正式项"],
-    ["RM-1.1c bus + replay","增量与全量归约一致","1–2d"],
-    ["RM-1.2a task matrix","覆盖完整状态转移和依赖图","2d"],
-    ["RM-1.3a strict MCP","把已验证的 Hub 工具正式化","2–3d"]]}
-};
-const routeList=document.querySelector("#route-list");
-function setMode(mode){
-  const data=routes[mode];
-  document.querySelectorAll(".mode-btn").forEach((b)=>b.setAttribute("aria-pressed",String(b.dataset.mode===mode)));
-  document.querySelector("#mode-badge").textContent=data.badge;
-  document.querySelector("#mode-title").textContent=data.title;
-  document.querySelector("#mode-desc").textContent=data.desc;
-  routeList.replaceChildren(...data.steps.map((step,index)=>{
-    const row=document.createElement("div");row.className="route-row";
-    const num=document.createElement("span");num.className="route-num";num.textContent=String(index+1).padStart(2,"0");
-    const copy=document.createElement("span");const title=document.createElement("b");title.textContent=step[0];const desc=document.createElement("p");desc.textContent=step[1];copy.append(title,desc);
-    const effort=document.createElement("span");effort.className="route-effort";effort.textContent=step[2];row.append(num,copy,effort);return row;
-  }));
-  localStorage.setItem("agent-os-next-mode",mode);
-}
-document.querySelectorAll(".mode-btn").forEach((b)=>b.addEventListener("click",()=>setMode(b.dataset.mode)));
-setMode(localStorage.getItem("agent-os-next-mode") in routes?localStorage.getItem("agent-os-next-mode"):"balanced");
-
-const root=document.documentElement;
-const savedTheme=localStorage.getItem("agent-os-next-theme");
-if(savedTheme)root.dataset.theme=savedTheme;
-document.querySelector("#theme").addEventListener("click",()=>{
-  root.dataset.theme=root.dataset.theme==="dark"?"light":"dark";
-  localStorage.setItem("agent-os-next-theme",root.dataset.theme);
-});
-const density=document.querySelector("#density");
-if(localStorage.getItem("agent-os-next-density")==="compact")document.body.classList.add("compact");
-density.addEventListener("click",()=>{
-  document.body.classList.toggle("compact");
-  localStorage.setItem("agent-os-next-density",document.body.classList.contains("compact")?"compact":"comfortable");
-});
-
-document.querySelectorAll(".check").forEach((box)=>{
-  box.checked=localStorage.getItem(`agent-os-next-check-${box.dataset.key}`)==="1";
-  box.addEventListener("change",()=>localStorage.setItem(`agent-os-next-check-${box.dataset.key}`,box.checked?"1":"0"));
-});
-
-const links=[...document.querySelectorAll(".nav-link[href^='#']")];
-const sections=links.map((link)=>document.querySelector(link.getAttribute("href"))).filter(Boolean);
-const observer=new IntersectionObserver((entries)=>{
-  const visible=entries.filter((e)=>e.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];
-  if(!visible)return;
-  links.forEach((link)=>link.classList.toggle("active",link.getAttribute("href")===`#${visible.target.id}`));
-},{rootMargin:"-18% 0px -70%",threshold:[0,.2,.5]});
-sections.forEach((section)=>observer.observe(section));
-</script>
 </body>
 </html>

@@ -129,6 +129,7 @@ causal edges. See
 | --- | --- |
 | Revival Mode | The welcome-back report for a dormant project |
 | Agent context | Injecting prior decisions into a new task's shared context |
+| Code Conversation | Rebuilding relevant project context when a visible session starts cold |
 | Knowledge Graph | Nodes and edges of the graph view inside Memory |
 | Project Pulse | Knowledge Updates section |
 
@@ -142,6 +143,13 @@ dependency scope. Superseded decisions remain readable through Memory but are
 not injected beside their replacement. Accepted upstream outputs use the same
 scope; there is no small recency limit. See
 [ADR-023](../decisions/ADR-023-relevance-bounded-task-context.md).
+
+ADR-047 adds a direct Code Conversation consumer, but it does not authorize a
+naive whole-project dump or reusing an arbitrary previous Task id. The
+Conversation / Run contract must define an explicit relevance scope and
+runtime-owned source authority before the live Chat Spike composition claims
+memory continuity. A resident Vendor Session may improve latency; it is never
+the memory correctness mechanism.
 
 ## Consequences
 

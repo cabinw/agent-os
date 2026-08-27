@@ -1,6 +1,6 @@
 # ADR-003: Seven Top-Level Destinations
 
-Status: accepted
+Status: accepted; landing hierarchy superseded by ADR-047
 
 ## Context
 
@@ -30,7 +30,11 @@ Three candidates are folded in rather than given a slot:
 | Project Info | Project Detail | Its content is per-project metadata. A global slot whose meaning changes with selection is a worse home than the project itself. |
 | Knowledge Graph | Memory, as a view toggle | The graph is a rendering of memory, not a separate corpus. Separating them makes the user choose a visualization before choosing a question. |
 
-Landing: Project Library with no active project, Project Pulse with one.
+The original landing was Project Library with no active project and Project
+Pulse with one. ADR-047 supersedes that landing: a project-bound Code Agent
+session is primary, while these seven destinations remain sourced secondary
+project-intelligence views. Its stable shell-root id `execution` sits outside
+the destination array; it is not an eighth project-data domain.
 
 ## Alternatives
 

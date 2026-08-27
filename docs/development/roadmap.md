@@ -4,7 +4,27 @@
 plan, Phase 6 bootstrap and Phase 6 roadmap — four documents describing the same
 scope under three numbers.
 
-## Current execution track
+## Current product-entry track
+
+The formal kernel, memory, human surfaces, Local / Remote Runner and production
+deployment tracks are implemented. Real first-use testing reopened the product
+entry: the existing Pulse / New task shell is not a conventional Code Agent
+workflow. ADR-047 fixes the new order.
+
+| Order | Status | Deliverable | Done when |
+| --- | --- | --- | --- |
+| ENTRY-0 | done | Product decision and cold handoff | ADR-047, canonical docs, board and `HANDOFF.md` agree |
+| ENTRY-1 | in progress (15%) | Conversation / Run contract | Conversation, Run, Vendor Session and optional Task have non-overlapping identity, lifecycle and replay semantics; two Conversations cannot share a vendor handle |
+| ENTRY-2 | pending | Project placement and readiness | Stable Project id maps `(project, runnerHost)` to an authorized working copy; readiness covers executable, auth, Runner, workspace and capacity facts |
+| ENTRY-3 | pending | One product entry and local vertical slice | `apps/macos` route `execution` runs at least one real Codex or Claude safely in the selected workspace; 4173 remains diagnostic |
+| ENTRY-4 | pending | Execution evidence and memory | Changed files, tests, accepted outputs and decisions are sourced, inspectable and available to a later cold session |
+| ENTRY-5 | pending | Remote and multi-agent exposure | The same entry can place work remotely and show delegation without turning team setup into first-use configuration |
+
+ENTRY-1 through ENTRY-4 are the only active product route. Do not start ENTRY-5
+until the local first-use browser journey passes. See
+[HANDOFF](../../HANDOFF.md) for the exact acceptance path.
+
+## Completed foundation track
 
 The executable chat spike precedes the formal package phases. ADR-008 fixes this
 order; Remote Runner work does not start until Local Runner semantics pass.
@@ -16,9 +36,9 @@ order; Remote Runner work does not start until Local Runner semantics pass.
 | L | done | Add injectable Hub → Local Runner vertical slice | A real subprocess crosses Hub → Runner → adapter, records its reply and recovers after failure |
 | C | done | Finish the shared Runner contract; remove direct-adapter fallback | Session, event stream, cancellation, retry, error and liveness cases have transport-neutral tests; Hub requires a Runner |
 | R | done | Remote Runner transport | The Local acceptance task runs unchanged; the normalized event sequence matches |
-| 1.1a | done | Versioned strict Event Contract | The v1 envelope, 29 payloads, ULID, subject rules and type contract live in `packages/event-core` |
-| SVR | active | Server Hub deployment and Windows Worker validation | Trusted deployment, recovery and real cross-host evidence pass without weakening HTTPS or identity boundaries |
-| 1.1b | next | SQLite Event Store | Transactional sequence allocation and idempotent append replace the throwaway JSONL truth source |
+| 1.1a | done | Versioned strict Event Contract | The v1 envelope, current 38 payload types, ULID, subject rules and type contract live in `packages/event-core` |
+| SVR | done | Server Hub deployment and Windows Worker validation | Trusted deployment, recovery and real cross-host evidence pass without weakening HTTPS or identity boundaries |
+| 1.1b | done | SQLite Event Store | Transactional sequence allocation and idempotent append replace the throwaway JSONL truth source in the formal kernel |
 
 The Hub is the server control plane and dispatches only. Project working copies,
 vendor credentials and adapters stay on Runners. See
@@ -65,8 +85,9 @@ replayed projections to match. See
 | 2.4 | `get_context` — active decisions and upstream outputs |
 | 2.5 | Query and graph API |
 
-Phase 2 is where the product becomes different from a task tracker. Do not defer
-it to chase UI.
+Phase 2 is implemented in the formal packages. ENTRY-4 must connect that memory
+to the live Code Agent composition; package completion alone is not product
+integration.
 
 ## Phase 3 — Human surfaces
 
@@ -93,12 +114,13 @@ land in Phase 1 alongside the other reducers; only the surface waits for Phase 3
 ## Phase 5 — Multi-agent depth
 
 Agent negotiation, multi-agent planning, autonomous routing, performance
-analytics. Deliberately last: each of these is only meaningful once the log,
-memory and approval gate are trustworthy.
+analytics. These foundations are implemented. ADR-047 changes how they appear:
+delegation stays an execution strategy behind a primary Code Agent session
+rather than first-use team configuration.
 
 ## Package sequencing rule
 
-Build downward-dependency-first: `event-core` → `task-engine` → `mcp-server` →
-`agent-sdk` → `memory-core` → UI. A UI built before the reducers exist will
-invent state, and that state will be wrong. This is the dependency order inside
-the formal packages; it does not reverse the current spike track above.
+Build permanent domain changes downward-dependency-first: `event-core` →
+`task-engine` → `mcp-server` → `agent-sdk` → `memory-core` → UI. The ENTRY track
+is a vertical integration over implemented packages; any new Conversation / Run
+fact still follows catalog → reducer → replay test → emitter → UI.

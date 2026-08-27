@@ -2,6 +2,11 @@
 
 Status: accepted
 
+Product-entry clarification: ADR-047 selects the existing Chat Spike/Hub as the
+starting point for the interactive Code Agent entry. The rejection below still
+applies to using Spike internals as proof of the formal deterministic Phase 1
+composition or copying its pre-v1 contracts into formal packages.
+
 ## Context
 
 Phase 1 has formal Event Core, SQLite store, Task Engine, MCP boundary, Agent

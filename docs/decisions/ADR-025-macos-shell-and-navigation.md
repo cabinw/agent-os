@@ -1,6 +1,6 @@
 # ADR-025: The macOS Shell Has One Canonical Navigation Contract
 
-Status: accepted
+Status: accepted; landing and always-primary sidebar superseded by ADR-047
 
 ## Context
 
@@ -21,8 +21,12 @@ not satisfy the desktop-shell requirement.
 `apps/macos` is a pnpm workspace with React, TypeScript and Vite inside a Tauri
 2 shell. Rust exists only under `apps/macos/src-tauri/` and contains Tauri
 startup/window code. It imports no domain implementation, Event Store or native
-SQLite driver. The frontend is a future authenticated Hub client; RM-3.1 uses
-local typed fixtures only to prove shell states.
+SQLite driver. The frontend is now an authenticated Hub client; RM-3.1 initially
+used local typed fixtures to prove shell states.
+
+ADR-047 makes this frontend the single product client for browser development
+and Tauri. The Chat Spike 4173 HTML remains a diagnostic prototype, not a second
+product shell.
 
 The Tauri window uses platform decorations and a visible native title bar,
 rather than drawing traffic lights in HTML. Initial content is 1440×900, minimum
@@ -43,10 +47,17 @@ Each item owns a stable id, bilingual externalized label and one local icon
 identifier. Runtime, Project Info and Knowledge Graph cannot appear as top-level
 items. Memory list/graph and Agents roster/threads remain internal view toggles.
 
-With no active project, the selected route is Project Library. With an active
-project, it is Project Pulse. RM-3.1 implements in-memory route selection without
-fabricating server state; later Hub routing may synchronize the same ids to a
-URL. The sidebar remains visible and 220px wide at every supported window size.
+RM-3.1 selected Project Library without an active project and Project Pulse with
+one, with a persistent 220px sidebar. ADR-047 supersedes those entry and
+hierarchy rules. The project-bound Code Agent session has stable shell-root id
+`execution`, outside `NAVIGATION`. The exact seven route ids remain the
+secondary project map and must stay accessible, but the execution workspace may
+collapse or relocate that map at supported widths.
+
+Browser project selection chooses only Runner-authorized `(project, host)`
+placements. If the native client later adds a path picker, its filesystem/IPC
+capability is narrow, introduced with ENTRY-2 and feeds Runner admission; broad
+filesystem or shell access remains forbidden.
 
 ### Design tokens and components
 
@@ -62,10 +73,12 @@ figures. Status tokens are used only for real status. Focus is visible,
 navigation is keyboard-operable, and every icon-only control has an accessible
 name.
 
-The shell renders a persistent sidebar, native-titlebar-safe content region,
-route heading and an honest surface state. Unimplemented Phase 3 destinations
-show a bilingual “surface foundation ready / live projection pending” state;
-they do not invent task counts, agents, risks or completion data.
+The RM-3.1 project-intelligence shell renders a persistent sidebar,
+native-titlebar-safe content region, route heading and an honest surface state.
+ADR-047 permits the execution home to collapse or relocate that sidebar while
+keeping the seven routes reachable. Unimplemented destinations show a bilingual
+“surface foundation ready / live projection pending” state; they do not invent
+task counts, agents, risks or completion data.
 
 ### Verification
 
@@ -73,6 +86,10 @@ The frontend gate is TypeScript no-emit, Vitest DOM-free contract tests and Vite
 production build. Static tests assert exact navigation ids/order, externalized
 labels, canonical token values, no forbidden top-level destinations, no literal
 component colors and no SQLite/native Hub dependency in the UI package.
+
+ENTRY adds a separate assertion for the `execution` shell root and continued
+access to all seven secondary ids. It does not add `execution` to the frozen
+project-intelligence array.
 
 The native gate is `cargo check --manifest-path apps/macos/src-tauri/Cargo.toml`
 and `tauri build --debug --no-bundle`; the latter proves the production Vite
@@ -96,8 +113,9 @@ belongs with live Hub navigation.
 **Copy color values into CSS Modules.** Rejected: design-language tokens are
 canonical and literal component values guarantee drift.
 
-**Collapse the sidebar at minimum width.** Rejected by the design language. The
-minimum native window width protects the fixed product map.
+**Remove the project map from the execution home.** Rejected: the seven sourced
+destinations remain required. ADR-047 permits collapsing or relocating their
+navigation; it does not permit making them unreachable.
 
 **Grant broad Tauri capabilities for future work.** Rejected: permissions are
 added with the feature that needs them, never speculatively.
@@ -105,6 +123,8 @@ added with the feature that needs them, never speculatively.
 ## Consequences
 
 - Every later human surface shares one shell, route id set and token source.
+- The execution home is one additional shell root, not an eighth data domain or
+  a second frontend.
 - Native Rust remains auditable and cannot become a second domain layer.
 - The first UI is intentionally honest and sparse; product data lands in RM-3.2+
   rather than as demo numbers that look authoritative.

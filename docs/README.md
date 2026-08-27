@@ -2,7 +2,9 @@
 
 ## Reading order
 
-New to the project: [vision](vision.md) → [architecture/overview](architecture/overview.md) →
+New to the project: [vision](vision.md) →
+[ADR-047](decisions/ADR-047-code-session-first-product-entry.md) →
+[architecture/overview](architecture/overview.md) →
 [ADR-008](decisions/ADR-008-server-hub-local-first-runners.md) →
 [ADR-009](decisions/ADR-009-versioned-strict-event-contract.md) →
 [protocol/event-catalog](protocol/event-catalog.md) →
@@ -21,7 +23,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [supervisor-agent](architecture/supervisor-agent.md) | The AI project manager |
 | [memory](architecture/memory.md) | Events → knowledge → project memory |
 | [packages](architecture/packages.md) | Monorepo layout and dependency direction |
-| [data-model](architecture/data-model.md) | Project / Goal / Task / Agent / Event / Knowledge |
+| [data-model](architecture/data-model.md) | Existing object spine and the Conversation / Run identity gap |
 
 ### Protocol
 
@@ -112,6 +114,7 @@ New to the project: [vision](vision.md) → [architecture/overview](architecture
 | [ADR-044](decisions/ADR-044-allowlisted-admin-kit-generation-upgrade.md) | Explicit 25-file administrator-kit generation edges and atomic rollback |
 | [ADR-045](decisions/ADR-045-offline-publisher-signatures.md) | Offline-root publisher policy, artifact envelopes, rotation and revocation |
 | [ADR-046](decisions/ADR-046-human-web-sessions-and-loopback-bootstrap.md) | HttpOnly human web sessions and zero-configuration local bootstrap |
+| [ADR-047](decisions/ADR-047-code-session-first-product-entry.md) | Project-bound Code Agent session is the product entry; existing Hub / Runner remains the substrate |
 
 ## Assets
 

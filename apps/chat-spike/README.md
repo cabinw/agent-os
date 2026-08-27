@@ -1,12 +1,23 @@
 # chat-spike
 
-A protocol spike, not a product. It exists to answer questions that only running
-code can answer, and it is expected to be partly thrown away.
+The executable Hub / Runner laboratory and backend starting point for the
+Code-session product entry refactor. `apps/macos` is the single product client;
+the 4173 page in this package remains diagnostic.
+
+It began as a protocol spike and still contains disposable scaffolding. Its
+JSONL store, monolithic browser file and pre-formal domain shapes are not
+canonical. The measured dispatch path, Runner / adapter boundary, authenticated
+Hub, vendor sessions and thread behavior are production-relevant assets and must
+not be rebuilt merely because this directory retains the `spike` name.
 
 It is also the executable baseline for
 [ADR-008](../../docs/decisions/ADR-008-server-hub-local-first-runners.md): first
 route a real CLI through a Local Runner contract, then move the same contract
 behind a Remote Runner transport.
+
+[ADR-047](../../docs/decisions/ADR-047-code-session-first-product-entry.md)
+selects this composition as the implementation starting point for a
+project-bound Codex / Claude-style entry. Herdr is not part of that stack.
 
 ## What it proves
 
@@ -14,7 +25,7 @@ behind a Remote Runner transport.
 running the thing showed that is only half of it.
 
 ```
-wake       browser ──POST /send──▶ server ──▶ Adapter ──▶ vendor CLI
+wake       browser ──POST /say───▶ server ──▶ Adapter ──▶ vendor CLI
                                                               │
 participate  agent ──MCP──▶ bin/agent-os-mcp.mjs ──▶ tools ──▶ event log
 ```
@@ -110,11 +121,11 @@ with its working directory pinned to `apps/chat-spike/workspace/`.
 
 ## Four vendors
 
-Codex, Claude, Grok and Kimi all run behind one adapter contract — switch in the
-header. Measurements and the full comparison are in
-[FINDINGS.md](FINDINGS.md); the short version is that they differ on three of
-four integration capabilities, so adapters **declare** what they can do and the
-UI branches on the declaration:
+Codex, Claude, Grok and Kimi all run behind one adapter contract — select a
+target card in the diagnostic page. Measurements and the full comparison are in
+[FINDINGS.md](FINDINGS.md); they differ across five observed integration
+dimensions, so adapters **declare** what they can do and UI behavior follows the
+declaration:
 
 | | participates | streaming | reasoning | session | usage |
 | --- | --- | --- | --- | --- | --- |
@@ -123,8 +134,9 @@ UI branches on the declaration:
 | Grok | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Kimi | ✅ | ❌ | ❌ | ✅ | ❌ |
 
-Switching provider keeps the transcript and drops the vendor session — the
-cheapest demonstration of why context belongs in the log.
+Changing the target keeps the shared transcript and each Agent's current vendor
+session. That legacy session is keyed by `(user, project, agent)`; ADR-047 must
+isolate it by visible Conversation before the product supports more than one.
 
 ## Measured behaviour
 
@@ -248,30 +260,53 @@ Two rules it enforces, both testable:
 Live-only signals — token deltas, reasoning, progress — bypass the log by
 design. They are previews; the logged `message.sent` is the fact.
 
-`log.mjs` is the throwaway part: RM-1.1b replaces JSONL with SQLite + WAL,
-transactional seq allocation and idempotency tokens. RM-1.1d adds projection
-snapshots as a disposable sidecar cache. Nothing above this file knows how
-events are stored.
+`log.mjs` is the throwaway part. Formal RM-1.1b already implements SQLite + WAL,
+transactional seq allocation and idempotency tokens, and RM-1.1d implements
+projection snapshots as a disposable sidecar cache. The live Spike composition
+has not adopted them; package completion is not a production migration.
 
 ## What is deliberately absent
 
-A formal Supervisor agent, memory extraction, the general risk-approval
-workflow, the seven screens and Tauri. The spike has only the task and human
-review behavior needed to prove the Hub / Runner boundary.
+The live composition still lacks formal memory integration, a durable
+Conversation / Run model, project selection, structured diff / test evidence and
+the general risk-approval workflow. Formal packages and the seven sourced
+management surfaces exist elsewhere; package completion does not mean these
+features are connected to the direct Code Agent conversation.
 
 ## Expected to survive
 
-The shared Runner / adapter contract, tool schemas and validation semantics, and
-the thread reducer — `src/thread.mjs` is already shared verbatim with the
-browser, which imports it rather than reimplementing it. `server.mjs`'s current
-co-located orchestration and `log.mjs` are scaffolding.
+The authenticated Hub session, shared Runner / adapter contract, tool schemas,
+validation semantics and measured vendor-session behavior survive. The Spike
+browser imports `src/thread.mjs`, but ADR-018 explicitly rejects that approximate
+reducer as canonical; the product consumes
+`packages/task-engine/src/conversation.ts`. `server.mjs`'s co-located
+orchestration, `public/index.html` and `log.mjs` remain scaffolding or diagnostic
+surfaces.
+
+## Product-entry work
+
+The next milestone does not add another execution substrate. It must:
+
+1. distinguish Conversation, Run, Vendor Session and optional Task;
+2. bind stable Project identity to a trusted `(project, runnerHost)` workspace
+   placement;
+3. expose sourced executable/auth/Runner/workspace/capacity readiness before
+   accepting a prompt;
+4. define a workspace-scoped write policy for at least one Agent without global
+   auto-approval; the current Codex adapter is intentionally read-only;
+5. persist Run terminal state and cancellation rather than relying on live SSE;
+6. connect structured execution evidence and project memory;
+7. make `apps/macos` the one authenticated product entry while retaining the
+   seven sourced views as secondary surfaces; keep 4173 diagnostic.
+
+See the repository [HANDOFF](../../HANDOFF.md) for acceptance and guardrails.
 
 ## Next execution order
 
 1. **Done:** protect every capable Hub route with authenticated principals.
 2. **Done:** Local Runner foundation — strict dispatch, normalized events /
    result / error, real subprocess, workspace containment and persistent
-   `(user, project, agent)` sessions.
+   legacy `(user, project, agent)` sessions.
 3. **Done:** the Hub supports injected Local Runner dispatch; normalized
    streaming, task review, failure and queue recovery have vertical-slice
    coverage.
@@ -281,7 +316,9 @@ co-located orchestration and `log.mjs` are scaffolding.
    acceptance task through the Hub, authenticated transport and Worker entry.
 6. **Done:** move the versioned strict Event Contract into
    `packages/event-core` (`RM-1.1a`).
-7. **Active:** harden and validate Server Hub deployment, recovery and the
-   Windows Worker path (`SVR-02` through `SVR-06`).
-8. **Next:** replace the throwaway JSONL truth source with the SQLite Event
-   Store (`RM-1.1b`).
+7. **Done:** harden and validate Server Hub deployment, recovery and the Windows
+   Worker path (`SVR-02` through `SVR-06`).
+8. **Done:** implement the formal SQLite Event Store and remaining Event Core,
+   Task, MCP, SDK, memory and human-surface phases.
+9. **Active:** define the Conversation / Run contract, then bind this executable
+   composition to a real selected project (`ENTRY-1` through `ENTRY-4`).
